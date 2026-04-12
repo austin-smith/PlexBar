@@ -5,7 +5,9 @@ enum AppConstants {
     static let bundleIdentifier = "com.crapshack.PlexBar"
     static let productVersion = "0.1.0"
     static let settingsWindowID = "settings"
-    static let defaultPollInterval: Duration = .seconds(15)
+    static let defaultPollIntervalSeconds = 15
+    static let minimumPollIntervalSeconds = 5
+    static let maximumPollIntervalSeconds = 300
 }
 
 enum KeychainAccounts {

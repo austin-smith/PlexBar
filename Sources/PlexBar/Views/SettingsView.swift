@@ -3,107 +3,168 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var settingsStore: PlexSettingsStore
     @Bindable var authStore: PlexAuthStore
+    @Bindable var sessionStore: PlexSessionStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(titleText)
-                    .font(.title2.weight(.semibold))
+        if settingsStore.hasAuthenticatedAccount {
+            authenticatedView
+        } else {
+            unauthenticatedView
+        }
+    }
 
-                Text(descriptionText)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: 360, alignment: .leading)
+    // MARK: - Authenticated
 
-            VStack(alignment: .leading, spacing: 12) {
-                Button(settingsStore.hasAuthenticatedAccount ? "Reconnect Plex" : "Sign In With Plex") {
-                    authStore.startSignIn()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(authStore.isAuthenticating)
-
-                if settingsStore.hasAuthenticatedAccount {
-                    HStack(spacing: 10) {
-                        Button("Refresh Servers") {
-                            Task {
-                                await authStore.refreshServers(autoSelectStoredServer: true)
-                            }
+    private var authenticatedView: some View {
+        VStack(spacing: 0) {
+            Form {
+                Picker("Server", selection: selectedServerBinding) {
+                    if authStore.availableServers.isEmpty {
+                        Text("No servers available").tag("")
+                    } else {
+                        ForEach(authStore.availableServers) { server in
+                            Text(server.name).tag(server.id)
                         }
-                        .buttonStyle(.bordered)
-                        .disabled(authStore.isAuthenticating || authStore.isLoadingServers)
-
-                        Button("Sign Out") {
-                            authStore.signOut()
-                        }
-                        .buttonStyle(.bordered)
                     }
+                }
+
+                LabeledContent("Connected URL") {
+                    Text(settingsStore.serverURLString.nilIfBlank ?? "None")
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .multilineTextAlignment(.trailing)
+                }
+
+                Picker("Refresh Interval", selection: pollIntervalBinding) {
+                    Text("5 seconds").tag(5)
+                    Text("10 seconds").tag(10)
+                    Text("15 seconds").tag(15)
+                    Text("30 seconds").tag(30)
+                    Text("1 minute").tag(60)
+                    Text("2 minutes").tag(120)
+                    Text("5 minutes").tag(300)
+                }
+            }
+            .formStyle(.grouped)
+
+            Divider()
+
+            HStack(spacing: 8) {
+                if authStore.isLoadingServers {
+                    ProgressView()
+                        .controlSize(.small)
                 }
 
                 if let statusMessage = authStore.statusMessage {
                     Text(statusLine(statusMessage))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
                 }
 
                 if let errorMessage = authStore.errorMessage {
                     Text(errorMessage)
                         .font(.footnote)
                         .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(1)
                 }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
-            if settingsStore.hasAuthenticatedAccount {
-                Form {
-                    Picker("Server", selection: selectedServerBinding) {
-                        if authStore.availableServers.isEmpty {
-                            Text("No servers available").tag("")
-                        } else {
-                            ForEach(authStore.availableServers) { server in
-                                Text(server.name).tag(server.id)
-                            }
-                        }
-                    }
+                Spacer()
 
-                    LabeledContent("Connected URL") {
-                        Text(settingsStore.serverURLString.nilIfBlank ?? "None")
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.trailing)
+                Button("Reconnect") {
+                    authStore.startSignIn()
+                }
+                .buttonStyle(.bordered)
+                .disabled(authStore.isAuthenticating)
+
+                Button("Refresh Servers") {
+                    Task {
+                        await authStore.refreshServers(autoSelectStoredServer: true)
                     }
                 }
-                .formStyle(.grouped)
+                .buttonStyle(.bordered)
+                .disabled(authStore.isAuthenticating || authStore.isLoadingServers)
 
-                if authStore.isLoadingServers {
-                    ProgressView("Loading Plex servers…")
-                        .controlSize(.small)
+                Button("Sign Out") {
+                    authStore.signOut()
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .frame(width: 480)
+    }
+
+    // MARK: - Unauthenticated
+
+    private var unauthenticatedView: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            VStack(spacing: 20) {
+                Image(systemName: "popcorn.fill")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.secondary)
+
+                VStack(spacing: 6) {
+                    Text("Connect Plex")
+                        .font(.title2.weight(.semibold))
+
+                    Text("Sign in with your Plex account to connect PlexBar.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+
+                Button("Sign In With Plex") {
+                    authStore.startSignIn()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(authStore.isAuthenticating)
+
+                if let statusMessage = authStore.statusMessage {
+                    Text(statusLine(statusMessage))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let errorMessage = authStore.errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
                 }
             }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 40)
+
+            Spacer()
         }
-        .padding(20)
-        .frame(width: settingsStore.hasAuthenticatedAccount ? 500 : 420, alignment: .leading)
+        .frame(width: 400, height: 280)
     }
 
-    private var titleText: String {
-        settingsStore.hasAuthenticatedAccount ? "Choose Server" : "Connect Plex"
-    }
-
-    private var descriptionText: String {
-        if settingsStore.hasAuthenticatedAccount {
-            return "Choose the Plex Media Server PlexBar should watch for active streams."
-        }
-
-        return "Sign in with your Plex account to connect PlexBar."
-    }
+    // MARK: - Helpers
 
     private var selectedServerBinding: Binding<String> {
         Binding(
             get: { settingsStore.selectedServerIdentifier ?? "" },
             set: { authStore.selectServer(withID: $0) }
+        )
+    }
+
+    private var pollIntervalBinding: Binding<Int> {
+        Binding(
+            get: { settingsStore.pollIntervalSeconds },
+            set: { newValue in
+                guard settingsStore.pollIntervalSeconds != newValue else {
+                    return
+                }
+
+                settingsStore.pollIntervalSeconds = newValue
+                sessionStore.restartPolling()
+            }
         )
     }
 

@@ -9,6 +9,7 @@ final class PlexSettingsStore {
         static let clientIdentifier = "plex.clientIdentifier"
         static let selectedServerIdentifier = "plex.selectedServerIdentifier"
         static let selectedServerName = "plex.selectedServerName"
+        static let pollIntervalSeconds = "plex.pollIntervalSeconds"
     }
 
     private let defaults: UserDefaults
@@ -44,6 +45,18 @@ final class PlexSettingsStore {
         }
     }
 
+    var pollIntervalSeconds: Int {
+        didSet {
+            let normalizedValue = Self.normalizedPollIntervalSeconds(pollIntervalSeconds)
+            if pollIntervalSeconds != normalizedValue {
+                pollIntervalSeconds = normalizedValue
+                return
+            }
+
+            defaults.set(normalizedValue, forKey: DefaultsKeys.pollIntervalSeconds)
+        }
+    }
+
     let clientIdentifier: String
 
     init(defaults: UserDefaults = .standard, keychain: KeychainStore = KeychainStore(service: AppConstants.bundleIdentifier)) {
@@ -63,6 +76,9 @@ final class PlexSettingsStore {
         selectedServerName = defaults.string(forKey: DefaultsKeys.selectedServerName)
         userToken = keychain.read(account: KeychainAccounts.userToken) ?? ""
         serverToken = keychain.read(account: KeychainAccounts.serverToken) ?? ""
+        pollIntervalSeconds = Self.normalizedPollIntervalSeconds(
+            defaults.object(forKey: DefaultsKeys.pollIntervalSeconds) as? Int ?? AppConstants.defaultPollIntervalSeconds
+        )
     }
 
     var normalizedServerURL: URL? {
@@ -83,6 +99,10 @@ final class PlexSettingsStore {
 
     var hasAuthenticatedAccount: Bool {
         !trimmedUserToken.isEmpty
+    }
+
+    var pollIntervalDuration: Duration {
+        .seconds(pollIntervalSeconds)
     }
 
     func saveAuthenticatedUserToken(_ token: String) {
@@ -124,5 +144,9 @@ final class PlexSettingsStore {
         }
 
         keychain.write(trimmedToken, account: KeychainAccounts.serverToken)
+    }
+
+    private static func normalizedPollIntervalSeconds(_ value: Int) -> Int {
+        min(max(value, AppConstants.minimumPollIntervalSeconds), AppConstants.maximumPollIntervalSeconds)
     }
 }

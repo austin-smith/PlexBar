@@ -25,7 +25,7 @@ struct PlexBarApp: App {
 
     var body: some Scene {
         Window("PlexBar Settings", id: AppConstants.settingsWindowID) {
-            SettingsView(settingsStore: settingsStore, authStore: authStore)
+            SettingsView(settingsStore: settingsStore, authStore: authStore, sessionStore: sessionStore)
         }
         .defaultSize(width: 420, height: 300)
         .windowResizability(.contentSize)

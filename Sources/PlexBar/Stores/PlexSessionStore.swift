@@ -29,6 +29,12 @@ final class PlexSessionStore {
         }
     }
 
+    func restartPolling() {
+        pollingTask?.cancel()
+        pollingTask = nil
+        startPolling()
+    }
+
     private func startPolling() {
         guard pollingTask == nil else {
             return
@@ -43,7 +49,7 @@ final class PlexSessionStore {
                 await self.refresh()
 
                 do {
-                    try await Task.sleep(for: AppConstants.defaultPollInterval)
+                    try await Task.sleep(for: self.settings.pollIntervalDuration)
                 } catch {
                     return
                 }

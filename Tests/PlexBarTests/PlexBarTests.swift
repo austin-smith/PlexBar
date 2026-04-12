@@ -2,6 +2,45 @@ import Foundation
 import Testing
 @testable import PlexBar
 
+@MainActor
+@Test func defaultsPollIntervalToFifteenSeconds() async throws {
+    let suiteName = "PlexBarTests.defaultsPollIntervalToFifteenSeconds"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let store = PlexSettingsStore(
+        defaults: defaults,
+        keychain: KeychainStore(service: "tests.\(suiteName)")
+    )
+
+    #expect(store.pollIntervalSeconds == AppConstants.defaultPollIntervalSeconds)
+}
+
+@MainActor
+@Test func clampsAndPersistsConfiguredPollInterval() async throws {
+    let suiteName = "PlexBarTests.clampsAndPersistsConfiguredPollInterval"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let store = PlexSettingsStore(
+        defaults: defaults,
+        keychain: KeychainStore(service: "tests.\(suiteName)")
+    )
+
+    store.pollIntervalSeconds = 999
+
+    #expect(store.pollIntervalSeconds == AppConstants.maximumPollIntervalSeconds)
+
+    let reloadedStore = PlexSettingsStore(
+        defaults: defaults,
+        keychain: KeychainStore(service: "tests.\(suiteName)")
+    )
+
+    #expect(reloadedStore.pollIntervalSeconds == AppConstants.maximumPollIntervalSeconds)
+}
+
 @Test func normalizesServerURLAndDropsTrailingSlash() async throws {
     let url = PlexURLBuilder.normalizeServerURL("192.168.1.25:32400/")
 
