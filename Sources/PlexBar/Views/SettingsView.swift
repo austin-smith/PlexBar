@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Bindable var settingsStore: PlexSettingsStore
     @Bindable var authStore: PlexAuthStore
     @Bindable var sessionStore: PlexSessionStore
+    @State private var isShowingServerList = false
 
     var body: some View {
         if settingsStore.hasAuthenticatedAccount {
@@ -18,32 +19,26 @@ struct SettingsView: View {
     private var authenticatedView: some View {
         VStack(spacing: 0) {
             Form {
-                Picker("Server", selection: selectedServerBinding) {
-                    if authStore.availableServers.isEmpty {
-                        Text("No servers available").tag("")
-                    } else {
-                        ForEach(authStore.availableServers) { server in
-                            Text(server.name).tag(server.id)
-                        }
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Server")
+                            .font(.subheadline.weight(.semibold))
+
+                        serverMenu
                     }
+                    .padding(.vertical, 2)
                 }
 
-                LabeledContent("Connected URL") {
-                    Text(settingsStore.serverURLString.nilIfBlank ?? "None")
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .multilineTextAlignment(.trailing)
-                }
-
-                Picker("Refresh Interval", selection: pollIntervalBinding) {
-                    Text("5 seconds").tag(5)
-                    Text("10 seconds").tag(10)
-                    Text("15 seconds").tag(15)
-                    Text("30 seconds").tag(30)
-                    Text("1 minute").tag(60)
-                    Text("2 minutes").tag(120)
-                    Text("5 minutes").tag(300)
+                Section {
+                    Picker("Refresh Interval", selection: pollIntervalBinding) {
+                        Text("5 seconds").tag(5)
+                        Text("10 seconds").tag(10)
+                        Text("15 seconds").tag(15)
+                        Text("30 seconds").tag(30)
+                        Text("1 minute").tag(60)
+                        Text("2 minutes").tag(120)
+                        Text("5 minutes").tag(300)
+                    }
                 }
             }
             .formStyle(.grouped)
@@ -56,13 +51,6 @@ struct SettingsView: View {
                         .controlSize(.small)
                 }
 
-                if let statusMessage = authStore.statusMessage {
-                    Text(statusLine(statusMessage))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
                 if let errorMessage = authStore.errorMessage {
                     Text(errorMessage)
                         .font(.footnote)
@@ -71,12 +59,6 @@ struct SettingsView: View {
                 }
 
                 Spacer()
-
-                Button("Reconnect") {
-                    authStore.startSignIn()
-                }
-                .buttonStyle(.bordered)
-                .disabled(authStore.isAuthenticating)
 
                 Button("Refresh Servers") {
                     Task {
@@ -176,5 +158,121 @@ struct SettingsView: View {
         }
 
         return message
+    }
+
+    private var selectedServer: PlexServerResource? {
+        guard let selectedServerIdentifier = settingsStore.selectedServerIdentifier else {
+            return nil
+        }
+
+        return authStore.availableServers.first(where: { $0.id == selectedServerIdentifier })
+    }
+
+    private var serverMenu: some View {
+        Button {
+            isShowingServerList.toggle()
+        } label: {
+            serverMenuLabel
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $isShowingServerList, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+            serverListPopover
+        }
+    }
+
+    private var serverMenuLabel: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(selectedServer?.name ?? settingsStore.selectedServerName ?? "Choose a Server")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text(selectedServerSubtitle)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 12)
+
+            Image(systemName: "chevron.down")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(.white.opacity(0.08))
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private var serverListPopover: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                if authStore.availableServers.isEmpty {
+                    Text("No servers available")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                } else {
+                    ForEach(authStore.availableServers) { server in
+                        Button {
+                            authStore.selectServer(withID: server.id)
+                            isShowingServerList = false
+                        } label: {
+                            serverListRow(for: server)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(8)
+        }
+        .frame(minWidth: 320, idealWidth: 320, maxWidth: 320, minHeight: 220, idealHeight: 220, maxHeight: 280)
+    }
+
+    @ViewBuilder
+    private func serverListRow(for server: PlexServerResource) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            if settingsStore.selectedServerIdentifier == server.id {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.tint)
+            } else {
+                Image(systemName: "circle")
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(server.name)
+                    .foregroundStyle(.primary)
+
+                Text(server.displayProductVersion ?? "Plex Media Server")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(rowBackground(isSelected: settingsStore.selectedServerIdentifier == server.id))
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var selectedServerSubtitle: String {
+        selectedServer?.displayProductVersion ?? "Plex Media Server"
+    }
+
+    private func rowBackground(isSelected: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+            .fill(isSelected ? Color.white.opacity(0.08) : Color.clear)
     }
 }

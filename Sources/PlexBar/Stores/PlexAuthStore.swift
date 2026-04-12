@@ -70,6 +70,8 @@ final class PlexAuthStore {
             } else if settings.selectedServerIdentifier == nil || !servers.contains(where: { $0.id == settings.selectedServerIdentifier }) {
                 selectServer(servers[0])
             }
+
+            statusMessage = nil
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }

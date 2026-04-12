@@ -58,6 +58,8 @@ struct PlexAuthClient {
                 return nil
             }
 
+            let productVersion = element.attribute(forName: "productVersion")?.stringValue?.nilIfBlank
+
             let connections = (element.elements(forName: "Connection")).compactMap { connection -> PlexServerConnection? in
                 guard let uriString = connection.attribute(forName: "uri")?.stringValue,
                       let uri = URL(string: uriString) else {
@@ -78,6 +80,7 @@ struct PlexAuthClient {
             return PlexServerResource(
                 id: identifier,
                 name: name,
+                productVersion: productVersion,
                 accessToken: accessToken,
                 connections: connections
             )

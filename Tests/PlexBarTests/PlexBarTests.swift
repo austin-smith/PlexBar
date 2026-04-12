@@ -83,6 +83,19 @@ import Testing
     #expect(!absoluteString.contains("forwardUrl="))
 }
 
+@Test func normalizesProductVersionForDisplay() async throws {
+    let server = PlexServerResource(
+        id: "server-123",
+        name: "Home Plex",
+        productVersion: "1.43.1.10611-1e34174b1",
+        accessToken: "server-token",
+        connections: []
+    )
+
+    #expect(server.productVersion == "1.43.1.10611-1e34174b1")
+    #expect(server.displayProductVersion == "1.43.1.10611")
+}
+
 @Test func prefersSeriesPosterForEpisodeSessions() async throws {
     let session = PlexSession(
         ratingKey: "146",

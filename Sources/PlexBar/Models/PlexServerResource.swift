@@ -3,6 +3,7 @@ import Foundation
 struct PlexServerResource: Identifiable, Equatable {
     let id: String
     let name: String
+    let productVersion: String?
     let accessToken: String
     let connections: [PlexServerConnection]
 
@@ -12,6 +13,14 @@ struct PlexServerResource: Identifiable, Equatable {
 
     var selectedURL: URL? {
         preferredConnection?.uri
+    }
+
+    var displayProductVersion: String? {
+        guard let productVersion = productVersion?.nilIfBlank else {
+            return nil
+        }
+
+        return productVersion.split(separator: "-", maxSplits: 1).first.map(String.init)
     }
 }
 
