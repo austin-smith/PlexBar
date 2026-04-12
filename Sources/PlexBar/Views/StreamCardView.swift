@@ -12,7 +12,8 @@ struct StreamCardView: View {
                 fallbackImageURL: transcodedPosterURL,
                 clientIdentifier: settingsStore.clientIdentifier,
                 token: settingsStore.trimmedServerToken,
-                isPaused: session.isPaused
+                isPaused: session.isPaused,
+                placeholderSymbol: session.contentKind.contentMetaSymbolName
             )
 
             VStack(alignment: .leading, spacing: 0) {
@@ -156,6 +157,7 @@ private struct PosterThumbnailView: View {
     let clientIdentifier: String
     let token: String
     let isPaused: Bool
+    let placeholderSymbol: String
 
     @State private var image: Image?
     @State private var isLoading = false
@@ -256,7 +258,7 @@ private struct PosterThumbnailView: View {
         RoundedRectangle(cornerRadius: 12, style: .continuous)
             .fill(.quaternary)
             .overlay {
-                Image(systemName: "tv")
+                Image(systemName: placeholderSymbol)
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }
