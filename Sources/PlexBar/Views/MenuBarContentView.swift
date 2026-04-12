@@ -44,6 +44,7 @@ struct MenuBarContentView: View {
     private var content: some View {
         if !settingsStore.hasValidConfiguration {
             EmptyStateView(
+                icon: "link",
                 title: settingsStore.hasAuthenticatedAccount ? "Choose a Server" : "Connect Plex",
                 message: settingsStore.hasAuthenticatedAccount
                     ? "PlexBar signed in successfully, but no Plex Media Server is selected yet."
@@ -55,6 +56,7 @@ struct MenuBarContentView: View {
         } else {
             if let errorMessage = sessionStore.errorMessage, sessionStore.sessions.isEmpty {
                 EmptyStateView(
+                    icon: "exclamationmark.triangle",
                     title: "Couldn’t Reach Plex",
                     message: errorMessage,
                     actionTitle: "Refresh"
@@ -63,12 +65,10 @@ struct MenuBarContentView: View {
                 }
             } else if sessionStore.sessions.isEmpty {
                 EmptyStateView(
+                    icon: "popcorn",
                     title: "No Active Streams",
-                    message: "Nothing is currently playing on this server.",
-                    actionTitle: "Refresh"
-                ) {
-                    sessionStore.refreshNow()
-                }
+                    message: "Nothing is currently playing on this server."
+                )
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
@@ -177,26 +177,39 @@ private struct StreamContentHeightPreferenceKey: PreferenceKey {
 }
 
 private struct EmptyStateView: View {
+    let icon: String
     let title: String
     let message: String
-    let actionTitle: String
-    let action: () -> Void
+    var actionTitle: String? = nil
+    var action: (() -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
+        VStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(.tertiary)
 
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
 
-            Button(actionTitle, action: action)
-                .buttonStyle(.borderedProminent)
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .buttonStyle(.borderedProminent)
+                    .padding(.top, 2)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .padding(.horizontal, 14)
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
