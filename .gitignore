@@ -10,3 +10,6 @@ DerivedData/
 
 # macOS custom folder icon
 Icon[^a-zA-Z]
+
+# docs
+/docs
