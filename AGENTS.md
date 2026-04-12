@@ -20,8 +20,11 @@ This file defines project constraints for coding agents working in this reposito
 
 - Prefer modern Swift 6 and SwiftUI APIs.
 - Preserve the current Observation-based state flow.
+- Keep behavior deterministic and easy to reason about.
 - Avoid speculative abstractions.
 - Do not add backward-compatibility code, compatibility shims, or legacy fallback paths unless explicitly requested.
+- Do not add heuristic fallback logic, automatic failover paths, multi-strategy retries, or "best effort" guessing unless a maintainer explicitly asks for that behavior.
+- When something fails, prefer surfacing the concrete failure and fixing the root cause over adding alternate code paths that mask the problem.
 
 ## Building
 
