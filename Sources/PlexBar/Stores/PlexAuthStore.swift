@@ -35,8 +35,9 @@ final class PlexAuthStore {
         }
 
         signInTask?.cancel()
+        let clientIdentifier = settings.rotateClientIdentifier()
         signInTask = Task {
-            await runSignIn()
+            await runSignIn(clientIdentifier: clientIdentifier)
         }
     }
 
@@ -104,13 +105,13 @@ final class PlexAuthStore {
         sessionStore.refreshNow()
     }
 
-    private func runSignIn() async {
+    private func runSignIn(clientIdentifier: String) async {
         isAuthenticating = true
         statusMessage = "Waiting for authentication in your browser…"
         errorMessage = nil
         remainingSeconds = nil
 
-        let clientContext = PlexClientContext(clientIdentifier: settings.clientIdentifier)
+        let clientContext = PlexClientContext(clientIdentifier: clientIdentifier)
 
         do {
             let pin = try await client.createPin(clientContext: clientContext)

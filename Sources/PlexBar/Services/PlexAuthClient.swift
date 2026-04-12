@@ -8,10 +8,11 @@ struct PlexAuthClient {
     }
 
     func createPin(clientContext: PlexClientContext) async throws -> PlexPin {
-        var request = URLRequest(url: URL(string: "https://plex.tv/api/v2/pins?strong=true")!)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        clientContext.headers.forEach { request.addValue($0.value, forHTTPHeaderField: $0.key) }
+        let request = PlexRequestBuilder(clientContext: clientContext).request(
+            url: URL(string: "https://plex.tv/api/v2/pins?strong=true")!,
+            method: "POST",
+            accept: "application/json"
+        )
 
         let (data, response) = try await session.data(for: request)
         try validate(response: response)
@@ -19,10 +20,10 @@ struct PlexAuthClient {
     }
 
     func fetchPin(id: String, clientContext: PlexClientContext) async throws -> PlexPin {
-        var request = URLRequest(url: URL(string: "https://plex.tv/api/v2/pins/\(id)")!)
-        request.httpMethod = "GET"
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        clientContext.headers.forEach { request.addValue($0.value, forHTTPHeaderField: $0.key) }
+        let request = PlexRequestBuilder(clientContext: clientContext).request(
+            url: URL(string: "https://plex.tv/api/v2/pins/\(id)")!,
+            accept: "application/json"
+        )
 
         let (data, response) = try await session.data(for: request)
         try validate(response: response)
@@ -30,11 +31,11 @@ struct PlexAuthClient {
     }
 
     func fetchServers(userToken: String, clientContext: PlexClientContext) async throws -> [PlexServerResource] {
-        var request = URLRequest(url: URL(string: "https://plex.tv/api/resources?includeHttps=1")!)
-        request.httpMethod = "GET"
-        request.addValue("application/xml", forHTTPHeaderField: "Accept")
-        request.addValue(userToken, forHTTPHeaderField: "X-Plex-Token")
-        clientContext.headers.forEach { request.addValue($0.value, forHTTPHeaderField: $0.key) }
+        let request = PlexRequestBuilder(clientContext: clientContext).request(
+            url: URL(string: "https://plex.tv/api/resources?includeHttps=1")!,
+            accept: "application/xml",
+            token: userToken
+        )
 
         let (data, response) = try await session.data(for: request)
         try validate(response: response)

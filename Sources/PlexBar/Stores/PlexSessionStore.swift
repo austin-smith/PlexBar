@@ -75,7 +75,7 @@ final class PlexSessionStore {
             let configuration = PlexConnectionConfiguration(
                 serverURL: serverURL,
                 token: settings.trimmedServerToken,
-                clientIdentifier: settings.clientIdentifier
+                clientContext: PlexClientContext(clientIdentifier: settings.clientIdentifier)
             )
 
             sessions = try await client.fetchSessions(using: configuration)

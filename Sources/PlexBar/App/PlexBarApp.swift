@@ -27,7 +27,7 @@ struct PlexBarApp: App {
         Window("PlexBar Settings", id: AppConstants.settingsWindowID) {
             SettingsView(settingsStore: settingsStore, authStore: authStore, sessionStore: sessionStore)
         }
-        .defaultSize(width: 420, height: 300)
+        .defaultSize(width: 480, height: 300)
         .windowResizability(.contentSize)
 
         MenuBarExtra {

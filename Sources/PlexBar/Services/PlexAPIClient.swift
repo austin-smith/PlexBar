@@ -12,17 +12,11 @@ struct PlexAPIClient {
             throw PlexAPIError.invalidServerURL
         }
 
-        var request = URLRequest(url: endpoint)
-        request.timeoutInterval = 15
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        request.addValue(configuration.token, forHTTPHeaderField: "X-Plex-Token")
-        request.addValue(configuration.clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
-        request.addValue(AppConstants.appName, forHTTPHeaderField: "X-Plex-Product")
-        request.addValue(AppConstants.productVersion, forHTTPHeaderField: "X-Plex-Version")
-        request.addValue("macOS", forHTTPHeaderField: "X-Plex-Platform")
-        request.addValue(ProcessInfo.processInfo.operatingSystemVersionString, forHTTPHeaderField: "X-Plex-Platform-Version")
-        request.addValue(AppConstants.appName, forHTTPHeaderField: "X-Plex-Device")
-        request.addValue(AppConstants.appName, forHTTPHeaderField: "X-Plex-Device-Name")
+        let request = PlexRequestBuilder(clientContext: configuration.clientContext).request(
+            url: endpoint,
+            accept: "application/json",
+            token: configuration.token
+        )
 
         let (data, response) = try await session.data(for: request)
 
@@ -46,7 +40,7 @@ struct PlexAPIClient {
 struct PlexConnectionConfiguration {
     let serverURL: URL
     let token: String
-    let clientIdentifier: String
+    let clientContext: PlexClientContext
 }
 
 enum PlexAPIError: LocalizedError {

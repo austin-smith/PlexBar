@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class PlexSettingsStore {
     private enum DefaultsKeys {
+        static let installIdentifier = "plex.installIdentifier"
         static let serverURL = "plex.serverURL"
         static let clientIdentifier = "plex.clientIdentifier"
         static let selectedServerIdentifier = "plex.selectedServerIdentifier"
@@ -57,20 +58,19 @@ final class PlexSettingsStore {
         }
     }
 
-    let clientIdentifier: String
+    private(set) var clientIdentifier: String {
+        didSet {
+            defaults.set(clientIdentifier, forKey: DefaultsKeys.clientIdentifier)
+        }
+    }
 
     init(defaults: UserDefaults = .standard, keychain: KeychainStore = KeychainStore(service: AppConstants.bundleIdentifier)) {
         self.defaults = defaults
         self.keychain = keychain
         serverURLString = defaults.string(forKey: DefaultsKeys.serverURL) ?? ""
 
-        if let existingClientIdentifier = defaults.string(forKey: DefaultsKeys.clientIdentifier), !existingClientIdentifier.isEmpty {
-            clientIdentifier = existingClientIdentifier
-        } else {
-            let newIdentifier = UUID().uuidString
-            defaults.set(newIdentifier, forKey: DefaultsKeys.clientIdentifier)
-            clientIdentifier = newIdentifier
-        }
+        let installIdentifier = Self.loadInstallIdentifier(from: defaults)
+        clientIdentifier = Self.loadClientIdentifier(from: defaults, installIdentifier: installIdentifier)
 
         selectedServerIdentifier = defaults.string(forKey: DefaultsKeys.selectedServerIdentifier)
         selectedServerName = defaults.string(forKey: DefaultsKeys.selectedServerName)
@@ -124,6 +124,13 @@ final class PlexSettingsStore {
         serverToken = ""
     }
 
+    @discardableResult
+    func rotateClientIdentifier() -> String {
+        let newIdentifier = Self.newIdentifier()
+        clientIdentifier = newIdentifier
+        return newIdentifier
+    }
+
     private func persistUserToken() {
         let trimmedToken = trimmedUserToken
 
@@ -148,5 +155,28 @@ final class PlexSettingsStore {
 
     private static func normalizedPollIntervalSeconds(_ value: Int) -> Int {
         min(max(value, AppConstants.minimumPollIntervalSeconds), AppConstants.maximumPollIntervalSeconds)
+    }
+
+    private static func loadInstallIdentifier(from defaults: UserDefaults) -> String {
+        if let existingInstallIdentifier = defaults.string(forKey: DefaultsKeys.installIdentifier)?.nilIfBlank {
+            return existingInstallIdentifier
+        }
+
+        let installIdentifier = defaults.string(forKey: DefaultsKeys.clientIdentifier)?.nilIfBlank ?? newIdentifier()
+        defaults.set(installIdentifier, forKey: DefaultsKeys.installIdentifier)
+        return installIdentifier
+    }
+
+    private static func loadClientIdentifier(from defaults: UserDefaults, installIdentifier: String) -> String {
+        if let existingClientIdentifier = defaults.string(forKey: DefaultsKeys.clientIdentifier)?.nilIfBlank {
+            return existingClientIdentifier
+        }
+
+        defaults.set(installIdentifier, forKey: DefaultsKeys.clientIdentifier)
+        return installIdentifier
+    }
+
+    private static func newIdentifier() -> String {
+        UUID().uuidString
     }
 }

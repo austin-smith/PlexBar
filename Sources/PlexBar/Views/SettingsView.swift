@@ -124,7 +124,7 @@ struct SettingsView: View {
 
             Spacer()
         }
-        .frame(width: 400, height: 280)
+        .frame(width: 480, height: 280)
     }
 
     // MARK: - Helpers

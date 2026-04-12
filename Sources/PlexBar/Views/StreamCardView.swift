@@ -5,13 +5,17 @@ struct StreamCardView: View {
     let session: PlexSession
     let settingsStore: PlexSettingsStore
 
+    private var clientContext: PlexClientContext {
+        PlexClientContext(clientIdentifier: settingsStore.clientIdentifier)
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             PosterThumbnailView(
                 primaryImageURL: posterURL,
                 fallbackImageURL: transcodedPosterURL,
-                clientIdentifier: settingsStore.clientIdentifier,
                 token: settingsStore.trimmedServerToken,
+                clientContext: clientContext,
                 isPaused: session.isPaused,
                 placeholderSymbol: session.contentKind.contentMetaSymbolName
             )
@@ -80,7 +84,7 @@ struct StreamCardView: View {
                         playerName: session.playerDisplayName,
                         imageURL: userAvatarURL,
                         token: userAvatarToken,
-                        clientIdentifier: settingsStore.clientIdentifier
+                        clientContext: clientContext
                     )
                 }
             }
@@ -96,10 +100,9 @@ struct StreamCardView: View {
             return nil
         }
 
-        return PlexURLBuilder.authenticatedURL(
+        return PlexURLBuilder.mediaURL(
             serverURL: serverURL,
-            path: session.posterPath,
-            token: settingsStore.trimmedServerToken
+            path: session.posterPath
         )
     }
 
@@ -111,7 +114,6 @@ struct StreamCardView: View {
         return PlexURLBuilder.transcodedArtworkURL(
             serverURL: serverURL,
             path: session.posterPath,
-            token: settingsStore.trimmedServerToken,
             width: 176,
             height: 264
         )
@@ -130,10 +132,9 @@ struct StreamCardView: View {
             return nil
         }
 
-        return PlexURLBuilder.authenticatedURL(
+        return PlexURLBuilder.mediaURL(
             serverURL: serverURL,
-            path: thumb,
-            token: settingsStore.trimmedServerToken
+            path: thumb
         )
     }
 
@@ -153,13 +154,37 @@ struct StreamCardView: View {
 private struct PosterThumbnailView: View {
     let primaryImageURL: URL?
     let fallbackImageURL: URL?
-    let clientIdentifier: String
     let token: String
+    let clientContext: PlexClientContext
     let isPaused: Bool
     let placeholderSymbol: String
+    let imageClient: PlexImageClient
 
     @State private var image: Image?
     @State private var isLoading = false
+
+    init(
+        primaryImageURL: URL?,
+        fallbackImageURL: URL?,
+        token: String,
+        clientContext: PlexClientContext,
+        isPaused: Bool,
+        placeholderSymbol: String,
+        imageClient: PlexImageClient = PlexImageClient()
+    ) {
+        self.primaryImageURL = primaryImageURL
+        self.fallbackImageURL = fallbackImageURL
+        self.token = token
+        self.clientContext = clientContext
+        self.isPaused = isPaused
+        self.placeholderSymbol = placeholderSymbol
+        self.imageClient = imageClient
+        let cachedImage = imageClient.cachedImage(
+            from: [primaryImageURL, fallbackImageURL].compactMap { $0 },
+            token: token
+        )
+        _image = State(initialValue: cachedImage.map(Image.init(nsImage:)))
+    }
 
     var body: some View {
         ZStack {
@@ -193,7 +218,7 @@ private struct PosterThumbnailView: View {
         [
             primaryImageURL?.absoluteString,
             fallbackImageURL?.absoluteString,
-            clientIdentifier,
+            clientContext.clientIdentifier,
             token,
         ]
         .compactMap { $0 }
@@ -209,48 +234,31 @@ private struct PosterThumbnailView: View {
             return
         }
 
+        if let cachedImage = imageClient.cachedImage(from: candidateURLs, token: token) {
+            image = Image(nsImage: cachedImage)
+            isLoading = false
+            return
+        }
+
         isLoading = true
         image = nil
 
-        for url in candidateURLs {
-            if Task.isCancelled {
-                isLoading = false
-                return
-            }
+        if Task.isCancelled {
+            isLoading = false
+            return
+        }
 
-            do {
-                if let loadedImage = try await fetchImage(from: url) {
-                    image = Image(nsImage: loadedImage)
-                    isLoading = false
-                    return
-                }
-            } catch {
-                continue
-            }
+        if let loadedImage = await imageClient.fetchImage(
+            from: candidateURLs,
+            token: token,
+            clientContext: clientContext
+        ) {
+            image = Image(nsImage: loadedImage)
+            isLoading = false
+            return
         }
 
         isLoading = false
-    }
-
-    private func fetchImage(from url: URL) async throws -> NSImage? {
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 15
-        request.addValue("image/*", forHTTPHeaderField: "Accept")
-        request.addValue(token, forHTTPHeaderField: "X-Plex-Token")
-        request.addValue(clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
-        request.addValue(AppConstants.appName, forHTTPHeaderField: "X-Plex-Product")
-        request.addValue(AppConstants.productVersion, forHTTPHeaderField: "X-Plex-Version")
-        request.addValue("macOS", forHTTPHeaderField: "X-Plex-Platform")
-        request.addValue("Mac", forHTTPHeaderField: "X-Plex-Device")
-        request.addValue("Mac (\(AppConstants.appName))", forHTTPHeaderField: "X-Plex-Device-Name")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200..<300).contains(httpResponse.statusCode) else {
-            return nil
-        }
-
-        return NSImage(data: data)
     }
 
     private var placeholder: some View {
@@ -283,14 +291,14 @@ private struct UserIdentityRow: View {
     let playerName: String
     let imageURL: URL?
     let token: String
-    let clientIdentifier: String
+    let clientContext: PlexClientContext
 
     var body: some View {
         HStack(spacing: 10) {
             UserAvatarView(
                 imageURL: imageURL,
                 token: token,
-                clientIdentifier: clientIdentifier
+                clientContext: clientContext
             )
 
             VStack(alignment: .leading, spacing: 2) {
@@ -314,10 +322,25 @@ private struct UserIdentityRow: View {
 private struct UserAvatarView: View {
     let imageURL: URL?
     let token: String
-    let clientIdentifier: String
+    let clientContext: PlexClientContext
+    let imageClient: PlexImageClient
 
     @State private var image: Image?
     @State private var isLoading = false
+
+    init(
+        imageURL: URL?,
+        token: String,
+        clientContext: PlexClientContext,
+        imageClient: PlexImageClient = PlexImageClient()
+    ) {
+        self.imageURL = imageURL
+        self.token = token
+        self.clientContext = clientContext
+        self.imageClient = imageClient
+        let cachedImage = imageURL.map { imageClient.cachedImage(from: [$0], token: token) } ?? nil
+        _image = State(initialValue: cachedImage.map(Image.init(nsImage:)))
+    }
 
     var body: some View {
         ZStack {
@@ -328,16 +351,6 @@ private struct UserAvatarView: View {
             } else {
                 Circle()
                     .fill(.quaternary)
-                    .overlay {
-                        if isLoading {
-                            ProgressView()
-                                .controlSize(.mini)
-                        } else {
-                            Image(systemName: "person.fill")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
             }
         }
         .frame(width: 30, height: 30)
@@ -348,7 +361,7 @@ private struct UserAvatarView: View {
     }
 
     private var requestKey: String {
-        [imageURL?.absoluteString, token, clientIdentifier]
+        [imageURL?.absoluteString, token, clientContext.clientIdentifier]
             .compactMap { $0 }
             .joined(separator: "|")
     }
@@ -361,39 +374,25 @@ private struct UserAvatarView: View {
             return
         }
 
+        if let cachedImage = imageClient.cachedImage(from: [imageURL], token: token) {
+            image = Image(nsImage: cachedImage)
+            isLoading = false
+            return
+        }
+
         isLoading = true
         image = nil
 
-        do {
-            if let loadedImage = try await fetchImage(from: imageURL) {
-                image = Image(nsImage: loadedImage)
-            }
-        } catch {
+        if let loadedImage = await imageClient.fetchImage(
+            from: [imageURL],
+            token: token,
+            clientContext: clientContext
+        ) {
+            image = Image(nsImage: loadedImage)
+        } else {
             image = nil
         }
 
         isLoading = false
-    }
-
-    private func fetchImage(from url: URL) async throws -> NSImage? {
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 15
-        request.addValue("image/*", forHTTPHeaderField: "Accept")
-
-        if !token.isEmpty {
-            request.addValue(token, forHTTPHeaderField: "X-Plex-Token")
-        }
-
-        request.addValue(clientIdentifier, forHTTPHeaderField: "X-Plex-Client-Identifier")
-        request.addValue(AppConstants.appName, forHTTPHeaderField: "X-Plex-Product")
-        request.addValue(AppConstants.productVersion, forHTTPHeaderField: "X-Plex-Version")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200..<300).contains(httpResponse.statusCode) else {
-            return nil
-        }
-
-        return NSImage(data: data)
     }
 }

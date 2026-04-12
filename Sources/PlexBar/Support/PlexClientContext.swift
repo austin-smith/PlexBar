@@ -7,7 +7,7 @@ struct PlexClientContext {
         [
             "X-Plex-Client-Identifier": clientIdentifier,
             "X-Plex-Product": AppConstants.appName,
-            "X-Plex-Version": "Plex OAuth",
+            "X-Plex-Version": AppConstants.productVersion,
             "X-Plex-Platform": "macOS",
             "X-Plex-Platform-Version": platformVersion,
             "X-Plex-Device": "Mac",

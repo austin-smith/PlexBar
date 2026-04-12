@@ -37,21 +37,15 @@ enum PlexURLBuilder {
         return components.url
     }
 
-    static func authenticatedURL(serverURL: URL, path: String?, token: String) -> URL? {
-        guard let path = path?.nilIfBlank,
-              var components = endpointURL(serverURL: serverURL, path: path)
-                .flatMap({ URLComponents(url: $0, resolvingAgainstBaseURL: false) }) else {
+    static func mediaURL(serverURL: URL, path: String?) -> URL? {
+        guard let path = path?.nilIfBlank else {
             return nil
         }
 
-        var queryItems = components.queryItems ?? []
-        queryItems.removeAll { $0.name == "X-Plex-Token" }
-        queryItems.append(URLQueryItem(name: "X-Plex-Token", value: token))
-        components.queryItems = queryItems
-        return components.url
+        return endpointURL(serverURL: serverURL, path: path)
     }
 
-    static func transcodedArtworkURL(serverURL: URL, path: String?, token: String, width: Int, height: Int) -> URL? {
+    static func transcodedArtworkURL(serverURL: URL, path: String?, width: Int, height: Int) -> URL? {
         guard let path = path?.nilIfBlank,
               var components = endpointURL(serverURL: serverURL, path: "/photo/:/transcode")
                 .flatMap({ URLComponents(url: $0, resolvingAgainstBaseURL: false) }) else {
@@ -65,7 +59,6 @@ enum PlexURLBuilder {
             URLQueryItem(name: "minSize", value: "1"),
             URLQueryItem(name: "upscale", value: "1"),
             URLQueryItem(name: "format", value: "jpeg"),
-            URLQueryItem(name: "X-Plex-Token", value: token),
         ]
         return components.url
     }
