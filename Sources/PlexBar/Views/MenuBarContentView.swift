@@ -146,10 +146,7 @@ struct MenuBarContentView: View {
     }
 
     private var streamListHeight: CGFloat {
-        if streamContentHeight <= 0 {
-            return maximumStreamListHeight
-        }
-
+        guard streamContentHeight > 0 else { return 132 }
         return min(streamContentHeight, maximumStreamListHeight)
     }
 

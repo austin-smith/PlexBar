@@ -88,7 +88,6 @@ struct StreamCardView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
