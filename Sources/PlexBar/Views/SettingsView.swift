@@ -190,6 +190,7 @@ struct SettingsView: View {
 
                 Text(selectedServerSubtitle)
                     .font(.footnote)
+                    .fontDesign(.monospaced)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
@@ -254,6 +255,7 @@ struct SettingsView: View {
 
                 Text(server.displayProductVersion ?? "Plex Media Server")
                     .font(.caption)
+                    .fontDesign(.monospaced)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
