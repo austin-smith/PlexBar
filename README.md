@@ -1,4 +1,7 @@
-# <h1 align="center"><span style="font-family: monospace;">PlexBar</span></h1>
+<h1 align="center">
+  <img src="docs/images/plexbar-app-icon.png" width="128" alt="PlexBar Icon">
+  <br><span style="font-family: monospace;">PlexBar</span>
+</h1>
 
 PlexBar is a lightweight macOS menu bar app for Plex server telemetry.
 

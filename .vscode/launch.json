@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:PlexBar}",
+            "name": "Debug PlexBar",
+            "target": "PlexBar",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug PlexBar"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:PlexBar}",
+            "name": "Release PlexBar",
+            "target": "PlexBar",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release PlexBar"
+        }
+    ]
+}

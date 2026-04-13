@@ -1,19 +1,20 @@
 {
   "fill" : {
-    "automatic-gradient" : "display-p3:0.80815,0.90184,0.95295,1.00000"
+    "automatic-gradient" : "display-p3:0.85889,0.63916,0.22742,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
-          "glass" : false,
+          "glass" : true,
+          "hidden" : false,
           "image-name" : "ribbon.png",
           "name" : "ribbon",
           "position" : {
             "scale" : 1.25,
             "translation-in-points" : [
-              0.0078125,
-              15
+              15.8671875,
+              0
             ]
           }
         }
