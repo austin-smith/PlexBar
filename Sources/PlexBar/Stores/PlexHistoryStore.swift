@@ -7,6 +7,7 @@ final class PlexHistoryStore {
     static let historyWindowDays = 30
 
     private let settings: PlexSettingsStore
+    private let libraryStore: PlexLibraryStore
     private let client: PlexAPIClient
     private var pollingTask: Task<Void, Never>?
 
@@ -17,8 +18,13 @@ final class PlexHistoryStore {
     var errorMessage: String?
     var lastUpdated: Date?
 
-    init(settings: PlexSettingsStore, client: PlexAPIClient = PlexAPIClient()) {
+    init(
+        settings: PlexSettingsStore,
+        libraryStore: PlexLibraryStore,
+        client: PlexAPIClient = PlexAPIClient()
+    ) {
         self.settings = settings
+        self.libraryStore = libraryStore
         self.client = client
         startPolling()
     }
@@ -47,6 +53,7 @@ final class PlexHistoryStore {
     func refreshNow() {
         Task {
             await refresh()
+            libraryStore.refreshNow()
         }
     }
 
@@ -70,6 +77,7 @@ final class PlexHistoryStore {
                 }
 
                 await self.refresh()
+                self.libraryStore.refreshNow()
 
                 do {
                     try await Task.sleep(for: pollIntervalDuration)

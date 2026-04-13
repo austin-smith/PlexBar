@@ -15,18 +15,22 @@ struct PlexBarApp: App {
     @State private var authStore: PlexAuthStore
     @State private var sessionStore: PlexSessionStore
     @State private var historyStore: PlexHistoryStore
+    @State private var libraryStore: PlexLibraryStore
 
     init() {
         let settingsStore = PlexSettingsStore()
         let sessionStore = PlexSessionStore(settings: settingsStore)
-        let historyStore = PlexHistoryStore(settings: settingsStore)
+        let libraryStore = PlexLibraryStore(settings: settingsStore)
+        let historyStore = PlexHistoryStore(settings: settingsStore, libraryStore: libraryStore)
         _settingsStore = State(initialValue: settingsStore)
         _sessionStore = State(initialValue: sessionStore)
         _historyStore = State(initialValue: historyStore)
+        _libraryStore = State(initialValue: libraryStore)
         _authStore = State(initialValue: PlexAuthStore(
             settings: settingsStore,
             sessionStore: sessionStore,
-            historyStore: historyStore
+            historyStore: historyStore,
+            libraryStore: libraryStore
         ))
     }
 
@@ -47,7 +51,8 @@ struct PlexBarApp: App {
                 settingsStore: settingsStore,
                 authStore: authStore,
                 sessionStore: sessionStore,
-                historyStore: historyStore
+                historyStore: historyStore,
+                libraryStore: libraryStore
             )
         } label: {
             MenuBarLabelView(streamCount: sessionStore.activeStreamCount)

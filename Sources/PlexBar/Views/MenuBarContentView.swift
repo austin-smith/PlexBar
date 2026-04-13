@@ -6,10 +6,12 @@ struct MenuBarContentView: View {
     @Bindable var authStore: PlexAuthStore
     @Bindable var sessionStore: PlexSessionStore
     @Bindable var historyStore: PlexHistoryStore
+    @Bindable var libraryStore: PlexLibraryStore
     @Environment(\.openWindow) private var openWindow
     @State private var selectedSection: DashboardSection = .streams
     @State private var streamContentHeight: CGFloat = 0
     @State private var historyContentHeight: CGFloat = 0
+    @State private var libraryContentHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -64,6 +66,26 @@ struct MenuBarContentView: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        case .libraries:
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 10) {
+                    Text("Libraries")
+                        .font(.headline)
+
+                    Spacer()
+
+                    if libraryStore.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -97,11 +119,14 @@ struct MenuBarContentView: View {
                 streamsContent
             case .history:
                 historyContent
+            case .libraries:
+                librariesContent
             }
 
             if let inlineErrorMessage = selectedSection.inlineErrorMessage(
                 sessionStore: sessionStore,
-                historyStore: historyStore
+                historyStore: historyStore,
+                libraryStore: libraryStore
             ) {
                 Text(inlineErrorMessage)
                     .font(.caption)
@@ -191,6 +216,44 @@ struct MenuBarContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var librariesContent: some View {
+        if let errorMessage = libraryStore.errorMessage, libraryStore.libraries.isEmpty {
+            EmptyStateView(
+                icon: "books.vertical",
+                title: "Couldn’t Load Libraries",
+                message: errorMessage,
+                actionTitle: "Refresh"
+            ) {
+                refreshAllData()
+            }
+        } else if libraryStore.libraries.isEmpty {
+            EmptyStateView(
+                icon: "books.vertical",
+                title: "No Libraries Found",
+                message: "PlexBar didn’t find any visible libraries on this server yet."
+            )
+        } else {
+            ScrollView {
+                LibrariesDashboardView(settingsStore: settingsStore, libraryStore: libraryStore)
+                    .background {
+                        GeometryReader { proxy in
+                            Color.clear
+                                .preference(key: MenuBarContentHeightPreferenceKey.self, value: proxy.size.height)
+                        }
+                    }
+            }
+            .frame(height: libraryListHeight, alignment: .top)
+            .onPreferenceChange(MenuBarContentHeightPreferenceKey.self) { newHeight in
+                guard abs(libraryContentHeight - newHeight) > 0.5 else {
+                    return
+                }
+
+                libraryContentHeight = newHeight
+            }
+        }
+    }
+
     private var footer: some View {
         HStack {
             Button("Refresh") {
@@ -241,6 +304,19 @@ struct MenuBarContentView: View {
             }
 
             return "\(historyLabel) on \(serverLabel)"
+        case .libraries:
+            let libraryLabel = libraryStore.libraryCount == 1
+                ? "1 library"
+                : "\(libraryStore.libraryCount) libraries"
+            let itemLabel = libraryStore.totalItemCount == 1
+                ? "1 item"
+                : "\(libraryStore.totalItemCount.formatted()) items"
+
+            if let lastUpdated = libraryStore.lastUpdated {
+                return "\(libraryLabel) • \(itemLabel) on \(serverLabel) • Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))"
+            }
+
+            return "\(libraryLabel) • \(itemLabel) on \(serverLabel)"
         }
     }
 
@@ -260,6 +336,10 @@ struct MenuBarContentView: View {
 
     private var historyListHeight: CGFloat {
         boundedHeight(for: historyContentHeight, minimum: 320)
+    }
+
+    private var libraryListHeight: CGFloat {
+        boundedHeight(for: libraryContentHeight, minimum: 320)
     }
 
     private func boundedHeight(for measuredHeight: CGFloat, minimum: CGFloat) -> CGFloat {
@@ -291,6 +371,7 @@ struct MenuBarContentView: View {
 private enum DashboardSection: String, CaseIterable, Identifiable {
     case streams
     case history
+    case libraries
 
     var id: String { rawValue }
 
@@ -300,6 +381,8 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
             "Active Streams"
         case .history:
             "Watch History"
+        case .libraries:
+            "Libraries"
         }
     }
 
@@ -309,23 +392,32 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
             "Streams"
         case .history:
             "History"
+        case .libraries:
+            "Libraries"
         }
     }
 
     @MainActor
-    func isLoading(sessionStore: PlexSessionStore, historyStore: PlexHistoryStore) -> Bool {
+    func isLoading(
+        sessionStore: PlexSessionStore,
+        historyStore: PlexHistoryStore,
+        libraryStore: PlexLibraryStore
+    ) -> Bool {
         switch self {
         case .streams:
             sessionStore.isLoading
         case .history:
             historyStore.isLoading
+        case .libraries:
+            libraryStore.isLoading
         }
     }
 
     @MainActor
     func inlineErrorMessage(
         sessionStore: PlexSessionStore,
-        historyStore: PlexHistoryStore
+        historyStore: PlexHistoryStore,
+        libraryStore: PlexLibraryStore
     ) -> String? {
         switch self {
         case .streams:
@@ -340,6 +432,12 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
             }
 
             return historyStore.errorMessage
+        case .libraries:
+            guard !libraryStore.libraries.isEmpty else {
+                return nil
+            }
+
+            return libraryStore.errorMessage
         }
     }
 }

@@ -8,6 +8,7 @@ final class PlexAuthStore {
     private let settings: PlexSettingsStore
     private let sessionStore: PlexSessionStore
     private let historyStore: PlexHistoryStore
+    private let libraryStore: PlexLibraryStore
     private let client: PlexAuthClient
     private var signInTask: Task<Void, Never>?
 
@@ -22,11 +23,13 @@ final class PlexAuthStore {
         settings: PlexSettingsStore,
         sessionStore: PlexSessionStore,
         historyStore: PlexHistoryStore,
+        libraryStore: PlexLibraryStore,
         client: PlexAuthClient = PlexAuthClient()
     ) {
         self.settings = settings
         self.sessionStore = sessionStore
         self.historyStore = historyStore
+        self.libraryStore = libraryStore
         self.client = client
 
         if settings.hasAuthenticatedAccount {
