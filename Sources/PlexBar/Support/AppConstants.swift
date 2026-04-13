@@ -8,6 +8,8 @@ enum AppConstants {
     static let defaultPollIntervalSeconds = 15
     static let minimumPollIntervalSeconds = 5
     static let maximumPollIntervalSeconds = 300
+    static let defaultHistoryPollIntervalSeconds = 900
+    static let allowedHistoryPollIntervalSeconds = [900, 3_600, 86_400]
 }
 
 enum KeychainAccounts {

@@ -15,6 +15,7 @@ import Testing
     )
 
     #expect(store.pollIntervalSeconds == AppConstants.defaultPollIntervalSeconds)
+    #expect(store.historyPollIntervalSeconds == AppConstants.defaultHistoryPollIntervalSeconds)
 }
 
 @MainActor
@@ -39,6 +40,30 @@ import Testing
     )
 
     #expect(reloadedStore.pollIntervalSeconds == AppConstants.maximumPollIntervalSeconds)
+}
+
+@MainActor
+@Test func persistsConfiguredHistoryPollInterval() async throws {
+    let suiteName = "PlexBarTests.persistsConfiguredHistoryPollInterval"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let store = PlexSettingsStore(
+        defaults: defaults,
+        keychain: KeychainStore(service: "tests.\(suiteName)")
+    )
+
+    store.historyPollIntervalSeconds = 3_600
+
+    #expect(store.historyPollIntervalSeconds == 3_600)
+
+    let reloadedStore = PlexSettingsStore(
+        defaults: defaults,
+        keychain: KeychainStore(service: "tests.\(suiteName)")
+    )
+
+    #expect(reloadedStore.historyPollIntervalSeconds == 3_600)
 }
 
 @MainActor

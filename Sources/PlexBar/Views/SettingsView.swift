@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Bindable var settingsStore: PlexSettingsStore
     @Bindable var authStore: PlexAuthStore
     @Bindable var sessionStore: PlexSessionStore
+    @Bindable var historyStore: PlexHistoryStore
     @State private var isShowingServerList = false
 
     var body: some View {
@@ -30,7 +31,7 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Picker("Refresh Interval", selection: pollIntervalBinding) {
+                    Picker("Active Streams Refresh", selection: pollIntervalBinding) {
                         Text("5 seconds").tag(5)
                         Text("10 seconds").tag(10)
                         Text("15 seconds").tag(15)
@@ -38,6 +39,12 @@ struct SettingsView: View {
                         Text("1 minute").tag(60)
                         Text("2 minutes").tag(120)
                         Text("5 minutes").tag(300)
+                    }
+
+                    Picker("History Refresh", selection: historyPollIntervalBinding) {
+                        Text("15 minutes").tag(900)
+                        Text("1 hour").tag(3_600)
+                        Text("24 hours").tag(86_400)
                     }
                 }
             }
@@ -146,6 +153,20 @@ struct SettingsView: View {
 
                 settingsStore.pollIntervalSeconds = newValue
                 sessionStore.restartPolling()
+            }
+        )
+    }
+
+    private var historyPollIntervalBinding: Binding<Int> {
+        Binding(
+            get: { settingsStore.historyPollIntervalSeconds },
+            set: { newValue in
+                guard settingsStore.historyPollIntervalSeconds != newValue else {
+                    return
+                }
+
+                settingsStore.historyPollIntervalSeconds = newValue
+                historyStore.restartPolling()
             }
         )
     }

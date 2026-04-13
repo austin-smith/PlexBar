@@ -7,6 +7,7 @@ import Observation
 final class PlexAuthStore {
     private let settings: PlexSettingsStore
     private let sessionStore: PlexSessionStore
+    private let historyStore: PlexHistoryStore
     private let client: PlexAuthClient
     private var signInTask: Task<Void, Never>?
 
@@ -17,9 +18,15 @@ final class PlexAuthStore {
     var errorMessage: String?
     var remainingSeconds: Int?
 
-    init(settings: PlexSettingsStore, sessionStore: PlexSessionStore, client: PlexAuthClient = PlexAuthClient()) {
+    init(
+        settings: PlexSettingsStore,
+        sessionStore: PlexSessionStore,
+        historyStore: PlexHistoryStore,
+        client: PlexAuthClient = PlexAuthClient()
+    ) {
         self.settings = settings
         self.sessionStore = sessionStore
+        self.historyStore = historyStore
         self.client = client
 
         if settings.hasAuthenticatedAccount {
@@ -98,11 +105,13 @@ final class PlexAuthStore {
         availableServers = []
         settings.clearAuthentication()
         sessionStore.refreshNow()
+        historyStore.refreshNow()
     }
 
     private func selectServer(_ server: PlexServerResource) {
         settings.saveServerSelection(server)
         sessionStore.refreshNow()
+        historyStore.refreshNow()
     }
 
     private func runSignIn(clientIdentifier: String) async {

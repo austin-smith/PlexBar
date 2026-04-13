@@ -162,6 +162,78 @@ struct PlexRequestTests {
         #expect(requestCounter.value == 1)
     }
 
+    @Test func fetchHistoryUsesThirtyDayCutoffAndPaginationHeaders() async throws {
+        let capture = RequestCapture()
+        let session = makeMockSession { request in
+            capture.record(request)
+
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"{"MediaContainer":{"Metadata":[]}}"#.data(using: .utf8))
+            return (response, data)
+        }
+
+        let client = PlexAPIClient(session: session)
+        let serverURL = try #require(PlexURLBuilder.normalizeServerURL("http://plex.local:32400"))
+        let clientContext = PlexClientContext(clientIdentifier: "client-123")
+        let cutoffDate = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let history = try await client.fetchHistory(using: PlexConnectionConfiguration(
+            serverURL: serverURL,
+            token: "server-token",
+            clientContext: clientContext
+        ), since: cutoffDate, pageSize: 80)
+
+        #expect(history.isEmpty)
+
+        let request = try #require(capture.request)
+        let requestURL = try #require(request.url)
+        let components = try #require(URLComponents(url: requestURL, resolvingAgainstBaseURL: false))
+
+        #expect(components.path == "/status/sessions/history/all")
+        #expect(components.queryItems?.contains(where: { $0.name == "sort" && $0.value == "viewedAt:desc" }) == true)
+        #expect(components.queryItems?.contains(where: { $0.name == "viewedAt>" && $0.value == "1700000000" }) == true)
+        #expect(request.value(forHTTPHeaderField: "X-Plex-Container-Start") == "0")
+        #expect(request.value(forHTTPHeaderField: "X-Plex-Container-Size") == "80")
+        #expect(request.value(forHTTPHeaderField: "X-Plex-Token") == "server-token")
+    }
+
+    @Test func fetchAccountsUsesStatisticsMediaEndpoint() async throws {
+        let capture = RequestCapture()
+        let session = makeMockSession { request in
+            capture.record(request)
+
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"{"MediaContainer":{"Account":[{"id":7,"name":"smitty_","thumb":"https://plex.tv/users/avatar"}]}}"#.data(using: .utf8))
+            return (response, data)
+        }
+
+        let client = PlexAPIClient(session: session)
+        let serverURL = try #require(PlexURLBuilder.normalizeServerURL("http://plex.local:32400"))
+        let clientContext = PlexClientContext(clientIdentifier: "client-123")
+
+        let accounts = try await client.fetchAccounts(using: PlexConnectionConfiguration(
+            serverURL: serverURL,
+            token: "server-token",
+            clientContext: clientContext
+        ))
+
+        #expect(accounts == [PlexAccount(id: 7, name: "smitty_", thumb: "https://plex.tv/users/avatar")])
+
+        let request = try #require(capture.request)
+        #expect(request.url?.path == "/statistics/media")
+        #expect(request.value(forHTTPHeaderField: "X-Plex-Token") == "server-token")
+    }
+
     private func makeMockSession(
         handler: @escaping @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)
     ) -> URLSession {

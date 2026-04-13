@@ -14,24 +14,41 @@ struct PlexBarApp: App {
     @State private var settingsStore: PlexSettingsStore
     @State private var authStore: PlexAuthStore
     @State private var sessionStore: PlexSessionStore
+    @State private var historyStore: PlexHistoryStore
 
     init() {
         let settingsStore = PlexSettingsStore()
         let sessionStore = PlexSessionStore(settings: settingsStore)
+        let historyStore = PlexHistoryStore(settings: settingsStore)
         _settingsStore = State(initialValue: settingsStore)
         _sessionStore = State(initialValue: sessionStore)
-        _authStore = State(initialValue: PlexAuthStore(settings: settingsStore, sessionStore: sessionStore))
+        _historyStore = State(initialValue: historyStore)
+        _authStore = State(initialValue: PlexAuthStore(
+            settings: settingsStore,
+            sessionStore: sessionStore,
+            historyStore: historyStore
+        ))
     }
 
     var body: some Scene {
         Window("PlexBar Settings", id: AppConstants.settingsWindowID) {
-            SettingsView(settingsStore: settingsStore, authStore: authStore, sessionStore: sessionStore)
+            SettingsView(
+                settingsStore: settingsStore,
+                authStore: authStore,
+                sessionStore: sessionStore,
+                historyStore: historyStore
+            )
         }
         .defaultSize(width: 480, height: 300)
         .windowResizability(.contentSize)
 
         MenuBarExtra {
-            MenuBarContentView(settingsStore: settingsStore, authStore: authStore, sessionStore: sessionStore)
+            MenuBarContentView(
+                settingsStore: settingsStore,
+                authStore: authStore,
+                sessionStore: sessionStore,
+                historyStore: historyStore
+            )
         } label: {
             MenuBarLabelView(streamCount: sessionStore.activeStreamCount)
         }

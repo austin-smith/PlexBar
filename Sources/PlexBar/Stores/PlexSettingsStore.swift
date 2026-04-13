@@ -11,6 +11,7 @@ final class PlexSettingsStore {
         static let selectedServerIdentifier = "plex.selectedServerIdentifier"
         static let selectedServerName = "plex.selectedServerName"
         static let pollIntervalSeconds = "plex.pollIntervalSeconds"
+        static let historyPollIntervalSeconds = "plex.historyPollIntervalSeconds"
     }
 
     private let defaults: UserDefaults
@@ -58,6 +59,18 @@ final class PlexSettingsStore {
         }
     }
 
+    var historyPollIntervalSeconds: Int {
+        didSet {
+            let normalizedValue = Self.normalizedHistoryPollIntervalSeconds(historyPollIntervalSeconds)
+            if historyPollIntervalSeconds != normalizedValue {
+                historyPollIntervalSeconds = normalizedValue
+                return
+            }
+
+            defaults.set(normalizedValue, forKey: DefaultsKeys.historyPollIntervalSeconds)
+        }
+    }
+
     private(set) var clientIdentifier: String {
         didSet {
             defaults.set(clientIdentifier, forKey: DefaultsKeys.clientIdentifier)
@@ -78,6 +91,9 @@ final class PlexSettingsStore {
         serverToken = keychain.read(account: KeychainAccounts.serverToken) ?? ""
         pollIntervalSeconds = Self.normalizedPollIntervalSeconds(
             defaults.object(forKey: DefaultsKeys.pollIntervalSeconds) as? Int ?? AppConstants.defaultPollIntervalSeconds
+        )
+        historyPollIntervalSeconds = Self.normalizedHistoryPollIntervalSeconds(
+            defaults.object(forKey: DefaultsKeys.historyPollIntervalSeconds) as? Int ?? AppConstants.defaultHistoryPollIntervalSeconds
         )
     }
 
@@ -103,6 +119,10 @@ final class PlexSettingsStore {
 
     var pollIntervalDuration: Duration {
         .seconds(pollIntervalSeconds)
+    }
+
+    var historyPollIntervalDuration: Duration {
+        return .seconds(historyPollIntervalSeconds)
     }
 
     func saveAuthenticatedUserToken(_ token: String) {
@@ -155,6 +175,14 @@ final class PlexSettingsStore {
 
     private static func normalizedPollIntervalSeconds(_ value: Int) -> Int {
         min(max(value, AppConstants.minimumPollIntervalSeconds), AppConstants.maximumPollIntervalSeconds)
+    }
+
+    private static func normalizedHistoryPollIntervalSeconds(_ value: Int) -> Int {
+        guard AppConstants.allowedHistoryPollIntervalSeconds.contains(value) else {
+            return AppConstants.defaultHistoryPollIntervalSeconds
+        }
+
+        return value
     }
 
     private static func loadInstallIdentifier(from defaults: UserDefaults) -> String {

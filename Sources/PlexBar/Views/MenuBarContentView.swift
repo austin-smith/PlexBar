@@ -5,11 +5,15 @@ struct MenuBarContentView: View {
     @Bindable var settingsStore: PlexSettingsStore
     @Bindable var authStore: PlexAuthStore
     @Bindable var sessionStore: PlexSessionStore
+    @Bindable var historyStore: PlexHistoryStore
     @Environment(\.openWindow) private var openWindow
+    @State private var selectedSection: DashboardSection = .streams
     @State private var streamContentHeight: CGFloat = 0
+    @State private var historyContentHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            sectionPicker
             header
             content
             footer
@@ -19,25 +23,59 @@ struct MenuBarContentView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 10) {
-                Text("Active Streams")
-                    .font(.headline)
+        switch selectedSection {
+        case .streams:
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 10) {
+                    Text("Active Streams")
+                        .font(.headline)
 
-                Spacer()
+                    Spacer()
 
-                if sessionStore.isLoading {
-                    ProgressView()
-                        .controlSize(.small)
+                    if sessionStore.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
                 }
-            }
 
-            Text(subtitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .history:
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 10) {
+                    Text("Watch History")
+                        .font(.headline)
+
+                    Spacer()
+
+                    if historyStore.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+    }
+
+    private var sectionPicker: some View {
+        Picker("Dashboard Section", selection: $selectedSection) {
+            ForEach(DashboardSection.allCases) { section in
+                Text(section.controlTitle)
+                    .tag(section)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
     }
 
     @ViewBuilder
@@ -54,47 +92,18 @@ struct MenuBarContentView: View {
                 openSettings()
             }
         } else {
-            if let errorMessage = sessionStore.errorMessage, sessionStore.sessions.isEmpty {
-                EmptyStateView(
-                    icon: "exclamationmark.triangle",
-                    title: "Couldn’t Reach Plex",
-                    message: errorMessage,
-                    actionTitle: "Refresh"
-                ) {
-                    sessionStore.refreshNow()
-                }
-            } else if sessionStore.sessions.isEmpty {
-                EmptyStateView(
-                    icon: "popcorn",
-                    title: "No Active Streams",
-                    message: "Nothing is currently playing on this server."
-                )
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(sessionStore.sessions) { session in
-                            StreamCardView(session: session, settingsStore: settingsStore)
-                        }
-                    }
-                    .background {
-                        GeometryReader { proxy in
-                            Color.clear
-                                .preference(key: StreamContentHeightPreferenceKey.self, value: proxy.size.height)
-                        }
-                    }
-                }
-                .frame(height: streamListHeight, alignment: .top)
-                .onPreferenceChange(StreamContentHeightPreferenceKey.self) { newHeight in
-                    guard abs(streamContentHeight - newHeight) > 0.5 else {
-                        return
-                    }
-
-                    streamContentHeight = newHeight
-                }
+            switch selectedSection {
+            case .streams:
+                streamsContent
+            case .history:
+                historyContent
             }
 
-            if let errorMessage = sessionStore.errorMessage, !sessionStore.sessions.isEmpty {
-                Text(errorMessage)
+            if let inlineErrorMessage = selectedSection.inlineErrorMessage(
+                sessionStore: sessionStore,
+                historyStore: historyStore
+            ) {
+                Text(inlineErrorMessage)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -102,10 +111,90 @@ struct MenuBarContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var streamsContent: some View {
+        if let errorMessage = sessionStore.errorMessage, sessionStore.sessions.isEmpty {
+            EmptyStateView(
+                icon: "exclamationmark.triangle",
+                title: "Couldn’t Reach Plex",
+                message: errorMessage,
+                actionTitle: "Refresh"
+            ) {
+                refreshAllData()
+            }
+        } else if sessionStore.sessions.isEmpty {
+            EmptyStateView(
+                icon: "popcorn",
+                title: "No Active Streams",
+                message: "Nothing is currently playing on this server."
+            )
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(sessionStore.sessions) { session in
+                        StreamCardView(session: session, settingsStore: settingsStore)
+                    }
+                }
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(key: MenuBarContentHeightPreferenceKey.self, value: proxy.size.height)
+                    }
+                }
+            }
+            .frame(height: streamListHeight, alignment: .top)
+            .onPreferenceChange(MenuBarContentHeightPreferenceKey.self) { newHeight in
+                guard abs(streamContentHeight - newHeight) > 0.5 else {
+                    return
+                }
+
+                streamContentHeight = newHeight
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var historyContent: some View {
+        if let errorMessage = historyStore.errorMessage, historyStore.recentItems.isEmpty {
+            EmptyStateView(
+                icon: "clock.arrow.circlepath",
+                title: "Couldn’t Load Watch History",
+                message: errorMessage,
+                actionTitle: "Refresh"
+            ) {
+                refreshAllData()
+            }
+        } else if historyStore.recentItems.isEmpty {
+            EmptyStateView(
+                icon: "clock",
+                title: "No Watch History Yet",
+                message: "Recent watches and charting will appear here after people finish something on this server."
+            )
+        } else {
+            ScrollView {
+                HistoryDashboardView(settingsStore: settingsStore, historyStore: historyStore)
+                    .background {
+                        GeometryReader { proxy in
+                            Color.clear
+                                .preference(key: MenuBarContentHeightPreferenceKey.self, value: proxy.size.height)
+                        }
+                    }
+            }
+            .frame(height: historyListHeight, alignment: .top)
+            .onPreferenceChange(MenuBarContentHeightPreferenceKey.self) { newHeight in
+                guard abs(historyContentHeight - newHeight) > 0.5 else {
+                    return
+                }
+
+                historyContentHeight = newHeight
+            }
+        }
+    }
+
     private var footer: some View {
         HStack {
             Button("Refresh") {
-                sessionStore.refreshNow()
+                refreshAllData()
             }
             .disabled(!settingsStore.hasValidConfiguration)
 
@@ -130,14 +219,34 @@ struct MenuBarContentView: View {
         let serverLabel = settingsStore.selectedServerName?.nilIfBlank
             ?? settingsStore.normalizedServerURL?.host
             ?? "your server"
-        let count = sessionStore.activeStreamCount
-        let streamsLabel = count == 1 ? "1 stream" : "\(count) streams"
 
-        if let lastUpdated = sessionStore.lastUpdated {
-            return "\(streamsLabel) on \(serverLabel) • Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))"
+        switch selectedSection {
+        case .streams:
+            let count = sessionStore.activeStreamCount
+            let streamsLabel = count == 1 ? "1 stream" : "\(count) streams"
+
+            if let lastUpdated = sessionStore.lastUpdated {
+                return "\(streamsLabel) on \(serverLabel) • Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))"
+            }
+
+            return "\(streamsLabel) on \(serverLabel)"
+        case .history:
+            let count = historyStore.totalPlayCount
+            let historyLabel = count == 1
+                ? "1 watch in \(historyStore.historyWindowLabel.lowercased())"
+                : "\(count) watches in \(historyStore.historyWindowLabel.lowercased())"
+
+            if let lastUpdated = historyStore.lastUpdated {
+                return "\(historyLabel) on \(serverLabel) • Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))"
+            }
+
+            return "\(historyLabel) on \(serverLabel)"
         }
+    }
 
-        return "\(streamsLabel) on \(serverLabel)"
+    private func refreshAllData() {
+        sessionStore.refreshNow()
+        historyStore.refreshNow()
     }
 
     private func openSettings() {
@@ -146,11 +255,22 @@ struct MenuBarContentView: View {
     }
 
     private var streamListHeight: CGFloat {
-        guard streamContentHeight > 0 else { return 132 }
-        return min(streamContentHeight, maximumStreamListHeight)
+        boundedHeight(for: streamContentHeight, minimum: 132)
     }
 
-    private var maximumStreamListHeight: CGFloat {
+    private var historyListHeight: CGFloat {
+        boundedHeight(for: historyContentHeight, minimum: 320)
+    }
+
+    private func boundedHeight(for measuredHeight: CGFloat, minimum: CGFloat) -> CGFloat {
+        guard measuredHeight > 0 else {
+            return minimum
+        }
+
+        return min(max(measuredHeight, minimum), maximumContentHeight)
+    }
+
+    private var maximumContentHeight: CGFloat {
         let fallbackHeight: CGFloat = 760
         guard let visibleFrame = activeScreen?.visibleFrame else {
             return fallbackHeight
@@ -168,7 +288,63 @@ struct MenuBarContentView: View {
     }
 }
 
-private struct StreamContentHeightPreferenceKey: PreferenceKey {
+private enum DashboardSection: String, CaseIterable, Identifiable {
+    case streams
+    case history
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .streams:
+            "Active Streams"
+        case .history:
+            "Watch History"
+        }
+    }
+
+    var controlTitle: String {
+        switch self {
+        case .streams:
+            "Streams"
+        case .history:
+            "History"
+        }
+    }
+
+    @MainActor
+    func isLoading(sessionStore: PlexSessionStore, historyStore: PlexHistoryStore) -> Bool {
+        switch self {
+        case .streams:
+            sessionStore.isLoading
+        case .history:
+            historyStore.isLoading
+        }
+    }
+
+    @MainActor
+    func inlineErrorMessage(
+        sessionStore: PlexSessionStore,
+        historyStore: PlexHistoryStore
+    ) -> String? {
+        switch self {
+        case .streams:
+            guard !sessionStore.sessions.isEmpty else {
+                return nil
+            }
+
+            return sessionStore.errorMessage
+        case .history:
+            guard !historyStore.recentItems.isEmpty else {
+                return nil
+            }
+
+            return historyStore.errorMessage
+        }
+    }
+}
+
+private struct MenuBarContentHeightPreferenceKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {

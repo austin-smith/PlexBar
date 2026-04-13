@@ -2,6 +2,10 @@
 
 This file defines project constraints for coding agents working in this repository.
 
+## Reference Documentation
+
+- Plex API documentation: `https://developer.plex.tv/pms/`
+
 ## Platform + App Contract
 
 - PlexBar is a macOS-only app built with SwiftPM.
