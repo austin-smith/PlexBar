@@ -135,6 +135,76 @@ struct PlexAPIClient {
             throw PlexAPIError.decodingFailed(error)
         }
     }
+
+    func fetchMetadataItems(
+        using configuration: PlexConnectionConfiguration,
+        ids: [String],
+        chunkSize: Int = 50
+    ) async throws -> [PlexMetadataItem] {
+        guard !ids.isEmpty else {
+            return []
+        }
+
+        var items: [PlexMetadataItem] = []
+
+        for chunk in ids.chunked(into: chunkSize) {
+            guard let endpoint = PlexURLBuilder.endpointURL(
+                serverURL: configuration.serverURL,
+                path: "/library/metadata/\(chunk.joined(separator: ","))"
+            ) else {
+                throw PlexAPIError.invalidServerURL
+            }
+
+            let request = PlexRequestBuilder(clientContext: configuration.clientContext).request(
+                url: endpoint,
+                accept: "application/json",
+                token: configuration.token
+            )
+
+            let (data, response) = try await session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw PlexAPIError.invalidResponse
+            }
+
+            guard (200..<300).contains(httpResponse.statusCode) else {
+                throw PlexAPIError.badStatusCode(httpResponse.statusCode)
+            }
+
+            do {
+                let decodedResponse = try JSONDecoder().decode(PlexMetadataEnvelope.self, from: data)
+                items.append(contentsOf: decodedResponse.mediaContainer.metadata ?? [])
+            } catch {
+                throw PlexAPIError.decodingFailed(error)
+            }
+        }
+
+        return items
+    }
+
+    func fetchHistorySeriesIdentities(
+        using configuration: PlexConnectionConfiguration,
+        episodeIDs: [String]
+    ) async throws -> [String: PlexHistorySeriesIdentity] {
+        guard !episodeIDs.isEmpty else {
+            return [:]
+        }
+
+        let requestedEpisodeIDs = Set(episodeIDs)
+        let metadataItems = try await fetchMetadataItems(
+            using: configuration,
+            ids: Array(requestedEpisodeIDs).sorted()
+        )
+
+        let resolvedIdentities = Dictionary(uniqueKeysWithValues: metadataItems.compactMap(\.historySeriesResolution))
+        let unresolvedEpisodeIDs = requestedEpisodeIDs.subtracting(resolvedIdentities.keys)
+
+        guard unresolvedEpisodeIDs.isEmpty else {
+            throw PlexAPIError.missingHistorySeriesIdentity(Array(unresolvedEpisodeIDs).sorted())
+        }
+
+        return resolvedIdentities
+    }
 }
 
 struct PlexConnectionConfiguration {
@@ -149,6 +219,7 @@ enum PlexAPIError: LocalizedError {
     case invalidResponse
     case badStatusCode(Int)
     case decodingFailed(Error)
+    case missingHistorySeriesIdentity([String])
 
     var errorDescription: String? {
         switch self {
@@ -162,6 +233,8 @@ enum PlexAPIError: LocalizedError {
             return "Plex returned HTTP \(statusCode). Check the server URL and token."
         case .decodingFailed:
             return "Plex returned data in an unexpected format."
+        case .missingHistorySeriesIdentity:
+            return "Plex did not return enough metadata to build watch history charts."
         }
     }
 }
@@ -211,5 +284,72 @@ private struct PlexStatisticsContainer: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case accounts = "Account"
+    }
+}
+
+struct PlexMetadataItem: Decodable, Equatable {
+    let ratingKey: String
+    let grandparentRatingKey: String?
+    let grandparentTitle: String?
+    let grandparentThumb: String?
+
+    enum CodingKeys: String, CodingKey {
+        case ratingKey
+        case grandparentRatingKey
+        case grandparentTitle
+        case grandparentThumb
+    }
+
+    var historySeriesResolution: (String, PlexHistorySeriesIdentity)? {
+        guard let episodeID = ratingKey.nilIfBlank,
+              let seriesID = grandparentRatingKey?.nilIfBlank,
+              let seriesTitle = grandparentTitle?.nilIfBlank else {
+            return nil
+        }
+
+        return (
+            episodeID,
+            PlexHistorySeriesIdentity(
+                id: seriesID,
+                title: seriesTitle,
+                posterPath: grandparentThumb?.nilIfBlank
+            )
+        )
+    }
+}
+
+private struct PlexMetadataEnvelope: Decodable {
+    let mediaContainer: PlexMetadataContainer
+
+    enum CodingKeys: String, CodingKey {
+        case mediaContainer = "MediaContainer"
+    }
+}
+
+private struct PlexMetadataContainer: Decodable {
+    let metadata: [PlexMetadataItem]?
+
+    enum CodingKeys: String, CodingKey {
+        case metadata = "Metadata"
+    }
+}
+
+private extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else {
+            return [self]
+        }
+
+        var chunks: [[Element]] = []
+        chunks.reserveCapacity((count + size - 1) / size)
+
+        var startIndex = 0
+        while startIndex < count {
+            let endIndex = Swift.min(startIndex + size, count)
+            chunks.append(Array(self[startIndex..<endIndex]))
+            startIndex = endIndex
+        }
+
+        return chunks
     }
 }

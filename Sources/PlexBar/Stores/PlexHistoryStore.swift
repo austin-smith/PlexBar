@@ -11,6 +11,7 @@ final class PlexHistoryStore {
     private var pollingTask: Task<Void, Never>?
 
     var recentItems: [PlexHistoryItem] = []
+    var seriesByEpisodeID: [String: PlexHistorySeriesIdentity] = [:]
     var accountsByID: [Int: PlexAccount] = [:]
     var isLoading = false
     var errorMessage: String?
@@ -23,7 +24,12 @@ final class PlexHistoryStore {
     }
 
     var topTitleEntries: [PlexTopChartEntry] {
-        PlexHistoryAnalytics.topTitleEntries(from: recentItems, accountsByID: accountsByID, limit: 5)
+        PlexHistoryAnalytics.topTitleEntries(
+            from: recentItems,
+            accountsByID: accountsByID,
+            seriesByEpisodeID: seriesByEpisodeID,
+            limit: 5
+        )
     }
 
     var topTypeEntries: [PlexTopChartEntry] {
@@ -77,6 +83,7 @@ final class PlexHistoryStore {
     private func refresh() async {
         guard settings.hasValidConfiguration else {
             recentItems = []
+            seriesByEpisodeID = [:]
             accountsByID = [:]
             errorMessage = nil
             isLoading = false
@@ -101,8 +108,13 @@ final class PlexHistoryStore {
             async let accountsTask = client.fetchAccounts(using: configuration)
 
             let recentItems = try await historyTask
+            let seriesByEpisodeID = try await client.fetchHistorySeriesIdentities(
+                using: configuration,
+                episodeIDs: recentItems.compactMap(\.episodeMetadataItemID)
+            )
 
             self.recentItems = recentItems
+            self.seriesByEpisodeID = seriesByEpisodeID
 
             do {
                 let accounts = try await accountsTask

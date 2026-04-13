@@ -1,5 +1,11 @@
 import Foundation
 
+struct PlexHistorySeriesIdentity: Equatable {
+    let id: String
+    let title: String
+    let posterPath: String?
+}
+
 struct PlexHistoryItem: Decodable, Identifiable {
     let historyKey: String?
     let key: String?
@@ -119,6 +125,14 @@ struct PlexHistoryItem: Decodable, Identifiable {
         PlexSessionContentKind(type: type, live: false)
     }
 
+    var episodeMetadataItemID: String? {
+        guard contentKind == .tv else {
+            return nil
+        }
+
+        return ratingKey?.nilIfBlank
+    }
+
     var posterPath: String? {
         preferredPosterCandidates
             .compactMap { $0?.nilIfBlank }
@@ -159,21 +173,37 @@ struct PlexHistoryItem: Decodable, Identifiable {
         return formatter.localizedString(for: viewedAt, relativeTo: .now)
     }
 
-    var chartGroupKey: String {
+    func chartGroupKey(seriesByEpisodeID: [String: PlexHistorySeriesIdentity]) -> String? {
         switch contentKind {
         case .tv:
-            return "tv:\(grandparentTitle ?? ratingKey ?? title)"
+            guard let episodeID = ratingKey?.nilIfBlank,
+                  let seriesIdentity = seriesByEpisodeID[episodeID] else {
+                return nil
+            }
+
+            return "tv:\(seriesIdentity.id)"
         default:
             return "\(contentKind.rawValue):\(ratingKey ?? key ?? title)"
         }
     }
 
-    var chartDisplayTitle: String {
+    func chartDisplayTitle(seriesByEpisodeID: [String: PlexHistorySeriesIdentity]) -> String {
         switch contentKind {
         case .tv:
-            grandparentTitle ?? title
+            let episodeID = ratingKey?.nilIfBlank
+            return episodeID.flatMap { seriesByEpisodeID[$0]?.title } ?? grandparentTitle ?? title
         default:
-            title
+            return title
+        }
+    }
+
+    func chartPosterPath(seriesByEpisodeID: [String: PlexHistorySeriesIdentity]) -> String? {
+        switch contentKind {
+        case .tv:
+            let episodeID = ratingKey?.nilIfBlank
+            return episodeID.flatMap { seriesByEpisodeID[$0]?.posterPath } ?? posterPath
+        default:
+            return posterPath
         }
     }
 
@@ -230,18 +260,29 @@ enum PlexHistoryAnalytics {
     static func topTitleEntries(
         from items: [PlexHistoryItem],
         accountsByID: [Int: PlexAccount],
+        seriesByEpisodeID: [String: PlexHistorySeriesIdentity],
         limit: Int
     ) -> [PlexTopChartEntry] {
-        Dictionary(grouping: items, by: \.chartGroupKey)
+        Dictionary(grouping: items.compactMap { item in
+            item.chartGroupKey(seriesByEpisodeID: seriesByEpisodeID).map { ($0, item) }
+        }, by: \.0)
             .values
+            .map { $0.map(\.1) }
             .sorted { lhs, rhs in
                 if lhs.count != rhs.count {
                     return lhs.count > rhs.count
                 }
 
-                let lhsTitle = lhs.first?.chartDisplayTitle ?? ""
-                let rhsTitle = rhs.first?.chartDisplayTitle ?? ""
-                return lhsTitle.localizedCaseInsensitiveCompare(rhsTitle) == .orderedAscending
+                let lhsTitle = lhs.first?.chartDisplayTitle(seriesByEpisodeID: seriesByEpisodeID) ?? ""
+                let rhsTitle = rhs.first?.chartDisplayTitle(seriesByEpisodeID: seriesByEpisodeID) ?? ""
+
+                if lhsTitle.localizedCaseInsensitiveCompare(rhsTitle) != .orderedSame {
+                    return lhsTitle.localizedCaseInsensitiveCompare(rhsTitle) == .orderedAscending
+                }
+
+                let lhsID = lhs.first?.chartGroupKey(seriesByEpisodeID: seriesByEpisodeID) ?? ""
+                let rhsID = rhs.first?.chartGroupKey(seriesByEpisodeID: seriesByEpisodeID) ?? ""
+                return lhsID < rhsID
             }
             .prefix(limit)
             .map { group in
@@ -249,11 +290,11 @@ enum PlexHistoryAnalytics {
                 let playCount = group.count
 
                 return PlexTopChartEntry(
-                    id: representative.chartGroupKey,
-                    title: representative.chartDisplayTitle,
+                    id: representative.chartGroupKey(seriesByEpisodeID: seriesByEpisodeID) ?? representative.id,
+                    title: representative.chartDisplayTitle(seriesByEpisodeID: seriesByEpisodeID),
                     subtitle: chartSubtitle(for: group, representative: representative),
                     playCount: playCount,
-                    posterPath: representative.posterPath,
+                    posterPath: representative.chartPosterPath(seriesByEpisodeID: seriesByEpisodeID),
                     symbolName: representative.contentKind.symbolName,
                     watcherSummary: watcherSummary(for: group, accountsByID: accountsByID),
                     coverageLabel: coverageLabel(for: group, representative: representative),

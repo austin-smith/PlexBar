@@ -47,6 +47,31 @@ import Testing
             return (response, data)
         }
 
+        if url.path == "/library/metadata/500" {
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            {
+              "MediaContainer": {
+                "Metadata": [
+                  {
+                    "ratingKey": "500",
+                    "type": "episode",
+                    "grandparentRatingKey": "900",
+                    "grandparentTitle": "Bob's Burgers",
+                    "grandparentThumb": "/library/metadata/900/thumb/1715112830"
+                  }
+                ]
+              }
+            }
+            """#.data(using: .utf8))
+            return (response, data)
+        }
+
         if url.path == "/statistics/media" {
             let response = try #require(HTTPURLResponse(
                 url: url,

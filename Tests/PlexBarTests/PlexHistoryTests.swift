@@ -87,9 +87,22 @@ import Testing
         1: PlexAccount(id: 1, name: "myveryownsarah", thumb: nil),
         2: PlexAccount(id: 2, name: "smitty_", thumb: nil),
     ]
+    let seriesByEpisodeID = [
+        "2001": PlexHistorySeriesIdentity(
+            id: "show-search-party",
+            title: "Search Party",
+            posterPath: "/library/metadata/show-thumb"
+        ),
+        "2002": PlexHistorySeriesIdentity(
+            id: "show-search-party",
+            title: "Search Party",
+            posterPath: "/library/metadata/show-thumb"
+        ),
+    ]
     let topTitles = PlexHistoryAnalytics.topTitleEntries(
         from: [firstEpisode, secondEpisode, movie],
         accountsByID: accountsByID,
+        seriesByEpisodeID: seriesByEpisodeID,
         limit: 3
     )
 
@@ -101,6 +114,66 @@ import Testing
     #expect(topTitles.first?.coverageLabel == "2 episodes")
     #expect(topTitles.first?.viewerCountLabel == "1 viewer")
     #expect(topTitles.last?.title == "Heat")
+}
+
+@Test func keepsDistinctSeriesSeparateWhenTitlesMatch() async throws {
+    let firstSeriesEpisode = PlexHistoryItem(
+        historyKey: "/status/sessions/history/101",
+        key: "/library/metadata/4101",
+        ratingKey: "4101",
+        title: "Pilot",
+        type: "episode",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: "/library/metadata/us-office-thumb",
+        art: nil,
+        grandparentTitle: "The Office",
+        parentTitle: "Season 1",
+        parentIndex: 1,
+        index: 1,
+        originallyAvailableAt: "2005-03-24",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        accountID: 1
+    )
+    let secondSeriesEpisode = PlexHistoryItem(
+        historyKey: "/status/sessions/history/102",
+        key: "/library/metadata/4201",
+        ratingKey: "4201",
+        title: "Downsize",
+        type: "episode",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: "/library/metadata/uk-office-thumb",
+        art: nil,
+        grandparentTitle: "The Office",
+        parentTitle: "Season 1",
+        parentIndex: 1,
+        index: 1,
+        originallyAvailableAt: "2001-07-09",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_100),
+        accountID: 2
+    )
+
+    let topTitles = PlexHistoryAnalytics.topTitleEntries(
+        from: [firstSeriesEpisode, secondSeriesEpisode],
+        accountsByID: [:],
+        seriesByEpisodeID: [
+            "4101": PlexHistorySeriesIdentity(
+                id: "show-office-us",
+                title: "The Office",
+                posterPath: "/library/metadata/us-office-thumb"
+            ),
+            "4201": PlexHistorySeriesIdentity(
+                id: "show-office-uk",
+                title: "The Office",
+                posterPath: "/library/metadata/uk-office-thumb"
+            ),
+        ],
+        limit: 5
+    )
+
+    #expect(topTitles.count == 2)
+    #expect(Set(topTitles.map(\.id)) == ["tv:show-office-us", "tv:show-office-uk"])
 }
 
 @Test func decodesViewedAtTimestampFromHistoryPayload() async throws {
