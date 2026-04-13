@@ -55,16 +55,18 @@ private struct LibraryCardView: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: library.type.symbolName)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.68))
+                        .shadow(color: .black.opacity(0.35), radius: 3, x: 0, y: 1)
 
                     Text(library.title)
                         .font(.headline.weight(.semibold))
                         .foregroundStyle(.white)
                         .lineLimit(2)
+                        .shadow(color: .black.opacity(0.45), radius: 4, x: 0, y: 1)
                 }
 
                 HStack(spacing: 6) {
@@ -73,13 +75,21 @@ private struct LibraryCardView: View {
                 }
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.9))
+                .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 1)
 
                 Text(statusLine)
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(1)
+                    .shadow(color: .black.opacity(0.24), radius: 2, x: 0, y: 1)
             }
-            .padding(14)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background {
+                LibraryTextPlate()
+            }
+            .padding(.leading, 12)
+            .padding(.bottom, 8)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 152)
@@ -115,5 +125,12 @@ private struct LibraryCardView: View {
         }
 
         return "\(library.statusPrefix) \(statusDate.formatted(.relative(presentation: .named)))"
+    }
+}
+
+private struct LibraryTextPlate: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(.black.opacity(0.34))
     }
 }
