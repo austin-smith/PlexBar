@@ -11,8 +11,12 @@ DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
+APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
+APP_ICON_NAME="PlexBarAppIcon"
+APP_ICON_SOURCE="$ROOT_DIR/$APP_ICON_NAME.icon"
+ACTOOL="$(xcrun --find actool)"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
@@ -20,7 +24,7 @@ swift build
 BUILD_BINARY="$(swift build --show-bin-path)/$APP_NAME"
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_MACOS"
+mkdir -p "$APP_MACOS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 
@@ -44,6 +48,46 @@ cat >"$INFO_PLIST" <<PLIST
 </dict>
 </plist>
 PLIST
+
+if [[ -d "$APP_ICON_SOURCE" ]]; then
+  ASSET_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/PlexBarAppIcon.XXXXXX")"
+  ASSET_CATALOG="$ASSET_WORK_DIR/PlexBarAssets.xcassets"
+  ASSET_OUTPUT="$ASSET_WORK_DIR/output"
+  ASSET_INFO_PLIST="$ASSET_WORK_DIR/icon-info.plist"
+  cleanup_icon_workdir() {
+    rm -rf "$ASSET_WORK_DIR"
+  }
+  trap cleanup_icon_workdir EXIT
+
+  mkdir -p "$ASSET_CATALOG" "$ASSET_OUTPUT"
+  printf '{"info":{"author":"xcode","version":1}}\n' > "$ASSET_CATALOG/Contents.json"
+
+  "$ACTOOL" \
+    "$ASSET_CATALOG" \
+    "$APP_ICON_SOURCE" \
+    --compile "$ASSET_OUTPUT" \
+    --output-format human-readable-text \
+    --notices \
+    --warnings \
+    --output-partial-info-plist "$ASSET_INFO_PLIST" \
+    --app-icon "$APP_ICON_NAME" \
+    --target-device mac \
+    --minimum-deployment-target "$MIN_SYSTEM_VERSION" \
+    --platform macosx \
+    --bundle-identifier "$BUNDLE_ID"
+
+  if [[ ! -f "$ASSET_OUTPUT/Assets.car" || ! -f "$ASSET_OUTPUT/$APP_ICON_NAME.icns" ]]; then
+    echo "actool did not produce the expected app icon outputs." >&2
+    exit 1
+  fi
+
+  cp "$ASSET_OUTPUT/Assets.car" "$APP_RESOURCES/Assets.car"
+  cp "$ASSET_OUTPUT/$APP_ICON_NAME.icns" "$APP_RESOURCES/$APP_ICON_NAME.icns"
+  /usr/libexec/PlistBuddy -c "Merge $ASSET_INFO_PLIST" "$INFO_PLIST"
+
+  trap - EXIT
+  cleanup_icon_workdir
+fi
 
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"
