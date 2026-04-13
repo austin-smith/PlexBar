@@ -409,46 +409,25 @@ struct DashboardPanelModifier: ViewModifier {
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
 
-        if #available(macOS 26.0, *) {
-            content
-                .background {
-                    shape
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    accent.opacity(0.7),
-                                    Color.white.opacity(0.035),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+        content
+            .background {
+                shape
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                accent.opacity(0.7),
+                                Color.white.opacity(0.035),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
-                        .background(.thinMaterial, in: shape)
-                }
-                .overlay {
-                    shape.strokeBorder(.white.opacity(0.08))
-                }
-                .glassEffect(.regular, in: .rect(cornerRadius: 20))
-        } else {
-            content
-                .background {
-                    shape
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    accent.opacity(0.7),
-                                    Color.white.opacity(0.035),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .background(.thinMaterial, in: shape)
-                }
-                .overlay {
-                    shape.strokeBorder(.white.opacity(0.08))
-                }
-        }
+                    )
+                    .background(.thinMaterial, in: shape)
+            }
+            .overlay {
+                shape.strokeBorder(.white.opacity(0.08))
+            }
+            .glassEffect(.regular, in: .rect(cornerRadius: 20))
     }
 }
 

@@ -9,7 +9,7 @@ This file defines project constraints for coding agents working in this reposito
 ## Platform + App Contract
 
 - PlexBar is a macOS-only app built with SwiftPM.
-- Minimum supported platform is macOS 14+.
+- Minimum supported platform is macOS 26+.
 - The app is menu-bar-first and should remain an accessory app without a Dock icon unless otherwise explicitly requested.
 - UI work should stay SwiftUI-first.
 - Do not introduce AppKit UI implementations unless a maintainer explicitly asks.

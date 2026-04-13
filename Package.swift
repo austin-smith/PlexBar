@@ -6,7 +6,7 @@ import PackageDescription
 let package = Package(
     name: "PlexBar",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v26)
     ],
     products: [
         .executable(
