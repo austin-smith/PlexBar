@@ -23,7 +23,12 @@ struct HistoryDashboardView: View {
             }
 
             if !historyStore.topTypeEntries.isEmpty {
-                HistoryMixCard(entries: historyStore.topTypeEntries)
+                HistoryMixCard(
+                    entries: historyStore.topTypeEntries,
+                    accountsByID: historyStore.accountsByID,
+                    settingsStore: settingsStore,
+                    clientContext: clientContext
+                )
             }
 
             if !historyStore.recentItems.isEmpty {
@@ -35,17 +40,6 @@ struct HistoryDashboardView: View {
                     accountsByID: historyStore.accountsByID
                 )
             }
-        }
-    }
-
-    private func sectionHeader(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(.headline)
-
-            Text(subtitle)
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 }
@@ -91,7 +85,8 @@ private struct RecentPlaysCard: View {
                     ForEach(filteredItems) { item in
                         RecentHistoryCardView(
                             item: item,
-                            watcher: item.watcherName(using: accountsByID),
+                            watcherName: item.watcherName(using: accountsByID),
+                            watcherAccount: item.watcherAccount(using: accountsByID),
                             settingsStore: settingsStore,
                             clientContext: clientContext
                         )
@@ -165,6 +160,7 @@ private struct TopChartsCard: View {
                         TopChartRow(
                             rank: index + 1,
                             entry: entry,
+                            accountsByID: accountsByID,
                             settingsStore: settingsStore,
                             clientContext: clientContext
                         )
@@ -195,8 +191,13 @@ private struct HistorySectionFilterPicker: View {
 private struct TopChartRow: View {
     let rank: Int
     let entry: PlexTopChartEntry
+    let accountsByID: [Int: PlexAccount]
     let settingsStore: PlexSettingsStore
     let clientContext: PlexClientContext
+
+    private var watcherAccounts: [PlexAccount] {
+        entry.watcherAccountIDs.compactMap { accountsByID[$0] }
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -226,12 +227,15 @@ private struct TopChartRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
 
-                if let watcherSummary = entry.watcherSummary {
-                    Text(watcherSummary)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                }
+                HistoryWatcherIdentityView(
+                    summary: entry.watcherSummary ?? entry.viewerCountLabel,
+                    accounts: watcherAccounts,
+                    settingsStore: settingsStore,
+                    clientContext: clientContext,
+                    avatarSize: 16,
+                    font: .caption2,
+                    foregroundStyle: .tertiary
+                )
             }
 
             Spacer(minLength: 8)
@@ -269,6 +273,9 @@ private struct TopChartRow: View {
 
 private struct HistoryMixCard: View {
     let entries: [PlexTopChartEntry]
+    let accountsByID: [Int: PlexAccount]
+    let settingsStore: PlexSettingsStore
+    let clientContext: PlexClientContext
 
     private let columns = [
         GridItem(.flexible(), spacing: 10),
@@ -302,12 +309,16 @@ private struct HistoryMixCard: View {
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)
 
-                            if let watcherSummary = entry.watcherSummary {
-                                Text(watcherSummary)
-                                    .font(.caption2)
-                                    .foregroundStyle(.tertiary)
-                                    .lineLimit(2)
-                            }
+                            HistoryWatcherIdentityView(
+                                summary: entry.watcherSummary ?? entry.viewerCountLabel,
+                                accounts: entry.watcherAccountIDs.compactMap { accountsByID[$0] },
+                                settingsStore: settingsStore,
+                                clientContext: clientContext,
+                                avatarSize: 16,
+                                font: .caption2,
+                                foregroundStyle: .tertiary,
+                                lineLimit: 2
+                            )
                         }
 
                         Spacer(minLength: 0)
@@ -329,7 +340,8 @@ private struct HistoryMixCard: View {
 
 private struct RecentHistoryCardView: View {
     let item: PlexHistoryItem
-    let watcher: String?
+    let watcherName: String?
+    let watcherAccount: PlexAccount?
     let settingsStore: PlexSettingsStore
     let clientContext: PlexClientContext
 
@@ -367,12 +379,15 @@ private struct RecentHistoryCardView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-                if let watcher {
-                    Text(watcher)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                HistoryWatcherIdentityView(
+                    summary: watcherName,
+                    accounts: watcherAccount.map { [$0] } ?? [],
+                    settingsStore: settingsStore,
+                    clientContext: clientContext,
+                    avatarSize: 18,
+                    font: .caption.weight(.medium),
+                    foregroundStyle: .secondary
+                )
             }
 
             Spacer(minLength: 8)
@@ -400,6 +415,87 @@ private struct RecentHistoryCardView: View {
             width: 116,
             height: 160
         )
+    }
+}
+
+private struct HistoryWatcherIdentityView: View {
+    let summary: String?
+    let accounts: [PlexAccount]
+    let settingsStore: PlexSettingsStore
+    let clientContext: PlexClientContext
+    let avatarSize: CGFloat
+    let font: Font
+    let foregroundStyle: HierarchicalShapeStyle
+    var lineLimit: Int = 1
+
+    private var displayAccounts: [PlexAccount] {
+        Array(accounts.prefix(3))
+    }
+
+    var body: some View {
+        if let summary = summary?.nilIfBlank {
+            HStack(spacing: 8) {
+                if displayAccounts.count == 1, let account = displayAccounts.first {
+                    PlexAvatarView(
+                        thumb: account.thumb,
+                        serverURL: settingsStore.normalizedServerURL,
+                        serverToken: settingsStore.trimmedServerToken,
+                        userToken: settingsStore.trimmedUserToken,
+                        clientContext: clientContext,
+                        size: avatarSize
+                    )
+                } else if !displayAccounts.isEmpty {
+                    WatcherAvatarStack(
+                        accounts: displayAccounts,
+                        settingsStore: settingsStore,
+                        clientContext: clientContext,
+                        size: avatarSize
+                    )
+                }
+
+                Text(summary)
+                    .font(font)
+                    .foregroundStyle(foregroundStyle)
+                    .lineLimit(lineLimit)
+            }
+        }
+    }
+}
+
+private struct WatcherAvatarStack: View {
+    let accounts: [PlexAccount]
+    let settingsStore: PlexSettingsStore
+    let clientContext: PlexClientContext
+    let size: CGFloat
+
+    private var overlapOffset: CGFloat {
+        size * 0.42
+    }
+
+    private var width: CGFloat {
+        size + CGFloat(max(accounts.count - 1, 0)) * overlapOffset
+    }
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            ForEach(Array(accounts.enumerated()), id: \.element.id) { index, account in
+                PlexAvatarView(
+                    thumb: account.thumb,
+                    serverURL: settingsStore.normalizedServerURL,
+                    serverToken: settingsStore.trimmedServerToken,
+                    userToken: settingsStore.trimmedUserToken,
+                    clientContext: clientContext,
+                    size: size
+                )
+                .overlay {
+                    Circle()
+                        .stroke(.black.opacity(0.22), lineWidth: 1)
+                }
+                .offset(x: CGFloat(index) * overlapOffset)
+                .zIndex(Double(accounts.count - index))
+            }
+        }
+        .frame(width: width, height: size, alignment: .leading)
     }
 }
 

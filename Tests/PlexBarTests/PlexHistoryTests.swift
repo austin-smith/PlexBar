@@ -111,6 +111,7 @@ import Testing
     #expect(topTitles.first?.posterPath == "/library/metadata/show-thumb")
     #expect(topTitles.first?.subtitle == "2 recent plays across 2 episodes")
     #expect(topTitles.first?.watcherSummary == "myveryownsarah")
+    #expect(topTitles.first?.watcherAccountIDs == [1])
     #expect(topTitles.first?.coverageLabel == "2 episodes")
     #expect(topTitles.first?.viewerCountLabel == "1 viewer")
     #expect(topTitles.last?.title == "Heat")
@@ -395,6 +396,96 @@ import Testing
     #expect(topTitles.count == 1)
     #expect(topTitles.first?.playCount == 2)
     #expect(topTitles.first?.watcherSummary == "russy52")
+    #expect(topTitles.first?.watcherAccountIDs == [2])
+}
+
+@Test func topTitleChartsRankWatcherAccountIDsByPlaysThenName() async throws {
+    let first = PlexHistoryItem(
+        historyKey: "/status/sessions/history/1",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        accountID: 3
+    )
+    let second = PlexHistoryItem(
+        historyKey: "/status/sessions/history/2",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_100),
+        accountID: 1
+    )
+    let third = PlexHistoryItem(
+        historyKey: "/status/sessions/history/3",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_200),
+        accountID: 1
+    )
+    let fourth = PlexHistoryItem(
+        historyKey: "/status/sessions/history/4",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_300),
+        accountID: 2
+    )
+
+    let topTitles = PlexHistoryAnalytics.topTitleEntries(
+        from: [first, second, third, fourth],
+        accountsByID: [
+            1: PlexAccount(id: 1, name: "anna", thumb: nil),
+            2: PlexAccount(id: 2, name: "zoe", thumb: nil),
+            3: PlexAccount(id: 3, name: "mike", thumb: nil),
+        ],
+        seriesByEpisodeID: [:],
+        limit: 5
+    )
+
+    #expect(topTitles.first?.watcherSummary == "anna, mike, zoe")
+    #expect(topTitles.first?.watcherAccountIDs == [1, 3, 2])
 }
 
 @Test func keepsDistinctSeriesSeparateWhenTitlesMatch() async throws {

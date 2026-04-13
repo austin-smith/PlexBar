@@ -240,6 +240,14 @@ struct PlexHistoryItem: Decodable, Identifiable {
         return accountsByID[accountID]?.name.nilIfBlank
     }
 
+    func watcherAccount(using accountsByID: [Int: PlexAccount]) -> PlexAccount? {
+        guard let accountID else {
+            return nil
+        }
+
+        return accountsByID[accountID]
+    }
+
     private var releaseYear: String? {
         guard let component = originallyAvailableAt?
             .split(separator: "-")
@@ -277,6 +285,7 @@ struct PlexTopChartEntry: Identifiable, Equatable {
     let posterPath: String?
     let symbolName: String?
     let watcherSummary: String?
+    let watcherAccountIDs: [Int]
     let coverageLabel: String?
     let viewerCountLabel: String?
 }
@@ -384,6 +393,7 @@ enum PlexHistoryAnalytics {
                     posterPath: representative.chartPosterPath(seriesByEpisodeID: seriesByEpisodeID),
                     symbolName: representative.contentKind.symbolName,
                     watcherSummary: watcherSummary(for: group, accountsByID: accountsByID),
+                    watcherAccountIDs: watcherAccountIDs(for: group, accountsByID: accountsByID),
                     coverageLabel: coverageLabel(for: group, representative: representative),
                     viewerCountLabel: viewerCountLabel(for: group)
                 )
@@ -405,6 +415,7 @@ enum PlexHistoryAnalytics {
                     posterPath: nil,
                     symbolName: kind.symbolName,
                     watcherSummary: watcherSummary(for: group, accountsByID: accountsByID),
+                    watcherAccountIDs: watcherAccountIDs(for: group, accountsByID: accountsByID),
                     coverageLabel: nil,
                     viewerCountLabel: viewerCountLabel(for: group)
                 )
@@ -475,9 +486,34 @@ enum PlexHistoryAnalytics {
         for items: [PlexHistoryItem],
         accountsByID: [Int: PlexAccount]
     ) -> String? {
-        let rankedWatchers = Dictionary(grouping: items.compactMap(\.accountID), by: { $0 })
+        let rankedWatchers = rankedWatchers(for: items, accountsByID: accountsByID)
+            .prefix(3)
+            .map(\.name)
+
+        guard !rankedWatchers.isEmpty else {
+            return nil
+        }
+
+        return rankedWatchers.joined(separator: ", ")
+    }
+
+    private static func watcherAccountIDs(
+        for items: [PlexHistoryItem],
+        accountsByID: [Int: PlexAccount]
+    ) -> [Int] {
+        rankedWatchers(for: items, accountsByID: accountsByID)
+            .prefix(3)
+            .map(\.id)
+    }
+
+    private static func rankedWatchers(
+        for items: [PlexHistoryItem],
+        accountsByID: [Int: PlexAccount]
+    ) -> [(id: Int, name: String, playCount: Int)] {
+        Dictionary(grouping: items.compactMap(\.accountID), by: { $0 })
             .map { accountID, plays in
                 (
+                    id: accountID,
                     name: accountsByID[accountID]?.name ?? "Account \(accountID)",
                     playCount: plays.count
                 )
@@ -489,14 +525,6 @@ enum PlexHistoryAnalytics {
 
                 return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
-            .prefix(3)
-            .map(\.name)
-
-        guard !rankedWatchers.isEmpty else {
-            return nil
-        }
-
-        return rankedWatchers.joined(separator: ", ")
     }
 
     private static func mostRecentItem(in items: some Sequence<PlexHistoryItem>) -> PlexHistoryItem? {

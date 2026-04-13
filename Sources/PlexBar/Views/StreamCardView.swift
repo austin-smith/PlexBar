@@ -82,8 +82,10 @@ struct StreamCardView: View {
                     UserIdentityRow(
                         userName: session.userDisplayName,
                         playerName: session.playerDisplayName,
-                        imageURL: userAvatarURL,
-                        token: userAvatarToken,
+                        thumb: session.user?.thumb,
+                        serverURL: settingsStore.normalizedServerURL,
+                        serverToken: settingsStore.trimmedServerToken,
+                        userToken: settingsStore.trimmedUserToken,
                         clientContext: clientContext
                     )
                 }
@@ -119,36 +121,6 @@ struct StreamCardView: View {
         )
     }
 
-    private var userAvatarURL: URL? {
-        guard let thumb = session.user?.thumb?.nilIfBlank else {
-            return nil
-        }
-
-        if let absoluteURL = URL(string: thumb), absoluteURL.scheme != nil {
-            return absoluteURL
-        }
-
-        guard let serverURL = settingsStore.normalizedServerURL else {
-            return nil
-        }
-
-        return PlexURLBuilder.mediaURL(
-            serverURL: serverURL,
-            path: thumb
-        )
-    }
-
-    private var userAvatarToken: String {
-        guard let imageURL = userAvatarURL, let host = imageURL.host?.lowercased() else {
-            return settingsStore.trimmedServerToken
-        }
-
-        if host.contains("plex.tv") {
-            return settingsStore.trimmedUserToken
-        }
-
-        return settingsStore.trimmedServerToken
-    }
 }
 
 private struct PosterThumbnailView: View {
@@ -289,15 +261,19 @@ private struct PosterThumbnailView: View {
 private struct UserIdentityRow: View {
     let userName: String
     let playerName: String
-    let imageURL: URL?
-    let token: String
+    let thumb: String?
+    let serverURL: URL?
+    let serverToken: String
+    let userToken: String
     let clientContext: PlexClientContext
 
     var body: some View {
         HStack(spacing: 10) {
-            UserAvatarView(
-                imageURL: imageURL,
-                token: token,
+            PlexAvatarView(
+                thumb: thumb,
+                serverURL: serverURL,
+                serverToken: serverToken,
+                userToken: userToken,
                 clientContext: clientContext
             )
 
@@ -316,83 +292,5 @@ private struct UserIdentityRow: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct UserAvatarView: View {
-    let imageURL: URL?
-    let token: String
-    let clientContext: PlexClientContext
-    let imageClient: PlexImageClient
-
-    @State private var image: Image?
-    @State private var isLoading = false
-
-    init(
-        imageURL: URL?,
-        token: String,
-        clientContext: PlexClientContext,
-        imageClient: PlexImageClient = PlexImageClient()
-    ) {
-        self.imageURL = imageURL
-        self.token = token
-        self.clientContext = clientContext
-        self.imageClient = imageClient
-        let cachedImage = imageURL.map { imageClient.cachedImage(from: [$0], token: token) } ?? nil
-        _image = State(initialValue: cachedImage.map(Image.init(nsImage:)))
-    }
-
-    var body: some View {
-        ZStack {
-            if let image {
-                image
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Circle()
-                    .fill(.quaternary)
-            }
-        }
-        .frame(width: 30, height: 30)
-        .clipShape(Circle())
-        .task(id: requestKey) {
-            await loadImage()
-        }
-    }
-
-    private var requestKey: String {
-        [imageURL?.absoluteString, token, clientContext.clientIdentifier]
-            .compactMap { $0 }
-            .joined(separator: "|")
-    }
-
-    @MainActor
-    private func loadImage() async {
-        guard let imageURL else {
-            image = nil
-            isLoading = false
-            return
-        }
-
-        if let cachedImage = imageClient.cachedImage(from: [imageURL], token: token) {
-            image = Image(nsImage: cachedImage)
-            isLoading = false
-            return
-        }
-
-        isLoading = true
-        image = nil
-
-        if let loadedImage = await imageClient.fetchImage(
-            from: [imageURL],
-            token: token,
-            clientContext: clientContext
-        ) {
-            image = Image(nsImage: loadedImage)
-        } else {
-            image = nil
-        }
-
-        isLoading = false
     }
 }
