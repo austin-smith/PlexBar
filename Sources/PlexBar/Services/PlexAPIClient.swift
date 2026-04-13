@@ -207,6 +207,54 @@ struct PlexAPIClient {
         return items
     }
 
+    func fetchRecentAddedPreviewItems(
+        using configuration: PlexConnectionConfiguration,
+        totalLimit: Int = 4,
+        perSectionLimit: Int = 8
+    ) async throws -> [PlexServerPreviewItem] {
+        guard totalLimit > 0, perSectionLimit > 0 else {
+            return []
+        }
+
+        let sections = try await fetchLibrarySections(using: configuration)
+            .filter(\.isBrowsableLibrary)
+
+        guard !sections.isEmpty else {
+            return []
+        }
+
+        return try await withThrowingTaskGroup(of: [PlexServerPreviewItem].self) { group in
+            for section in sections {
+                group.addTask {
+                    try await fetchRecentAddedItems(
+                        for: section,
+                        limit: perSectionLimit,
+                        using: configuration
+                    )
+                }
+            }
+
+            var allItems: [PlexServerPreviewItem] = []
+            for try await items in group {
+                allItems.append(contentsOf: items)
+            }
+
+            var seenItemIDs = Set<String>()
+            return allItems
+                .filter(\.hasArtwork)
+                .sorted { lhs, rhs in
+                    if lhs.addedAt != rhs.addedAt {
+                        return lhs.addedAt > rhs.addedAt
+                    }
+
+                    return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+                }
+                .filter { seenItemIDs.insert($0.id).inserted }
+                .prefix(totalLimit)
+                .map { $0 }
+        }
+    }
+
     func fetchHistorySeriesIdentities(
         using configuration: PlexConnectionConfiguration,
         episodeIDs: [String]
@@ -360,6 +408,47 @@ struct PlexAPIClient {
 
         let (_, response) = try await responseData(for: request)
         return totalSize(from: response) ?? 0
+    }
+
+    private func fetchRecentAddedItems(
+        for section: PlexLibrarySection,
+        limit: Int,
+        using configuration: PlexConnectionConfiguration
+    ) async throws -> [PlexServerPreviewItem] {
+        guard let endpoint = PlexURLBuilder.endpointURL(
+            serverURL: configuration.serverURL,
+            path: "/library/sections/\(section.key)/all"
+        ),
+        var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw PlexAPIError.invalidServerURL
+        }
+
+        components.queryItems = [
+            URLQueryItem(name: "sort", value: "addedAt:desc")
+        ]
+
+        guard let url = components.url else {
+            throw PlexAPIError.invalidServerURL
+        }
+
+        var request = PlexRequestBuilder(clientContext: configuration.clientContext).request(
+            url: url,
+            accept: "application/json",
+            token: configuration.token
+        )
+        request.setValue("0", forHTTPHeaderField: "X-Plex-Container-Start")
+        request.setValue(String(limit), forHTTPHeaderField: "X-Plex-Container-Size")
+
+        let (data, _) = try await responseData(for: request)
+
+        do {
+            let decodedResponse = try JSONDecoder().decode(PlexLibraryItemsEnvelope.self, from: data)
+            return decodedResponse.mediaContainer.metadata?.compactMap {
+                $0.serverPreviewItem(sectionID: section.key)
+            } ?? []
+        } catch {
+            throw PlexAPIError.decodingFailed(error)
+        }
     }
 
     private func data(for request: URLRequest) async throws -> Data {
@@ -549,10 +638,29 @@ private struct PlexLibraryItemsContainer: Decodable {
 }
 
 private struct PlexLibraryRecentItem: Decodable {
+    let ratingKey: String?
     let title: String?
     let addedAt: Int?
     let art: String?
     let thumb: String?
+
+    func serverPreviewItem(sectionID: String) -> PlexServerPreviewItem? {
+        guard let title = title?.nilIfBlank,
+              let addedAt else {
+            return nil
+        }
+
+        let identifier = ratingKey?.nilIfBlank
+            ?? "\(sectionID)|\(title)|\(addedAt)"
+
+        return PlexServerPreviewItem(
+            id: identifier,
+            title: title,
+            posterPath: thumb?.nilIfBlank,
+            artworkPath: art?.nilIfBlank,
+            addedAt: Date(timeIntervalSince1970: TimeInterval(addedAt))
+        )
+    }
 }
 
 private extension KeyedDecodingContainer {

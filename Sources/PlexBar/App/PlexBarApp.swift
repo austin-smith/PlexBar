@@ -16,16 +16,19 @@ struct PlexBarApp: App {
     @State private var sessionStore: PlexSessionStore
     @State private var historyStore: PlexHistoryStore
     @State private var libraryStore: PlexLibraryStore
+    @State private var serverPreviewStore: PlexServerPreviewStore
 
     init() {
         let settingsStore = PlexSettingsStore()
         let sessionStore = PlexSessionStore(settings: settingsStore)
         let libraryStore = PlexLibraryStore(settings: settingsStore)
         let historyStore = PlexHistoryStore(settings: settingsStore, libraryStore: libraryStore)
+        let serverPreviewStore = PlexServerPreviewStore()
         _settingsStore = State(initialValue: settingsStore)
         _sessionStore = State(initialValue: sessionStore)
         _historyStore = State(initialValue: historyStore)
         _libraryStore = State(initialValue: libraryStore)
+        _serverPreviewStore = State(initialValue: serverPreviewStore)
         _authStore = State(initialValue: PlexAuthStore(
             settings: settingsStore,
             sessionStore: sessionStore,
@@ -39,6 +42,7 @@ struct PlexBarApp: App {
             SettingsView(
                 settingsStore: settingsStore,
                 authStore: authStore,
+                previewStore: serverPreviewStore,
                 sessionStore: sessionStore,
                 historyStore: historyStore
             )

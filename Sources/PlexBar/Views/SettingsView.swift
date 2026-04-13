@@ -3,15 +3,46 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var settingsStore: PlexSettingsStore
     @Bindable var authStore: PlexAuthStore
+    @Bindable var previewStore: PlexServerPreviewStore
     @Bindable var sessionStore: PlexSessionStore
     @Bindable var historyStore: PlexHistoryStore
     @State private var isShowingServerList = false
 
     var body: some View {
-        if settingsStore.hasAuthenticatedAccount {
-            authenticatedView
-        } else {
-            unauthenticatedView
+        Group {
+            if settingsStore.hasAuthenticatedAccount {
+                authenticatedView
+            } else {
+                unauthenticatedView
+            }
+        }
+        .task(id: availableServerIDsKey) {
+            previewStore.reconcileServers(authStore.availableServers)
+
+            if let selectedServer {
+                previewStore.loadPreviewsIfNeeded(
+                    for: [selectedServer],
+                    clientIdentifier: settingsStore.clientIdentifier
+                )
+            }
+
+            if isShowingServerList {
+                previewStore.loadPreviewsIfNeeded(
+                    for: authStore.availableServers,
+                    clientIdentifier: settingsStore.clientIdentifier
+                )
+            }
+        }
+        .onChange(of: isShowingServerList) { _, isShowingServerList in
+            guard isShowingServerList else {
+                return
+            }
+
+            previewStore.reconcileServers(authStore.availableServers)
+            previewStore.refreshPreviews(
+                for: authStore.availableServers,
+                clientIdentifier: settingsStore.clientIdentifier
+            )
         }
     }
 
@@ -70,6 +101,11 @@ struct SettingsView: View {
                 Button("Refresh Servers") {
                     Task {
                         await authStore.refreshServers(autoSelectStoredServer: true)
+                        previewStore.reconcileServers(authStore.availableServers)
+                        previewStore.refreshPreviews(
+                            for: authStore.availableServers,
+                            clientIdentifier: settingsStore.clientIdentifier
+                        )
                     }
                 }
                 .buttonStyle(.bordered)
@@ -204,10 +240,16 @@ struct SettingsView: View {
     private var serverMenuLabel: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(selectedServer?.name ?? settingsStore.selectedServerName ?? "Choose a Server")
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(spacing: 8) {
+                    Text(selectedServer?.name ?? settingsStore.selectedServerName ?? "Choose a Server")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if let selectedServer {
+                        connectionBadge(for: selectedServer)
+                    }
+                }
 
                 Text(selectedServerSubtitle)
                     .font(.footnote)
@@ -217,6 +259,19 @@ struct SettingsView: View {
             }
 
             Spacer(minLength: 12)
+
+            if settingsStore.selectedServerIdentifier != nil {
+                PosterStackView(
+                    state: selectedServerPreviewState,
+                    serverURL: selectedServer?.selectedURL ?? settingsStore.normalizedServerURL,
+                    token: selectedServer?.accessToken ?? settingsStore.trimmedServerToken,
+                    clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier),
+                    posterWidth: 32,
+                    posterHeight: 48,
+                    overlap: 13,
+                    cornerRadius: 8
+                )
+            }
 
             Image(systemName: "chevron.down")
                 .font(.footnote.weight(.semibold))
@@ -235,7 +290,7 @@ struct SettingsView: View {
 
     private var serverListPopover: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
+            LazyVStack(alignment: .leading, spacing: 10) {
                 if authStore.availableServers.isEmpty {
                     Text("No servers available")
                         .font(.subheadline)
@@ -254,48 +309,119 @@ struct SettingsView: View {
                     }
                 }
             }
-            .padding(8)
+            .padding(10)
         }
-        .frame(minWidth: 320, idealWidth: 320, maxWidth: 320, minHeight: 220, idealHeight: 220, maxHeight: 280)
+        .frame(minWidth: 380, idealWidth: 380, maxWidth: 380, minHeight: 240, idealHeight: 260, maxHeight: 320)
+        .background(.regularMaterial)
     }
 
     @ViewBuilder
     private func serverListRow(for server: PlexServerResource) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            if settingsStore.selectedServerIdentifier == server.id {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.tint)
-            } else {
-                Image(systemName: "circle")
-                    .foregroundStyle(.secondary)
+        let isSelected = settingsStore.selectedServerIdentifier == server.id
+
+        HStack(spacing: 14) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+
+                    HStack(spacing: 8) {
+                        Text(server.name)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        connectionBadge(for: server)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(serverSubtitle(for: server))
+                        .font(.footnote)
+                        .fontDesign(.monospaced)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(server.name)
-                    .foregroundStyle(.primary)
+            Spacer(minLength: 12)
 
-                Text(server.displayProductVersion ?? "Plex Media Server")
-                    .font(.caption)
-                    .fontDesign(.monospaced)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 8)
+            PosterStackView(
+                state: previewStore.state(for: server.id),
+                serverURL: server.selectedURL,
+                token: server.accessToken,
+                clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier),
+                posterWidth: 42,
+                posterHeight: 62,
+                overlap: 17,
+                cornerRadius: 9
+            )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(rowBackground(isSelected: settingsStore.selectedServerIdentifier == server.id))
-        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 14)
+        .background(rowBackground(isSelected: isSelected))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(isSelected ? Color.accentColor.opacity(0.32) : Color.white.opacity(0.06))
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var selectedServerSubtitle: String {
-        selectedServer?.displayProductVersion ?? "Plex Media Server"
+        guard let selectedServer else {
+            return "Plex Media Server"
+        }
+
+        return serverSubtitle(for: selectedServer)
+    }
+
+    private var selectedServerPreviewState: PlexServerPreviewState {
+        previewStore.state(for: selectedServer?.id ?? settingsStore.selectedServerIdentifier)
+    }
+
+    private var availableServerIDsKey: String {
+        authStore.availableServers.map(\.id).sorted().joined(separator: "|")
+    }
+
+    private func serverSubtitle(for server: PlexServerResource) -> String {
+        server.displayProductVersion ?? "Plex Media Server"
+    }
+
+    @ViewBuilder
+    private func connectionBadge(for server: PlexServerResource) -> some View {
+        Text(server.connectionSummary)
+            .font(.system(size: 10.5, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 999, style: .continuous)
+                    .fill(Color.white.opacity(0.045))
+            )
     }
 
     private func rowBackground(isSelected: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(isSelected ? Color.white.opacity(0.08) : Color.clear)
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(
+                isSelected
+                    ? LinearGradient(
+                        colors: [
+                            Color.accentColor.opacity(0.18),
+                            Color.accentColor.opacity(0.08),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    : LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.06),
+                            Color.white.opacity(0.02),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+            )
     }
 }

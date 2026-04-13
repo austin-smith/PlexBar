@@ -22,6 +22,22 @@ struct PlexServerResource: Identifiable, Equatable {
 
         return productVersion.split(separator: "-", maxSplits: 1).first.map(String.init)
     }
+
+    var connectionSummary: String {
+        guard let preferredConnection else {
+            return "Unavailable"
+        }
+
+        if preferredConnection.relay {
+            return "Relay"
+        }
+
+        if preferredConnection.local {
+            return "Local"
+        }
+
+        return "Remote"
+    }
 }
 
 struct PlexServerConnection: Equatable {
