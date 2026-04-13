@@ -116,6 +116,287 @@ import Testing
     #expect(topTitles.last?.title == "Heat")
 }
 
+@Test func filtersTopTitleChartsToMoviesOnly() async throws {
+    let episode = PlexHistoryItem(
+        historyKey: "/status/sessions/history/1",
+        key: "/library/metadata/2001",
+        ratingKey: "2001",
+        title: "Pilot",
+        type: "episode",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: "/library/metadata/show-thumb",
+        art: nil,
+        grandparentTitle: "Search Party",
+        parentTitle: "Season 1",
+        parentIndex: 1,
+        index: 1,
+        originallyAvailableAt: "2016-11-21",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        accountID: 1
+    )
+    let movie = PlexHistoryItem(
+        historyKey: "/status/sessions/history/2",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: "/library/metadata/heat-thumb",
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_200),
+        accountID: 2
+    )
+
+    let topTitles = PlexHistoryAnalytics.topTitleEntries(
+        from: [episode, movie],
+        accountsByID: [:],
+        seriesByEpisodeID: [
+            "2001": PlexHistorySeriesIdentity(
+                id: "show-search-party",
+                title: "Search Party",
+                posterPath: "/library/metadata/show-thumb"
+            )
+        ],
+        limit: 5,
+        filter: .movies
+    )
+
+    #expect(topTitles.count == 1)
+    #expect(topTitles.first?.title == "Heat")
+}
+
+@Test func filtersTopTitleChartsToTVOnly() async throws {
+    let firstEpisode = PlexHistoryItem(
+        historyKey: "/status/sessions/history/1",
+        key: "/library/metadata/2001",
+        ratingKey: "2001",
+        title: "Pilot",
+        type: "episode",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: "/library/metadata/show-thumb",
+        art: nil,
+        grandparentTitle: "Search Party",
+        parentTitle: "Season 1",
+        parentIndex: 1,
+        index: 1,
+        originallyAvailableAt: "2016-11-21",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        accountID: 1
+    )
+    let movie = PlexHistoryItem(
+        historyKey: "/status/sessions/history/2",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: "/library/metadata/heat-thumb",
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_200),
+        accountID: 2
+    )
+
+    let topTitles = PlexHistoryAnalytics.topTitleEntries(
+        from: [firstEpisode, movie],
+        accountsByID: [:],
+        seriesByEpisodeID: [
+            "2001": PlexHistorySeriesIdentity(
+                id: "show-search-party",
+                title: "Search Party",
+                posterPath: "/library/metadata/show-thumb"
+            )
+        ],
+        limit: 5,
+        filter: .tv
+    )
+
+    #expect(topTitles.count == 1)
+    #expect(topTitles.first?.title == "Search Party")
+}
+
+@Test func filtersRecentItemsBeforeApplyingPreviewLimit() async throws {
+    let movie = PlexHistoryItem(
+        historyKey: "/status/sessions/history/100",
+        key: "/library/metadata/3100",
+        ratingKey: "3100",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        accountID: 1
+    )
+
+    let episodes = (0..<12).map { offset in
+        PlexHistoryItem(
+            historyKey: "/status/sessions/history/\(offset)",
+            key: "/library/metadata/20\(offset)",
+            ratingKey: "20\(offset)",
+            title: "Episode \(offset)",
+            type: "episode",
+            thumb: nil,
+            parentThumb: nil,
+            grandparentThumb: nil,
+            art: nil,
+            grandparentTitle: "Search Party",
+            parentTitle: "Season 1",
+            parentIndex: 1,
+            index: offset + 1,
+            originallyAvailableAt: "2016-11-21",
+            viewedAt: Date(timeIntervalSince1970: 1_700_000_100 + Double(offset)),
+            accountID: 1
+        )
+    }
+
+    let recentMovies = PlexHistoryAnalytics.recentItems(
+        from: episodes + [movie],
+        filter: .movies,
+        limit: 10
+    )
+
+    #expect(recentMovies.count == 1)
+    #expect(recentMovies.first?.title == "Heat")
+}
+
+@Test func groupsRawHistoryRowsIntoSharedWatchEvents() async throws {
+    let firstRow = PlexHistoryItem(
+        historyKey: "/status/sessions/history/1",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        accountID: 2,
+        deviceID: 55
+    )
+    let secondRow = PlexHistoryItem(
+        historyKey: "/status/sessions/history/2",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_300),
+        accountID: 2,
+        deviceID: 55
+    )
+
+    let groupedItems = PlexHistoryAnalytics.groupedWatchItems(from: [firstRow, secondRow])
+
+    #expect(groupedItems.count == 1)
+    #expect(groupedItems.first?.historyKey == "/status/sessions/history/2")
+}
+
+@Test func topTitleChartsCountGroupedWatchesInsteadOfRawRows() async throws {
+    let firstRow = PlexHistoryItem(
+        historyKey: "/status/sessions/history/1",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        accountID: 2,
+        deviceID: 55
+    )
+    let secondRow = PlexHistoryItem(
+        historyKey: "/status/sessions/history/2",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_300),
+        accountID: 2,
+        deviceID: 55
+    )
+    let thirdRow = PlexHistoryItem(
+        historyKey: "/status/sessions/history/3",
+        key: "/library/metadata/3001",
+        ratingKey: "3001",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_086_400),
+        accountID: 2,
+        deviceID: 55
+    )
+
+    let groupedItems = PlexHistoryAnalytics.groupedWatchItems(from: [firstRow, secondRow, thirdRow])
+    let topTitles = PlexHistoryAnalytics.topTitleEntries(
+        from: groupedItems,
+        accountsByID: [2: PlexAccount(id: 2, name: "russy52", thumb: nil)],
+        seriesByEpisodeID: [:],
+        limit: 5
+    )
+
+    #expect(topTitles.count == 1)
+    #expect(topTitles.first?.playCount == 2)
+    #expect(topTitles.first?.watcherSummary == "russy52")
+}
+
 @Test func keepsDistinctSeriesSeparateWhenTitlesMatch() async throws {
     let firstSeriesEpisode = PlexHistoryItem(
         historyKey: "/status/sessions/history/101",

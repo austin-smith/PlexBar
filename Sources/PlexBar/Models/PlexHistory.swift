@@ -23,6 +23,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
     let originallyAvailableAt: String?
     let viewedAt: Date?
     let accountID: Int?
+    let deviceID: Int?
 
     enum CodingKeys: String, CodingKey {
         case historyKey
@@ -41,6 +42,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
         case originallyAvailableAt
         case viewedAt
         case accountID
+        case deviceID
     }
 
     init(
@@ -59,7 +61,8 @@ struct PlexHistoryItem: Decodable, Identifiable {
         index: Int?,
         originallyAvailableAt: String?,
         viewedAt: Date?,
-        accountID: Int?
+        accountID: Int?,
+        deviceID: Int? = nil
     ) {
         self.historyKey = historyKey
         self.key = key
@@ -77,6 +80,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
         self.originallyAvailableAt = originallyAvailableAt
         self.viewedAt = viewedAt
         self.accountID = accountID
+        self.deviceID = deviceID
     }
 
     init(from decoder: Decoder) throws {
@@ -97,6 +101,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
         index = try container.decodeIfPresent(Int.self, forKey: .index)
         originallyAvailableAt = try container.decodeIfPresent(String.self, forKey: .originallyAvailableAt)
         accountID = try container.decodeIfPresent(Int.self, forKey: .accountID)
+        deviceID = try container.decodeIfPresent(Int.self, forKey: .deviceID)
 
         if let viewedAtTimestamp = try container.decodeIfPresent(Double.self, forKey: .viewedAt) {
             viewedAt = Date(timeIntervalSince1970: viewedAtTimestamp)
@@ -171,6 +176,26 @@ struct PlexHistoryItem: Decodable, Identifiable {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
         return formatter.localizedString(for: viewedAt, relativeTo: .now)
+    }
+
+    var recentDistinctKey: String {
+        switch contentKind {
+        case .track:
+            return "track:\(parentTitle ?? ratingKey ?? key ?? title)"
+        default:
+            return "\(contentKind.rawValue):\(ratingKey ?? key ?? title)"
+        }
+    }
+
+    var groupedWatchKey: String {
+        guard let viewedAt else {
+            return "history:\(id)"
+        }
+
+        let dayBucket = Int(Calendar.current.startOfDay(for: viewedAt).timeIntervalSince1970)
+        let accountBucket = accountID.map(String.init) ?? "account:none"
+        let deviceBucket = deviceID.map(String.init) ?? "device:none"
+        return "\(recentDistinctKey)|\(accountBucket)|\(deviceBucket)|day:\(dayBucket)"
     }
 
     func chartGroupKey(seriesByEpisodeID: [String: PlexHistorySeriesIdentity]) -> String? {
@@ -256,14 +281,76 @@ struct PlexTopChartEntry: Identifiable, Equatable {
     let viewerCountLabel: String?
 }
 
+enum PlexHistoryContentFilter: String, CaseIterable, Identifiable {
+    case all
+    case movies
+    case tv
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .all:
+            "All"
+        case .movies:
+            "Movies"
+        case .tv:
+            "TV"
+        }
+    }
+
+    func includes(_ item: PlexHistoryItem) -> Bool {
+        switch self {
+        case .all:
+            true
+        case .movies:
+            item.contentKind == .movie
+        case .tv:
+            item.contentKind == .tv
+        }
+    }
+
+    var emptyStateMessage: String {
+        switch self {
+        case .all:
+            "No plays found for this history window."
+        case .movies:
+            "No movie plays in the last 30 days."
+        case .tv:
+            "No TV plays in the last 30 days."
+        }
+    }
+}
+
 enum PlexHistoryAnalytics {
+    static func groupedWatchItems(from items: [PlexHistoryItem]) -> [PlexHistoryItem] {
+        Dictionary(grouping: items, by: \.groupedWatchKey)
+            .values
+            .compactMap(mostRecentItem)
+            .sorted(by: isMoreRecent)
+    }
+
+    static func recentItems(
+        from items: [PlexHistoryItem],
+        filter: PlexHistoryContentFilter = .all,
+        limit: Int
+    ) -> [PlexHistoryItem] {
+        Dictionary(grouping: items.lazy.filter(filter.includes), by: \.recentDistinctKey)
+            .values
+            .compactMap(mostRecentItem)
+            .sorted(by: isMoreRecent)
+            .prefix(limit)
+            .map { $0 }
+    }
+
     static func topTitleEntries(
         from items: [PlexHistoryItem],
         accountsByID: [Int: PlexAccount],
         seriesByEpisodeID: [String: PlexHistorySeriesIdentity],
-        limit: Int
+        limit: Int,
+        filter: PlexHistoryContentFilter = .all
     ) -> [PlexTopChartEntry] {
-        Dictionary(grouping: items.compactMap { item in
+        Dictionary(grouping: items.lazy.filter(filter.includes).compactMap { item in
             item.chartGroupKey(seriesByEpisodeID: seriesByEpisodeID).map { ($0, item) }
         }, by: \.0)
             .values
@@ -410,5 +497,23 @@ enum PlexHistoryAnalytics {
         }
 
         return rankedWatchers.joined(separator: ", ")
+    }
+
+    private static func mostRecentItem(in items: some Sequence<PlexHistoryItem>) -> PlexHistoryItem? {
+        items.max(by: { lhs, rhs in
+            if let lhsViewedAt = lhs.viewedAt, let rhsViewedAt = rhs.viewedAt, lhsViewedAt != rhsViewedAt {
+                return lhsViewedAt < rhsViewedAt
+            }
+
+            return lhs.id.localizedCompare(rhs.id) == .orderedAscending
+        })
+    }
+
+    private static func isMoreRecent(_ lhs: PlexHistoryItem, _ rhs: PlexHistoryItem) -> Bool {
+        if let lhsViewedAt = lhs.viewedAt, let rhsViewedAt = rhs.viewedAt, lhsViewedAt != rhsViewedAt {
+            return lhsViewedAt > rhsViewedAt
+        }
+
+        return lhs.id.localizedCompare(rhs.id) == .orderedDescending
     }
 }

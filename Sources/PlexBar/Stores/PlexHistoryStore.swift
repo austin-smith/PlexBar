@@ -107,13 +107,13 @@ final class PlexHistoryStore {
             async let historyTask = client.fetchHistory(using: configuration, since: cutoffDate)
             async let accountsTask = client.fetchAccounts(using: configuration)
 
-            let recentItems = try await historyTask
+            let rawHistoryItems = try await historyTask
             let seriesByEpisodeID = try await client.fetchHistorySeriesIdentities(
                 using: configuration,
-                episodeIDs: recentItems.compactMap(\.episodeMetadataItemID)
+                episodeIDs: rawHistoryItems.compactMap(\.episodeMetadataItemID)
             )
 
-            self.recentItems = recentItems
+            self.recentItems = PlexHistoryAnalytics.groupedWatchItems(from: rawHistoryItems)
             self.seriesByEpisodeID = seriesByEpisodeID
 
             do {

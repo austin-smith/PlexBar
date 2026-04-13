@@ -10,11 +10,13 @@ struct HistoryDashboardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if !historyStore.topTitleEntries.isEmpty {
+            if !historyStore.recentItems.isEmpty {
                 TopChartsCard(
                     title: "Top Titles",
-                    subtitle: historyStore.historyWindowLabel,
-                    entries: historyStore.topTitleEntries,
+                    items: historyStore.recentItems,
+                    accountsByID: historyStore.accountsByID,
+                    seriesByEpisodeID: historyStore.seriesByEpisodeID,
+                    historyWindowLabel: historyStore.historyWindowLabel,
                     settingsStore: settingsStore,
                     clientContext: clientContext
                 )
@@ -25,21 +27,13 @@ struct HistoryDashboardView: View {
             }
 
             if !historyStore.recentItems.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
-                    sectionHeader(
-                        title: "Recent Plays",
-                        subtitle: historyStore.historyWindowLabel
-                    )
-
-                    ForEach(historyStore.recentItems.prefix(10)) { item in
-                        RecentHistoryCardView(
-                            item: item,
-                            watcher: item.watcherName(using: historyStore.accountsByID),
-                            settingsStore: settingsStore,
-                            clientContext: clientContext
-                        )
-                    }
-                }
+                RecentPlaysCard(
+                    items: historyStore.recentItems,
+                    historyWindowLabel: historyStore.historyWindowLabel,
+                    settingsStore: settingsStore,
+                    clientContext: clientContext,
+                    accountsByID: historyStore.accountsByID
+                )
             }
         }
     }
@@ -56,37 +50,145 @@ struct HistoryDashboardView: View {
     }
 }
 
-private struct TopChartsCard: View {
-    let title: String
-    let subtitle: String
-    let entries: [PlexTopChartEntry]
+private struct RecentPlaysCard: View {
+    let items: [PlexHistoryItem]
+    let historyWindowLabel: String
     let settingsStore: PlexSettingsStore
     let clientContext: PlexClientContext
+    let accountsByID: [Int: PlexAccount]
+
+    @State private var selectedFilter: PlexHistoryContentFilter = .all
+
+    private var filteredItems: [PlexHistoryItem] {
+        PlexHistoryAnalytics.recentItems(from: items, filter: selectedFilter, limit: 10)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline)
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Recent Plays")
+                        .font(.headline)
 
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text(historyWindowLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                HistorySectionFilterPicker(selection: $selectedFilter)
             }
 
-            VStack(spacing: 10) {
-                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                    TopChartRow(
-                        rank: index + 1,
-                        entry: entry,
-                        settingsStore: settingsStore,
-                        clientContext: clientContext
-                    )
+            if filteredItems.isEmpty {
+                Text(emptyStateMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 10)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(filteredItems) { item in
+                        RecentHistoryCardView(
+                            item: item,
+                            watcher: item.watcherName(using: accountsByID),
+                            settingsStore: settingsStore,
+                            clientContext: clientContext
+                        )
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .dashboardPanel(accent: .orange.opacity(0.12))
+    }
+
+    private var emptyStateMessage: String {
+        switch selectedFilter {
+        case .all:
+            "No recent plays found for this history window."
+        case .movies:
+            "No recent movie plays in the last 30 days."
+        case .tv:
+            "No recent TV plays in the last 30 days."
+        }
+    }
+}
+
+private struct TopChartsCard: View {
+    let title: String
+    let items: [PlexHistoryItem]
+    let accountsByID: [Int: PlexAccount]
+    let seriesByEpisodeID: [String: PlexHistorySeriesIdentity]
+    let historyWindowLabel: String
+    let settingsStore: PlexSettingsStore
+    let clientContext: PlexClientContext
+
+    @State private var selectedFilter: PlexHistoryContentFilter = .all
+
+    private var entries: [PlexTopChartEntry] {
+        PlexHistoryAnalytics.topTitleEntries(
+            from: items,
+            accountsByID: accountsByID,
+            seriesByEpisodeID: seriesByEpisodeID,
+            limit: 5,
+            filter: selectedFilter
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.headline)
+
+                    Text(historyWindowLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                HistorySectionFilterPicker(selection: $selectedFilter)
+            }
+
+            if entries.isEmpty {
+                Text(selectedFilter.emptyStateMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 10)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                        TopChartRow(
+                            rank: index + 1,
+                            entry: entry,
+                            settingsStore: settingsStore,
+                            clientContext: clientContext
+                        )
+                    }
                 }
             }
         }
         .padding(16)
         .dashboardPanel(accent: .red.opacity(0.14))
+    }
+}
+
+private struct HistorySectionFilterPicker: View {
+    @Binding var selection: PlexHistoryContentFilter
+
+    var body: some View {
+        Picker("Filter", selection: $selection) {
+            ForEach(PlexHistoryContentFilter.allCases) { filter in
+                Text(filter.title).tag(filter)
+            }
+        }
+        .labelsHidden()
+        .pickerStyle(.menu)
+        .fixedSize()
     }
 }
 
@@ -276,7 +378,7 @@ private struct RecentHistoryCardView: View {
             Spacer(minLength: 8)
         }
         .padding(14)
-        .dashboardPanel(accent: .clear)
+        .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private var posterURL: URL? {
