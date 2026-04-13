@@ -82,11 +82,34 @@ import Testing
             return (response, Data())
         }
 
+        if url.path == "/library/sections/all" {
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            {
+              "MediaContainer": {
+                "Directory": []
+              }
+            }
+            """#.data(using: .utf8))
+            return (response, data)
+        }
+
         throw URLError(.unsupportedURL)
     }
 
+    let libraryStore = PlexLibraryStore(
+        settings: settings,
+        client: PlexAPIClient(session: session)
+    )
+
     let store = PlexHistoryStore(
         settings: settings,
+        libraryStore: libraryStore,
         client: PlexAPIClient(session: session)
     )
 
