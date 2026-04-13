@@ -90,14 +90,31 @@ struct MenuBarContentView: View {
     }
 
     private var sectionPicker: some View {
-        Picker("Dashboard Section", selection: $selectedSection) {
+        HStack(spacing: 6) {
             ForEach(DashboardSection.allCases) { section in
-                Text(section.controlTitle)
-                    .tag(section)
+                Button {
+                    selectedSection = section
+                } label: {
+                    Label(section.controlTitle, systemImage: section.systemImage)
+                        .font(.subheadline.weight(selectedSection == section ? .semibold : .regular))
+                        .foregroundStyle(selectedSection == section ? .primary : .secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(selectedSection == section ? Color.accentColor.opacity(0.18) : .clear)
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(section.title)
+                .accessibilityAddTraits(selectedSection == section ? .isSelected : [])
             }
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
+        .padding(4)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .animation(.snappy(duration: 0.18), value: selectedSection)
     }
 
     @ViewBuilder
@@ -394,6 +411,17 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
             "History"
         case .libraries:
             "Libraries"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .streams:
+            "play.rectangle.on.rectangle"
+        case .history:
+            "clock.arrow.circlepath"
+        case .libraries:
+            "books.vertical"
         }
     }
 
