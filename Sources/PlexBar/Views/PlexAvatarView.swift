@@ -11,7 +11,6 @@ struct PlexAvatarView: View {
     let imageClient: PlexImageClient
 
     @State private var image: Image?
-    @State private var isLoading = false
 
     init(
         thumb: String?,
@@ -49,16 +48,6 @@ struct PlexAvatarView: View {
             } else {
                 Circle()
                     .fill(.quaternary)
-                    .overlay {
-                        if isLoading {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: "person.fill")
-                                .font(.system(size: size * 0.42, weight: .medium))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
             }
         }
         .frame(width: size, height: size)
@@ -92,21 +81,17 @@ struct PlexAvatarView: View {
     private func loadImage() async {
         guard let resolvedRequest else {
             image = nil
-            isLoading = false
             return
         }
 
         if let cachedImage = imageClient.cachedImage(from: [resolvedRequest.url], token: resolvedRequest.token) {
             image = Image(nsImage: cachedImage)
-            isLoading = false
             return
         }
 
-        isLoading = true
         image = nil
 
         if Task.isCancelled {
-            isLoading = false
             return
         }
 
@@ -119,8 +104,6 @@ struct PlexAvatarView: View {
         } else {
             image = nil
         }
-
-        isLoading = false
     }
 
     private struct AvatarRequest {
