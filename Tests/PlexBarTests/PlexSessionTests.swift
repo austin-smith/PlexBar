@@ -245,3 +245,183 @@ import Testing
     #expect(!session.isPaused)
     #expect(session.playbackLine == "Buffering • Transcode • WAN")
 }
+
+@Test func playbackTimingSummaryFormatsRemainingMinutesAndEndTime() async throws {
+    let session = PlexSession(
+        ratingKey: "42",
+        key: "/library/metadata/42",
+        type: "movie",
+        subtype: nil,
+        live: false,
+        title: "Heat",
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        duration: 1_377_000,
+        viewOffset: 905_000,
+        year: 1995,
+        user: nil,
+        player: PlexPlayer(address: nil, machineIdentifier: nil, platform: nil, product: nil, state: "playing", title: nil),
+        session: nil,
+        media: nil
+    )
+
+    let timeZone = try #require(TimeZone(secondsFromGMT: 0))
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    let referenceDate = try #require(calendar.date(from: DateComponents(
+        timeZone: timeZone,
+        year: 2026,
+        month: 4,
+        day: 13,
+        hour: 18,
+        minute: 23,
+        second: 8
+    )))
+
+    let summary = session.playbackTimingSummary(
+        referenceDate: referenceDate,
+        locale: Locale(identifier: "en_US_POSIX"),
+        timeZone: timeZone
+    )
+
+    #expect(summary?.replacingOccurrences(of: "\u{202F}", with: " ") == "8 min left (6:31 PM)")
+}
+
+@Test func playbackTimingSummaryFormatsHourAndMinuteRemainder() async throws {
+    let session = PlexSession(
+        ratingKey: "42",
+        key: "/library/metadata/42",
+        type: "movie",
+        subtype: nil,
+        live: false,
+        title: "Heat",
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        duration: 5_400_000,
+        viewOffset: 1_500_000,
+        year: 1995,
+        user: nil,
+        player: PlexPlayer(address: nil, machineIdentifier: nil, platform: nil, product: nil, state: "playing", title: nil),
+        session: nil,
+        media: nil
+    )
+
+    let timeZone = try #require(TimeZone(secondsFromGMT: 0))
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = timeZone
+    let referenceDate = try #require(calendar.date(from: DateComponents(
+        timeZone: timeZone,
+        year: 2026,
+        month: 4,
+        day: 13,
+        hour: 17,
+        minute: 36,
+        second: 0
+    )))
+
+    let summary = session.playbackTimingSummary(
+        referenceDate: referenceDate,
+        locale: Locale(identifier: "en_US_POSIX"),
+        timeZone: timeZone
+    )
+
+    #expect(summary?.replacingOccurrences(of: "\u{202F}", with: " ") == "1 hr 5 min left (6:41 PM)")
+}
+
+@Test func playbackTimingSummaryOmitsLiveAndIncompleteSessions() async throws {
+    let referenceDate = Date(timeIntervalSince1970: 0)
+
+    let liveSession = PlexSession(
+        ratingKey: "42",
+        key: "/livetv/sessions/42",
+        type: "episode",
+        subtype: nil,
+        live: true,
+        title: "Heat",
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        duration: 1_377_000,
+        viewOffset: 905_000,
+        year: 1995,
+        user: nil,
+        player: PlexPlayer(address: nil, machineIdentifier: nil, platform: nil, product: nil, state: "playing", title: nil),
+        session: nil,
+        media: nil
+    )
+
+    let incompleteSession = PlexSession(
+        ratingKey: "43",
+        key: "/library/metadata/43",
+        type: "movie",
+        subtype: nil,
+        live: false,
+        title: "Collateral",
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        duration: nil,
+        viewOffset: 905_000,
+        year: 2004,
+        user: nil,
+        player: PlexPlayer(address: nil, machineIdentifier: nil, platform: nil, product: nil, state: "playing", title: nil),
+        session: nil,
+        media: nil
+    )
+
+    #expect(liveSession.playbackTimingSummary(referenceDate: referenceDate) == nil)
+    #expect(incompleteSession.playbackTimingSummary(referenceDate: referenceDate) == nil)
+}
+
+@Test func playbackTimingSummaryOmitsCompletionTimeWhenPaused() async throws {
+    let session = PlexSession(
+        ratingKey: "42",
+        key: "/library/metadata/42",
+        type: "movie",
+        subtype: nil,
+        live: false,
+        title: "Heat",
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        duration: 1_377_000,
+        viewOffset: 905_000,
+        year: 1995,
+        user: nil,
+        player: PlexPlayer(address: nil, machineIdentifier: nil, platform: nil, product: nil, state: "paused", title: nil),
+        session: nil,
+        media: nil
+    )
+
+    let referenceDate = Date(timeIntervalSince1970: 0)
+    let summary = session.playbackTimingSummary(referenceDate: referenceDate)
+
+    #expect(summary == "8 min left")
+}

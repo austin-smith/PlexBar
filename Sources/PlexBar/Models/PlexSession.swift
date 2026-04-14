@@ -315,6 +315,32 @@ struct PlexSession: Decodable, Identifiable {
         return min(max(rawProgress, 0), 1)
     }
 
+    func playbackTimingSummary(
+        referenceDate: Date,
+        locale: Locale = .autoupdatingCurrent,
+        timeZone: TimeZone = .autoupdatingCurrent
+    ) -> String? {
+        guard let remainingMilliseconds else {
+            return nil
+        }
+
+        let endDate = referenceDate.addingTimeInterval(Double(remainingMilliseconds) / 1000)
+        let remainingTimeText = Self.remainingTimeText(milliseconds: remainingMilliseconds)
+
+        guard !isPaused else {
+            return remainingTimeText
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.timeZone = timeZone
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        let endTime = formatter.string(from: endDate)
+
+        return "\(remainingTimeText) (\(endTime))"
+    }
+
     var userDisplayName: String {
         user?.title?.nilIfBlank ?? "Unknown User"
     }
@@ -344,6 +370,17 @@ struct PlexSession: Decodable, Identifiable {
         session?.location?.nilIfBlank?.uppercased()
     }
 
+    private var remainingMilliseconds: Int? {
+        guard !isLive,
+              let duration,
+              duration > 0,
+              let viewOffset else {
+            return nil
+        }
+
+        return max(duration - min(max(viewOffset, 0), duration), 0)
+    }
+
     private var episodeCode: String? {
         let season = parentIndex.map { "S\($0)" }
         let episode = index.map { String(format: "E%02d", $0) }
@@ -368,6 +405,24 @@ struct PlexSession: Decodable, Identifiable {
         default:
             [thumb, parentThumb, grandparentThumb, art]
         }
+    }
+
+    private static func remainingTimeText(milliseconds: Int) -> String {
+        let roundedMinutes = max(Int((Double(milliseconds) / 60000).rounded()), 1)
+
+        guard roundedMinutes >= 60 else {
+            return "\(roundedMinutes) min left"
+        }
+
+        let hours = roundedMinutes / 60
+        let minutes = roundedMinutes % 60
+        let hourLabel = hours == 1 ? "1 hr" : "\(hours) hr"
+
+        guard minutes > 0 else {
+            return "\(hourLabel) left"
+        }
+
+        return "\(hourLabel) \(minutes) min left"
     }
 }
 

@@ -174,7 +174,11 @@ struct MenuBarContentView: View {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     ForEach(sessionStore.sessions) { session in
-                        StreamCardView(session: session, settingsStore: settingsStore)
+                        StreamCardView(
+                            session: session,
+                            settingsStore: settingsStore,
+                            snapshotDate: sessionStore.lastUpdated
+                        )
                     }
                 }
                 .background {

@@ -4,6 +4,7 @@ import SwiftUI
 struct StreamCardView: View {
     let session: PlexSession
     let settingsStore: PlexSettingsStore
+    let snapshotDate: Date?
 
     private var clientContext: PlexClientContext {
         PlexClientContext(clientIdentifier: settingsStore.clientIdentifier)
@@ -60,6 +61,14 @@ struct StreamCardView: View {
                         .font(.footnote)
                         .lineLimit(1)
                     }
+
+                    if let playbackTimingSummary {
+                        Text(playbackTimingSummary)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                    }
                 }
 
                 Spacer(minLength: 14)
@@ -95,6 +104,14 @@ struct StreamCardView: View {
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var playbackTimingSummary: String? {
+        guard let snapshotDate else {
+            return nil
+        }
+
+        return session.playbackTimingSummary(referenceDate: snapshotDate)
     }
 
     private var posterURL: URL? {
