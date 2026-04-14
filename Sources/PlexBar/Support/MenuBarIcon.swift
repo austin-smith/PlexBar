@@ -2,11 +2,24 @@ import AppKit
 
 @MainActor
 enum MenuBarIcon {
+    private static let resourceBundleName = "PlexBar_PlexBar.bundle"
+
+    private static let resourceBundle: Bundle = {
+        guard
+            let resourceURL = Bundle.main.resourceURL,
+            let bundle = Bundle(url: resourceURL.appendingPathComponent(resourceBundleName))
+        else {
+            preconditionFailure("Missing resource bundle \(resourceBundleName)")
+        }
+
+        return bundle
+    }()
+
     static let image: NSImage = {
         let image = NSImage(size: NSSize(width: 16, height: 16))
 
         for resourceName in ["MenuBarIcon.png", "MenuBarIcon@2x.png"] {
-            guard let url = Bundle.module.url(forResource: resourceName, withExtension: nil),
+            guard let url = resourceBundle.url(forResource: resourceName, withExtension: nil),
                   let data = try? Data(contentsOf: url),
                   let representation = NSBitmapImageRep(data: data)
             else {

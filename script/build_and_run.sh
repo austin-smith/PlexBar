@@ -5,6 +5,9 @@ MODE="${1:-run}"
 APP_NAME="PlexBar"
 BUNDLE_ID="com.crapshack.PlexBar"
 MIN_SYSTEM_VERSION="26.0"
+BUILD_CONFIGURATION="${BUILD_CONFIGURATION:-debug}"
+APP_MARKETING_VERSION="${APP_MARKETING_VERSION:-}"
+APP_BUILD_VERSION="${APP_BUILD_VERSION:-}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
@@ -18,10 +21,19 @@ APP_ICON_NAME="AppIcon"
 APP_ICON_SOURCE="$ROOT_DIR/$APP_ICON_NAME.icon"
 ACTOOL="$(xcrun --find actool)"
 
+case "$BUILD_CONFIGURATION" in
+  debug|release)
+    ;;
+  *)
+    echo "BUILD_CONFIGURATION must be 'debug' or 'release', received '$BUILD_CONFIGURATION'." >&2
+    exit 2
+    ;;
+esac
+
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
-swift build
-BUILD_BIN_DIR="$(swift build --show-bin-path)"
+swift build -c "$BUILD_CONFIGURATION"
+BUILD_BIN_DIR="$(swift build -c "$BUILD_CONFIGURATION" --show-bin-path)"
 BUILD_BINARY="$BUILD_BIN_DIR/$APP_NAME"
 RESOURCE_BUNDLE_NAME="${APP_NAME}_${APP_NAME}.bundle"
 RESOURCE_BUNDLE_SOURCE="$BUILD_BIN_DIR/$RESOURCE_BUNDLE_NAME"
@@ -32,7 +44,7 @@ cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 
 if [[ -d "$RESOURCE_BUNDLE_SOURCE" ]]; then
-  cp -R "$RESOURCE_BUNDLE_SOURCE" "$APP_BUNDLE/$RESOURCE_BUNDLE_NAME"
+  cp -R "$RESOURCE_BUNDLE_SOURCE" "$APP_RESOURCES/$RESOURCE_BUNDLE_NAME"
 fi
 
 cat >"$INFO_PLIST" <<PLIST
@@ -55,6 +67,14 @@ cat >"$INFO_PLIST" <<PLIST
 </dict>
 </plist>
 PLIST
+
+if [[ -n "$APP_MARKETING_VERSION" ]]; then
+  /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_MARKETING_VERSION" "$INFO_PLIST"
+fi
+
+if [[ -n "$APP_BUILD_VERSION" ]]; then
+  /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD_VERSION" "$INFO_PLIST"
+fi
 
 if [[ -d "$APP_ICON_SOURCE" ]]; then
   ASSET_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/AppIcon.XXXXXX")"

@@ -30,7 +30,7 @@ if [[ $# -gt 1 ]]; then
   exit 2
 fi
 
-"$ROOT_DIR/script/build_and_run.sh" build
+BUILD_CONFIGURATION="${BUILD_CONFIGURATION:-release}" "$ROOT_DIR/script/build_and_run.sh" build
 
 if [[ ! -f "$DMG_BACKGROUND_PATH" ]]; then
   echo "DMG background image not found at $DMG_BACKGROUND_PATH." >&2
