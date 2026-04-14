@@ -129,10 +129,8 @@ struct SettingsView: View {
             Spacer()
 
             VStack(spacing: 20) {
-                Image(nsImage: MenuBarIcon.image)
-                    .renderingMode(.template)
-                    .interpolation(.high)
-                    .frame(width: 40, height: 40)
+                Image(systemName: "popcorn.fill")
+                    .font(.system(size: 40))
                     .foregroundStyle(.secondary)
 
                 VStack(spacing: 6) {
