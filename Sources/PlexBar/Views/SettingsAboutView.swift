@@ -8,15 +8,7 @@ struct SettingsAboutView: View {
     private let plexURL = URL(string: "https://www.plex.tv/")!
 
     private var versionString: String {
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
-        let resolvedVersion = version ?? AppConstants.productVersion
-
-        guard let build, !build.isEmpty, build != resolvedVersion else {
-            return resolvedVersion
-        }
-
-        return "\(resolvedVersion) (\(build))"
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? AppConstants.productVersion
     }
 
     private var copyrightYear: String {
