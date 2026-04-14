@@ -261,21 +261,28 @@ struct SettingsView: View {
             Spacer(minLength: 12)
 
             if settingsStore.selectedServerIdentifier != nil {
-                PosterStackView(
-                    state: selectedServerPreviewState,
-                    serverURL: selectedServer?.selectedURL ?? settingsStore.normalizedServerURL,
-                    token: selectedServer?.accessToken ?? settingsStore.trimmedServerToken,
-                    clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier),
-                    posterWidth: 32,
-                    posterHeight: 48,
-                    overlap: 13,
-                    cornerRadius: 8
-                )
-            }
+                HStack(spacing: 2) {
+                    PosterStackView(
+                        state: selectedServerPreviewState,
+                        serverURL: selectedServer?.selectedURL ?? settingsStore.normalizedServerURL,
+                        token: selectedServer?.accessToken ?? settingsStore.trimmedServerToken,
+                        clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier),
+                        posterWidth: 36,
+                        posterHeight: 54,
+                        overlap: 15,
+                        cornerRadius: 8
+                    )
 
-            Image(systemName: "chevron.down")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.down")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, -1)
+                }
+            } else {
+                Image(systemName: "chevron.down")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 14)
@@ -311,15 +318,16 @@ struct SettingsView: View {
             }
             .padding(10)
         }
-        .frame(minWidth: 380, idealWidth: 380, maxWidth: 380, minHeight: 240, idealHeight: 260, maxHeight: 320)
+        .frame(minWidth: 380, idealWidth: 380, maxWidth: 380, minHeight: 120, idealHeight: 120, maxHeight: 320)
         .background(.regularMaterial)
     }
 
     @ViewBuilder
     private func serverListRow(for server: PlexServerResource) -> some View {
         let isSelected = settingsStore.selectedServerIdentifier == server.id
+        let posterSlotWidth: CGFloat = 103
 
-        HStack(spacing: 14) {
+        ZStack(alignment: .trailing) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -336,30 +344,29 @@ struct SettingsView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(serverSubtitle(for: server))
-                        .font(.footnote)
-                        .fontDesign(.monospaced)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                Text(serverSubtitle(for: server))
+                    .font(.footnote)
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-
-            Spacer(minLength: 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.trailing, posterSlotWidth + 12)
 
             PosterStackView(
                 state: previewStore.state(for: server.id),
                 serverURL: server.selectedURL,
                 token: server.accessToken,
                 clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier),
-                posterWidth: 42,
-                posterHeight: 62,
-                overlap: 17,
+                posterWidth: 46,
+                posterHeight: 68,
+                overlap: 19,
                 cornerRadius: 9
             )
+            .frame(width: posterSlotWidth, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
+        .padding(.leading, 14)
+        .padding(.trailing, 8)
         .padding(.vertical, 14)
         .background(rowBackground(isSelected: isSelected))
         .overlay {

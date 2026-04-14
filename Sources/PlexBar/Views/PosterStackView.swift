@@ -27,6 +27,7 @@ struct PosterStackView: View {
             width: posterWidth + overlap * CGFloat(max(stackCount - 1, 0)),
             height: posterHeight + 4
         )
+        .offset(y: stackVerticalOffset)
         .accessibilityHidden(true)
     }
 
@@ -36,6 +37,10 @@ struct PosterStackView: View {
 
     private var stackCount: Int {
         visibleItems.isEmpty ? 4 : visibleItems.count
+    }
+
+    private var stackVerticalOffset: CGFloat {
+        -CGFloat(max(stackCount - 1, 0))
     }
 
     @ViewBuilder
