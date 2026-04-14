@@ -37,6 +37,23 @@ jobs:
           echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_ENV"
           echo "DMG_PATH=$RUNNER_TEMP/PlexBar-${TAG}-arm64.dmg" >> "$GITHUB_ENV"
 
+      - name: Generate release notes
+        run: |
+          PREVIOUS_TAG="$(git tag --sort=-version:refname | grep '^v' | grep -Fxv "$RELEASE_TAG" | head -n 1 || true)"
+          RELEASE_NOTES_PATH="$RUNNER_TEMP/release-notes.md"
+
+          {
+            echo "## Changes"
+
+            if [[ -n "${PREVIOUS_TAG:-}" ]]; then
+              git log --format='- %s' "${PREVIOUS_TAG}..${RELEASE_TAG}"
+            else
+              git log --format='- %s' "$RELEASE_TAG"
+            fi
+          } > "$RELEASE_NOTES_PATH"
+
+          echo "RELEASE_NOTES_PATH=$RELEASE_NOTES_PATH" >> "$GITHUB_ENV"
+
       - name: Setup Swift 6.3
         uses: swift-actions/setup-swift@v3
         with:
@@ -213,18 +230,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --notes-file "$RELEASE_NOTES_PATH"
             gh release upload "$RELEASE_TAG" "$DMG_PATH" --clobber
           else
             if [[ "${IS_PRERELEASE}" == "true" ]]; then
               gh release create "$RELEASE_TAG" \
                 --title "$RELEASE_TAG" \
-                --generate-notes \
+                --notes-file "$RELEASE_NOTES_PATH" \
                 --prerelease \
                 "$DMG_PATH"
             else
               gh release create "$RELEASE_TAG" \
                 --title "$RELEASE_TAG" \
-                --generate-notes \
+                --notes-file "$RELEASE_NOTES_PATH" \
                 "$DMG_PATH"
             fi
           fi
