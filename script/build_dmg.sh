@@ -8,6 +8,7 @@ APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 STAGING_DIR="$(mktemp -d "${TMPDIR:-/tmp}/${APP_NAME}DMG.XXXXXX")"
 DMG_BACKGROUND_PATH="$ROOT_DIR/.github/release-assets/background.png"
 OUTPUT_DMG="${1:-$DIST_DIR/$APP_NAME.dmg}"
+VOLUME_ICON_PATH=""
 
 usage() {
   cat <<EOF
@@ -37,12 +38,19 @@ if [[ ! -f "$DMG_BACKGROUND_PATH" ]]; then
   exit 1
 fi
 
+VOLUME_ICON_PATH="$(find "$APP_BUNDLE/Contents/Resources" -maxdepth 1 -type f -name '*.icns' -print -quit)"
+if [[ -z "${VOLUME_ICON_PATH:-}" ]]; then
+  echo "No .icns volume icon found in app bundle resources." >&2
+  exit 1
+fi
+
 mkdir -p "$(dirname "$OUTPUT_DMG")"
 rm -f "$OUTPUT_DMG"
 cp -R "$APP_BUNDLE" "$STAGING_DIR/"
 
 create-dmg \
   --volname "$APP_NAME" \
+  --volicon "$VOLUME_ICON_PATH" \
   --window-size 660 420 \
   --background "$DMG_BACKGROUND_PATH" \
   --icon-size 128 \
