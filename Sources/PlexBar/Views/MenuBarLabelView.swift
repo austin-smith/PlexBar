@@ -5,7 +5,10 @@ struct MenuBarLabelView: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "popcorn.fill")
+            Image(nsImage: MenuBarIcon.image)
+                .renderingMode(.template)
+                .interpolation(.high)
+                .frame(width: 16, height: 16)
 
             if streamCount > 0 {
                 Text("\(streamCount)")

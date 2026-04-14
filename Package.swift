@@ -16,7 +16,10 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "PlexBar"
+            name: "PlexBar",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "PlexBarTests",
