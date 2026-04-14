@@ -7,14 +7,21 @@ struct SettingsView: View {
     @Bindable var sessionStore: PlexSessionStore
     @Bindable var historyStore: PlexHistoryStore
     @State private var isShowingServerList = false
+    @State private var selectedTab = Tab.general
 
     var body: some View {
-        Group {
-            if settingsStore.hasAuthenticatedAccount {
-                authenticatedView
-            } else {
-                unauthenticatedView
-            }
+        TabView(selection: $selectedTab) {
+            generalView
+                .tabItem {
+                    Label("General", systemImage: "gearshape")
+                }
+                .tag(Tab.general)
+
+            aboutView
+                .tabItem {
+                    Label("About", systemImage: "info.circle")
+                }
+                .tag(Tab.about)
         }
         .task(id: availableServerIDsKey) {
             previewStore.reconcileServers(authStore.availableServers)
@@ -44,6 +51,28 @@ struct SettingsView: View {
                 clientIdentifier: settingsStore.clientIdentifier
             )
         }
+    }
+
+    private enum Tab: Hashable {
+        case general
+        case about
+    }
+
+    private var generalView: some View {
+        Group {
+            if settingsStore.hasAuthenticatedAccount {
+                authenticatedView
+            } else {
+                unauthenticatedView
+            }
+        }
+    }
+
+    private var aboutView: some View {
+        ScrollView {
+            SettingsAboutView()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     // MARK: - Authenticated
@@ -125,7 +154,7 @@ struct SettingsView: View {
     // MARK: - Unauthenticated
 
     private var unauthenticatedView: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 24) {
             Spacer()
 
             VStack(spacing: 20) {
