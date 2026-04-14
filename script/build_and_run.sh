@@ -4,7 +4,7 @@ set -euo pipefail
 MODE="${1:-run}"
 APP_NAME="PlexBar"
 BUNDLE_ID="com.crapshack.PlexBar"
-MIN_SYSTEM_VERSION="14.0"
+MIN_SYSTEM_VERSION="26.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
@@ -14,7 +14,7 @@ APP_MACOS="$APP_CONTENTS/MacOS"
 APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
-APP_ICON_NAME="PlexBarAppIcon"
+APP_ICON_NAME="AppIcon"
 APP_ICON_SOURCE="$ROOT_DIR/$APP_ICON_NAME.icon"
 ACTOOL="$(xcrun --find actool)"
 
@@ -57,7 +57,7 @@ cat >"$INFO_PLIST" <<PLIST
 PLIST
 
 if [[ -d "$APP_ICON_SOURCE" ]]; then
-  ASSET_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/PlexBarAppIcon.XXXXXX")"
+  ASSET_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/AppIcon.XXXXXX")"
   ASSET_CATALOG="$ASSET_WORK_DIR/PlexBarAssets.xcassets"
   ASSET_OUTPUT="$ASSET_WORK_DIR/output"
   ASSET_INFO_PLIST="$ASSET_WORK_DIR/icon-info.plist"
