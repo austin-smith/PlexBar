@@ -39,11 +39,15 @@ struct PlexConnectionResolverTests {
     }
 
     @Test func prefersHTTPSWithinSameTierEvenIfHTTPRespondsFaster() async throws {
+        let requestSchemes = RequestSequence()
         let session = makeResolverSession { request in
             let url = try #require(request.url)
 
+            if url.path == "/identity", url.host == "plex.local" {
+                requestSchemes.record(try #require(url.scheme))
+            }
+
             if url.path == "/identity", url.scheme == "https", url.host == "plex.local" {
-                Thread.sleep(forTimeInterval: 0.05)
                 return try identityResponse(url: url, serverID: "server-id")
             }
 
@@ -73,6 +77,7 @@ struct PlexConnectionResolverTests {
         )
 
         #expect(resolved.url.scheme == "https")
+        #expect(requestSchemes.values == ["https"])
     }
 
     @Test func fallsBackToRemoteWhenLocalProbeFails() async throws {
@@ -538,5 +543,22 @@ private final class RequestCounter: @unchecked Sendable {
         defer { lock.unlock() }
         counts[key, default: 0] += 1
         return counts[key, default: 0]
+    }
+}
+
+private final class RequestSequence: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedValues: [String] = []
+
+    var values: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedValues
+    }
+
+    func record(_ value: String) {
+        lock.lock()
+        recordedValues.append(value)
+        lock.unlock()
     }
 }
