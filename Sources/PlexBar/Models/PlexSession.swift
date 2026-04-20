@@ -328,6 +328,14 @@ struct PlexSession: Decodable, Identifiable {
         player.state?.nilIfBlank?.lowercased() == "paused"
     }
 
+    var geoLookupIPAddress: String? {
+        guard player.relayed != true else {
+            return nil
+        }
+
+        return player.remotePublicAddress?.nilIfBlank
+    }
+
     func applying(playNotification: PlexPlaySessionStateNotification) -> PlexSession {
         PlexSession(
             sessionKey: playNotification.sessionKey ?? sessionKey,
@@ -499,8 +507,36 @@ struct PlexPlayer: Decodable {
     let machineIdentifier: String?
     let platform: String?
     let product: String?
+    let remotePublicAddress: String?
     let state: String?
     let title: String?
+    let local: Bool?
+    let relayed: Bool?
+    let secure: Bool?
+
+    init(
+        address: String?,
+        machineIdentifier: String?,
+        platform: String?,
+        product: String?,
+        remotePublicAddress: String? = nil,
+        state: String?,
+        title: String?,
+        local: Bool? = nil,
+        relayed: Bool? = nil,
+        secure: Bool? = nil
+    ) {
+        self.address = address
+        self.machineIdentifier = machineIdentifier
+        self.platform = platform
+        self.product = product
+        self.remotePublicAddress = remotePublicAddress
+        self.state = state
+        self.title = title
+        self.local = local
+        self.relayed = relayed
+        self.secure = secure
+    }
 
     func updating(state: String?) -> PlexPlayer {
         PlexPlayer(
@@ -508,8 +544,12 @@ struct PlexPlayer: Decodable {
             machineIdentifier: machineIdentifier,
             platform: platform,
             product: product,
+            remotePublicAddress: remotePublicAddress,
             state: state ?? self.state,
-            title: title
+            title: title,
+            local: local,
+            relayed: relayed,
+            secure: secure
         )
     }
 }

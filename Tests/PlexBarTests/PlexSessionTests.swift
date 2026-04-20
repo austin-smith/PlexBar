@@ -160,6 +160,39 @@ import Testing
     #expect(session.contentKind == PlexSessionContentKind.liveTV)
 }
 
+@Test func localSessionsStillExposeGeoLookupAddressWhenPlexProvidesPublicIP() async throws {
+    let json = #"""
+    {
+      "sessionKey": "77",
+      "ratingKey": "146",
+      "key": "/library/metadata/146",
+      "type": "episode",
+      "title": "Local Stream",
+      "Player": {
+        "title": "MacBook Air",
+        "address": "192.168.1.226",
+        "remotePublicAddress": "97.115.180.233",
+        "local": true,
+        "relayed": false,
+        "secure": true
+      },
+      "Session": {
+        "id": "77",
+        "location": "lan"
+      }
+    }
+    """#
+
+    let data = try #require(json.data(using: .utf8))
+    let session = try JSONDecoder().decode(PlexSession.self, from: data)
+
+    #expect(session.player.remotePublicAddress == "97.115.180.233")
+    #expect(session.player.local == true)
+    #expect(session.player.relayed == false)
+    #expect(session.player.secure == true)
+    #expect(session.geoLookupIPAddress == "97.115.180.233")
+}
+
 @Test func playbackLineOmitsPlayingStateText() async throws {
     let session = PlexSession(
         ratingKey: "42",

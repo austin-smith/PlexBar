@@ -52,6 +52,10 @@ struct PlexAvatarView: View {
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
+        .overlay {
+            Circle()
+                .strokeBorder(.white.opacity(0.9), lineWidth: 1)
+        }
         .task(id: requestKey) {
             await loadImage()
         }

@@ -606,7 +606,11 @@ struct SettingsView: View {
     }
 
     private func serverSubtitle(for server: PlexServerResource) -> String {
-        server.displayProductVersion ?? "Plex Media Server"
+        guard let version = server.displayProductVersion else {
+            return "Plex Media Server"
+        }
+
+        return "v\(version)"
     }
 
     @ViewBuilder

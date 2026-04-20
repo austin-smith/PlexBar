@@ -176,7 +176,8 @@ struct MenuBarContentView: View {
                             session: session,
                             serverURL: connectionStore.resolvedServerURL,
                             settingsStore: settingsStore,
-                            snapshotDate: sessionStore.lastUpdated
+                            snapshotDate: sessionStore.lastUpdated,
+                            resolvedLocation: sessionStore.resolvedLocation(for: session)
                         )
                     }
                 }

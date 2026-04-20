@@ -290,6 +290,50 @@ struct PlexRequestTests {
         #expect(request.value(forHTTPHeaderField: "X-Plex-Token") == "user-token")
     }
 
+    @Test func fetchGeoLocationUsesPlexTvGeoIPEndpoint() async throws {
+        let capture = RequestCapture()
+        let session = makeMockSession { request in
+            capture.record(request)
+
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <MediaContainer size="1">
+              <location city="Portland" subdivisions="Oregon" country="United States" code="US" />
+            </MediaContainer>
+            """#.data(using: .utf8))
+            return (response, data)
+        }
+
+        let client = PlexGeoIPClient(session: session)
+        let geoLocation = try await client.fetchGeoLocation(
+            ipAddress: "73.115.85.232",
+            userToken: "user-token",
+            clientContext: PlexClientContext(clientIdentifier: "client-123")
+        )
+
+        #expect(geoLocation == PlexGeoLocation(
+            city: "Portland",
+            region: "Oregon",
+            country: "United States",
+            countryCode: "US"
+        ))
+        #expect(geoLocation?.displayName == "Portland, Oregon")
+
+        let request = try #require(capture.request)
+        let requestURL = try #require(request.url)
+        let components = try #require(URLComponents(url: requestURL, resolvingAgainstBaseURL: false))
+        #expect(components.path == "/api/v2/geoip")
+        #expect(components.queryItems?.contains(where: { $0.name == "ip_address" && $0.value == "73.115.85.232" }) == true)
+        #expect(request.value(forHTTPHeaderField: "Accept") == "application/xml")
+        #expect(request.value(forHTTPHeaderField: "X-Plex-Token") == "user-token")
+    }
+
     @Test func imageClientUsesHeaderTokenInsteadOfQueryToken() async throws {
         let capture = RequestCapture()
         let imageData = try #require(NSImage(

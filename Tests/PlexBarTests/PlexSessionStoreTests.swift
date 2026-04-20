@@ -220,6 +220,278 @@ struct PlexSessionStoreTests {
 }
 
 @MainActor
+@Test func lanSessionsResolveGeoLocationWhenPlexProvidesRemotePublicAddress() async throws {
+    let suiteName = "PlexBarTests.lanSessionsResolveGeoLocationWhenPlexProvidesRemotePublicAddress"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let geoLookupCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.host == "plex.tv", url.path == "/api/v2/geoip" {
+            geoLookupCounter.increment()
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <MediaContainer size="1">
+              <location city="Portland" subdivisions="Oregon" country="United States" code="US" />
+            </MediaContainer>
+            """#.data(using: .utf8))
+            return (response, data)
+        }
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            return try sessionsResponse(for: url, metadata: [
+                sessionJSON(
+                    sessionKey: "44",
+                    ratingKey: "900",
+                    state: "playing",
+                    viewOffset: 1000,
+                    sessionLocation: "lan",
+                    playerAddress: "192.168.1.226",
+                    remotePublicAddress: "97.115.180.233",
+                    playerLocal: true,
+                    playerRelayed: false
+                )
+            ])
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    settings.userToken = "user-token"
+
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        geoIPClient: PlexGeoIPClient(session: session),
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) {
+        guard let firstSession = $0.sessions.first else {
+            return false
+        }
+
+        return $0.resolvedLocation(for: firstSession) == "Portland, Oregon"
+    }
+
+    #expect(geoLookupCounter.value == 1)
+
+    store.refreshNow()
+
+    await waitForSessionStore(store) {
+        guard let firstSession = $0.sessions.first else {
+            return false
+        }
+
+        return $0.resolvedLocation(for: firstSession) == "Portland, Oregon"
+    }
+
+    #expect(geoLookupCounter.value == 1)
+}
+
+@MainActor
+@Test func transientGeoLookupFailuresAreRetriedOnLaterRefresh() async throws {
+    let suiteName = "PlexBarTests.transientGeoLookupFailuresAreRetriedOnLaterRefresh"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let geoLookupCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.host == "plex.tv", url.path == "/api/v2/geoip" {
+            geoLookupCounter.increment()
+
+            if geoLookupCounter.value == 1 {
+                let response = try #require(HTTPURLResponse(
+                    url: url,
+                    statusCode: 503,
+                    httpVersion: nil,
+                    headerFields: nil
+                ))
+                return (response, Data())
+            }
+
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <MediaContainer size="1">
+              <location city="Portland" subdivisions="Oregon" country="United States" code="US" />
+            </MediaContainer>
+            """#.data(using: .utf8))
+            return (response, data)
+        }
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            return try sessionsResponse(for: url, metadata: [
+                sessionJSON(
+                    sessionKey: "44",
+                    ratingKey: "900",
+                    state: "playing",
+                    viewOffset: 1000,
+                    sessionLocation: "lan",
+                    playerAddress: "192.168.1.226",
+                    remotePublicAddress: "97.115.180.233",
+                    playerLocal: true,
+                    playerRelayed: false
+                )
+            ])
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    settings.userToken = "user-token"
+
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        geoIPClient: PlexGeoIPClient(session: session),
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) {
+        $0.sessions.count == 1 && geoLookupCounter.value == 1
+    }
+
+    #expect(store.resolvedLocation(for: try #require(store.sessions.first)) == nil)
+
+    store.refreshNow()
+
+    await waitForSessionStore(store) {
+        guard let firstSession = $0.sessions.first else {
+            return false
+        }
+
+        return $0.resolvedLocation(for: firstSession) == "Portland, Oregon"
+    }
+
+    #expect(geoLookupCounter.value == 2)
+}
+
+@MainActor
+@Test func cancelledGeoLookupErrorsDoNotMarkIPUnavailable() async throws {
+    let suiteName = "PlexBarTests.cancelledGeoLookupErrorsDoNotMarkIPUnavailable"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let geoLookupCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.host == "plex.tv", url.path == "/api/v2/geoip" {
+            geoLookupCounter.increment()
+
+            if geoLookupCounter.value == 1 {
+                throw URLError(.cancelled)
+            }
+
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <MediaContainer size="1">
+              <location city="Portland" subdivisions="Oregon" country="United States" code="US" />
+            </MediaContainer>
+            """#.data(using: .utf8))
+            return (response, data)
+        }
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            return try sessionsResponse(for: url, metadata: [
+                sessionJSON(
+                    sessionKey: "44",
+                    ratingKey: "900",
+                    state: "playing",
+                    viewOffset: 1000,
+                    sessionLocation: "lan",
+                    playerAddress: "192.168.1.226",
+                    remotePublicAddress: "97.115.180.233",
+                    playerLocal: true,
+                    playerRelayed: false
+                )
+            ])
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    settings.userToken = "user-token"
+
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        geoIPClient: PlexGeoIPClient(session: session),
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) {
+        $0.sessions.count == 1 && geoLookupCounter.value == 1
+    }
+
+    #expect(store.resolvedLocation(for: try #require(store.sessions.first)) == nil)
+
+    store.refreshNow()
+
+    await waitForSessionStore(store) {
+        guard let firstSession = $0.sessions.first else {
+            return false
+        }
+
+        return $0.resolvedLocation(for: firstSession) == "Portland, Oregon"
+    }
+
+    #expect(geoLookupCounter.value == 2)
+}
+
+@MainActor
 @Test func unknownPlayingEventTriggersOneTargetedHydrate() async throws {
     let suiteName = "PlexBarTests.unknownPlayingEventTriggersOneTargetedHydrate"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -639,6 +911,7 @@ private func waitForSessionStore(
 private func makeSessionStore(
     settings: PlexSettingsStore,
     session: URLSession,
+    geoIPClient: PlexGeoIPClient = PlexGeoIPClient(),
     eventsClient: PlexSessionEventsClient,
     availableServers: [PlexServerResource] = [],
     connectionRecheckSleep: @escaping PlexSessionStore.ConnectionRecheckSleep = { duration in
@@ -685,6 +958,7 @@ private func makeSessionStore(
     let store = PlexSessionStore(
         connectionStore: connectionStore,
         client: PlexAPIClient(session: session),
+        geoIPClient: geoIPClient,
         eventsClient: eventsClient,
         connectionRecheckSleep: connectionRecheckSleep
     )
@@ -750,11 +1024,20 @@ private func sessionJSON(
     ratingKey: String,
     state: String,
     viewOffset: Int,
-    transcodeSessionKey: String? = nil
+    transcodeSessionKey: String? = nil,
+    sessionLocation: String = "lan",
+    playerAddress: String? = nil,
+    remotePublicAddress: String? = nil,
+    playerLocal: Bool? = nil,
+    playerRelayed: Bool? = nil
 ) -> String {
     let transcodeSessionJSON = transcodeSessionKey.map { key in
         ",\n      \"TranscodeSession\": {\n        \"key\": \"\(key)\"\n      }"
     } ?? ""
+    let playerAddressJSON = playerAddress.map { ",\n        \"address\": \"\($0)\"" } ?? ""
+    let remotePublicAddressJSON = remotePublicAddress.map { ",\n        \"remotePublicAddress\": \"\($0)\"" } ?? ""
+    let playerLocalJSON = playerLocal.map { ",\n        \"local\": \($0)" } ?? ""
+    let playerRelayedJSON = playerRelayed.map { ",\n        \"relayed\": \($0)" } ?? ""
 
     return #"""
     {
@@ -766,11 +1049,11 @@ private func sessionJSON(
       "viewOffset": \#(viewOffset),
       "Player": {
         "title": "Apple TV",
-        "state": "\#(state)"
+        "state": "\#(state)"\#(playerAddressJSON)\#(remotePublicAddressJSON)\#(playerLocalJSON)\#(playerRelayedJSON)
       },
       "Session": {
         "id": "\#(sessionKey)",
-        "location": "lan"
+        "location": "\#(sessionLocation)"
       }\#(transcodeSessionJSON)
     }
     """#

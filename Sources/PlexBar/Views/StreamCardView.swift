@@ -6,6 +6,7 @@ struct StreamCardView: View {
     let serverURL: URL?
     let settingsStore: PlexSettingsStore
     let snapshotDate: Date?
+    let resolvedLocation: String?
 
     private var clientContext: PlexClientContext {
         PlexClientContext(clientIdentifier: settingsStore.clientIdentifier)
@@ -92,6 +93,7 @@ struct StreamCardView: View {
                     UserIdentityRow(
                         userName: session.userDisplayName,
                         playerName: session.playerDisplayName,
+                        resolvedLocation: resolvedLocation,
                         thumb: session.user?.thumb,
                         serverURL: serverURL,
                         serverToken: settingsStore.trimmedServerToken,
@@ -283,6 +285,7 @@ private struct PosterThumbnailView: View {
 private struct UserIdentityRow: View {
     let userName: String
     let playerName: String
+    let resolvedLocation: String?
     let thumb: String?
     let serverURL: URL?
     let serverToken: String
@@ -309,6 +312,13 @@ private struct UserIdentityRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+
+                if let resolvedLocation {
+                    Text(resolvedLocation)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer(minLength: 0)
