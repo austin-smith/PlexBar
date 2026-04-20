@@ -7,6 +7,34 @@ struct PlexAPIClient {
         self.session = session
     }
 
+    func fetchIdentity(
+        using configuration: PlexConnectionConfiguration,
+        timeoutInterval: TimeInterval? = nil
+    ) async throws -> PlexServerIdentity {
+        guard let endpoint = PlexURLBuilder.endpointURL(serverURL: configuration.serverURL, path: "/identity") else {
+            throw PlexAPIError.invalidServerURL
+        }
+
+        var request = PlexRequestBuilder(clientContext: configuration.clientContext).request(
+            url: endpoint,
+            accept: "application/json",
+            token: configuration.token
+        )
+
+        if let timeoutInterval {
+            request.timeoutInterval = timeoutInterval
+        }
+
+        let data = try await data(for: request)
+
+        do {
+            let decodedResponse = try JSONDecoder().decode(PlexIdentityEnvelope.self, from: data)
+            return decodedResponse.mediaContainer
+        } catch {
+            throw PlexAPIError.decodingFailed(error)
+        }
+    }
+
     func fetchLibraries(using configuration: PlexConnectionConfiguration) async throws -> [PlexLibrary] {
         let sections = try await fetchLibrarySections(using: configuration)
 
@@ -56,6 +84,49 @@ struct PlexAPIClient {
         do {
             let decodedResponse = try JSONDecoder().decode(PlexSessionsEnvelope.self, from: data)
             return decodedResponse.mediaContainer.metadata ?? []
+        } catch {
+            throw PlexAPIError.decodingFailed(error)
+        }
+    }
+
+    func fetchSession(
+        using configuration: PlexConnectionConfiguration,
+        sessionKey: String
+    ) async throws -> PlexSession? {
+        guard let endpoint = PlexURLBuilder.endpointURL(serverURL: configuration.serverURL, path: "/status/sessions"),
+              var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw PlexAPIError.invalidServerURL
+        }
+
+        components.queryItems = [
+            URLQueryItem(name: "sessionKey", value: sessionKey)
+        ]
+
+        guard let sessionURL = components.url else {
+            throw PlexAPIError.invalidServerURL
+        }
+
+        let request = PlexRequestBuilder(clientContext: configuration.clientContext).request(
+            url: sessionURL,
+            accept: "application/json",
+            token: configuration.token
+        )
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PlexAPIError.invalidResponse
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw PlexAPIError.badStatusCode(httpResponse.statusCode)
+        }
+
+        do {
+            let decodedResponse = try JSONDecoder().decode(PlexSessionsEnvelope.self, from: data)
+            return decodedResponse.mediaContainer.metadata?.first(where: {
+                $0.canonicalSessionKey == sessionKey
+            })
         } catch {
             throw PlexAPIError.decodingFailed(error)
         }
@@ -513,6 +584,26 @@ enum PlexAPIError: LocalizedError {
 
 private struct PlexSessionsEnvelope: Decodable {
     let mediaContainer: PlexSessionsContainer
+
+    enum CodingKeys: String, CodingKey {
+        case mediaContainer = "MediaContainer"
+    }
+}
+
+struct PlexServerIdentity: Decodable, Equatable, Sendable {
+    let claimed: Bool?
+    let machineIdentifier: String
+    let version: String?
+
+    enum CodingKeys: String, CodingKey {
+        case claimed
+        case machineIdentifier
+        case version
+    }
+}
+
+private struct PlexIdentityEnvelope: Decodable {
+    let mediaContainer: PlexServerIdentity
 
     enum CodingKeys: String, CodingKey {
         case mediaContainer = "MediaContainer"

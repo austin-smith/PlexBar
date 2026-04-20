@@ -6,7 +6,7 @@ import Observation
 final class PlexHistoryStore {
     static let historyWindowDays = 30
 
-    private let settings: PlexSettingsStore
+    private let connectionStore: PlexConnectionStore
     private let libraryStore: PlexLibraryStore
     private let client: PlexAPIClient
     private var pollingTask: Task<Void, Never>?
@@ -19,11 +19,11 @@ final class PlexHistoryStore {
     var lastUpdated: Date?
 
     init(
-        settings: PlexSettingsStore,
+        connectionStore: PlexConnectionStore,
         libraryStore: PlexLibraryStore,
         client: PlexAPIClient = PlexAPIClient()
     ) {
-        self.settings = settings
+        self.connectionStore = connectionStore
         self.libraryStore = libraryStore
         self.client = client
         startPolling()
@@ -68,7 +68,7 @@ final class PlexHistoryStore {
             return
         }
 
-        let pollIntervalDuration = settings.historyPollIntervalDuration
+        let pollIntervalDuration = connectionStore.settings.historyPollIntervalDuration
 
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -89,7 +89,7 @@ final class PlexHistoryStore {
     }
 
     private func refresh() async {
-        guard settings.hasValidConfiguration else {
+        guard connectionStore.settings.hasValidConfiguration else {
             recentItems = []
             seriesByEpisodeID = [:]
             accountsByID = [:]
@@ -101,35 +101,30 @@ final class PlexHistoryStore {
         isLoading = true
 
         do {
-            guard let serverURL = settings.normalizedServerURL else {
-                throw PlexAPIError.invalidServerURL
-            }
-
-            let configuration = PlexConnectionConfiguration(
-                serverURL: serverURL,
-                token: settings.trimmedServerToken,
-                clientContext: PlexClientContext(clientIdentifier: settings.clientIdentifier)
-            )
             let cutoffDate = Calendar.current.date(byAdding: .day, value: -Self.historyWindowDays, to: Date()) ?? Date.distantPast
+            let result = try await connectionStore.perform { configuration in
+                async let historyTask = client.fetchHistory(using: configuration, since: cutoffDate)
+                async let accountsTask = client.fetchAccounts(using: configuration)
 
-            async let historyTask = client.fetchHistory(using: configuration, since: cutoffDate)
-            async let accountsTask = client.fetchAccounts(using: configuration)
+                let rawHistoryItems = try await historyTask
+                let seriesByEpisodeID = try await client.fetchHistorySeriesIdentities(
+                    using: configuration,
+                    episodeIDs: rawHistoryItems.compactMap(\.episodeMetadataItemID)
+                )
 
-            let rawHistoryItems = try await historyTask
-            let seriesByEpisodeID = try await client.fetchHistorySeriesIdentities(
-                using: configuration,
-                episodeIDs: rawHistoryItems.compactMap(\.episodeMetadataItemID)
-            )
+                let accounts: [PlexAccount]
+                do {
+                    accounts = try await accountsTask
+                } catch {
+                    accounts = []
+                }
 
-            self.recentItems = PlexHistoryAnalytics.groupedWatchItems(from: rawHistoryItems)
-            self.seriesByEpisodeID = seriesByEpisodeID
-
-            do {
-                let accounts = try await accountsTask
-                accountsByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
-            } catch {
-                accountsByID = [:]
+                return (rawHistoryItems, seriesByEpisodeID, accounts)
             }
+
+            self.recentItems = PlexHistoryAnalytics.groupedWatchItems(from: result.0)
+            self.seriesByEpisodeID = result.1
+            self.accountsByID = Dictionary(uniqueKeysWithValues: result.2.map { ($0.id, $0) })
 
             errorMessage = nil
             lastUpdated = Date()

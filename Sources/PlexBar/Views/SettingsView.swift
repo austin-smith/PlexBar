@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var settingsStore: PlexSettingsStore
+    @Bindable var connectionStore: PlexConnectionStore
     @Bindable var authStore: PlexAuthStore
     @Bindable var previewStore: PlexServerPreviewStore
     @Bindable var sessionStore: PlexSessionStore
@@ -86,19 +87,21 @@ struct SettingsView: View {
                             .font(.subheadline.weight(.semibold))
 
                         serverMenu
+
+                        if let serverStatusMessage {
+                            serverStatusBanner(message: serverStatusMessage)
+                        }
                     }
                     .padding(.vertical, 2)
                 }
 
                 Section {
-                    Picker("Active Streams Refresh", selection: pollIntervalBinding) {
-                        Text("5 seconds").tag(5)
-                        Text("10 seconds").tag(10)
-                        Text("15 seconds").tag(15)
-                        Text("30 seconds").tag(30)
-                        Text("1 minute").tag(60)
-                        Text("2 minutes").tag(120)
+                    Picker("Connection Recheck", selection: connectionRecheckIntervalBinding) {
+                        Text("Off").tag(0)
                         Text("5 minutes").tag(300)
+                        Text("15 minutes").tag(900)
+                        Text("30 minutes").tag(1_800)
+                        Text("1 hour").tag(3_600)
                     }
 
                     Picker("History Refresh", selection: historyPollIntervalBinding) {
@@ -116,13 +119,6 @@ struct SettingsView: View {
                 if authStore.isLoadingServers {
                     ProgressView()
                         .controlSize(.small)
-                }
-
-                if let errorMessage = authStore.errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .lineLimit(1)
                 }
 
                 Spacer()
@@ -208,20 +204,6 @@ struct SettingsView: View {
         )
     }
 
-    private var pollIntervalBinding: Binding<Int> {
-        Binding(
-            get: { settingsStore.pollIntervalSeconds },
-            set: { newValue in
-                guard settingsStore.pollIntervalSeconds != newValue else {
-                    return
-                }
-
-                settingsStore.pollIntervalSeconds = newValue
-                sessionStore.restartPolling()
-            }
-        )
-    }
-
     private var historyPollIntervalBinding: Binding<Int> {
         Binding(
             get: { settingsStore.historyPollIntervalSeconds },
@@ -232,6 +214,20 @@ struct SettingsView: View {
 
                 settingsStore.historyPollIntervalSeconds = newValue
                 historyStore.restartPolling()
+            }
+        )
+    }
+
+    private var connectionRecheckIntervalBinding: Binding<Int> {
+        Binding(
+            get: { settingsStore.connectionRecheckIntervalSeconds },
+            set: { newValue in
+                guard settingsStore.connectionRecheckIntervalSeconds != newValue else {
+                    return
+                }
+
+                settingsStore.connectionRecheckIntervalSeconds = newValue
+                sessionStore.restartConnectionRecheckTask()
             }
         )
     }
@@ -275,8 +271,8 @@ struct SettingsView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
 
-                    if let selectedServer {
-                        connectionBadge(for: selectedServer)
+                    if settingsStore.selectedServerIdentifier != nil {
+                        activeConnectionBadge
                     }
                 }
 
@@ -293,7 +289,7 @@ struct SettingsView: View {
                 HStack(spacing: 2) {
                     PosterStackView(
                         state: selectedServerPreviewState,
-                        serverURL: selectedServer?.selectedURL ?? settingsStore.normalizedServerURL,
+                        serverURL: connectionStore.resolvedServerURL,
                         token: selectedServer?.accessToken ?? settingsStore.trimmedServerToken,
                         clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier),
                         posterWidth: 36,
@@ -369,7 +365,9 @@ struct SettingsView: View {
                             .foregroundStyle(.primary)
                             .lineLimit(1)
 
-                        connectionBadge(for: server)
+                        if isSelected {
+                            activeConnectionBadge
+                        }
                     }
                 }
 
@@ -384,7 +382,7 @@ struct SettingsView: View {
 
             PosterStackView(
                 state: previewStore.state(for: server.id),
-                serverURL: server.selectedURL,
+                serverURL: previewStore.state(for: server.id).serverURL,
                 token: server.accessToken,
                 clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier),
                 posterWidth: 46,
@@ -426,8 +424,8 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func connectionBadge(for server: PlexServerResource) -> some View {
-        Text(server.connectionSummary)
+    private var activeConnectionBadge: some View {
+        Text(activeConnectionBadgeLabel)
             .font(.system(size: 10.5, weight: .semibold))
             .foregroundStyle(.secondary)
             .padding(.horizontal, 6)
@@ -436,6 +434,52 @@ struct SettingsView: View {
                 RoundedRectangle(cornerRadius: 999, style: .continuous)
                     .fill(Color.white.opacity(0.045))
             )
+    }
+
+    private var activeConnectionBadgeLabel: String {
+        if connectionStore.isResolving {
+            return "Resolving…"
+        }
+
+        if connectionStore.errorMessage != nil {
+            return "Unavailable"
+        }
+
+        return connectionStore.activeConnectionKind?.displayName ?? "Unavailable"
+    }
+
+    private var serverStatusMessage: String? {
+        if let connectionErrorMessage = connectionStore.errorMessage {
+            return connectionErrorMessage
+        }
+
+        return authStore.errorMessage
+    }
+
+    @ViewBuilder
+    private func serverStatusBanner(message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.footnote)
+                .foregroundStyle(.orange)
+                .padding(.top, 1)
+
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.orange.opacity(0.12))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.22))
+        }
     }
 
     private func rowBackground(isSelected: Bool) -> some View {

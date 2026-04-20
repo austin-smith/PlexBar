@@ -6,20 +6,27 @@ import Observation
 final class PlexSettingsStore {
     private enum DefaultsKeys {
         static let installIdentifier = "plex.installIdentifier"
-        static let serverURL = "plex.serverURL"
+        static let cachedConnectionURL = "plex.serverURL"
+        static let cachedConnectionKind = "plex.cachedConnectionKind"
         static let clientIdentifier = "plex.clientIdentifier"
         static let selectedServerIdentifier = "plex.selectedServerIdentifier"
         static let selectedServerName = "plex.selectedServerName"
-        static let pollIntervalSeconds = "plex.pollIntervalSeconds"
+        static let connectionRecheckIntervalSeconds = "plex.connectionRecheckIntervalSeconds"
         static let historyPollIntervalSeconds = "plex.historyPollIntervalSeconds"
     }
 
     private let defaults: UserDefaults
     private let keychain: KeychainStore
 
-    var serverURLString: String {
+    var cachedConnectionURLString: String {
         didSet {
-            defaults.set(serverURLString, forKey: DefaultsKeys.serverURL)
+            defaults.set(cachedConnectionURLString, forKey: DefaultsKeys.cachedConnectionURL)
+        }
+    }
+
+    var cachedConnectionKind: PlexConnectionKind? {
+        didSet {
+            defaults.set(cachedConnectionKind?.rawValue, forKey: DefaultsKeys.cachedConnectionKind)
         }
     }
 
@@ -47,15 +54,15 @@ final class PlexSettingsStore {
         }
     }
 
-    var pollIntervalSeconds: Int {
+    var connectionRecheckIntervalSeconds: Int {
         didSet {
-            let normalizedValue = Self.normalizedPollIntervalSeconds(pollIntervalSeconds)
-            if pollIntervalSeconds != normalizedValue {
-                pollIntervalSeconds = normalizedValue
+            let normalizedValue = Self.normalizedConnectionRecheckIntervalSeconds(connectionRecheckIntervalSeconds)
+            if connectionRecheckIntervalSeconds != normalizedValue {
+                connectionRecheckIntervalSeconds = normalizedValue
                 return
             }
 
-            defaults.set(normalizedValue, forKey: DefaultsKeys.pollIntervalSeconds)
+            defaults.set(normalizedValue, forKey: DefaultsKeys.connectionRecheckIntervalSeconds)
         }
     }
 
@@ -80,7 +87,8 @@ final class PlexSettingsStore {
     init(defaults: UserDefaults = .standard, keychain: KeychainStore = KeychainStore(service: AppConstants.bundleIdentifier)) {
         self.defaults = defaults
         self.keychain = keychain
-        serverURLString = defaults.string(forKey: DefaultsKeys.serverURL) ?? ""
+        cachedConnectionURLString = defaults.string(forKey: DefaultsKeys.cachedConnectionURL) ?? ""
+        cachedConnectionKind = defaults.string(forKey: DefaultsKeys.cachedConnectionKind).flatMap(PlexConnectionKind.init(rawValue:))
 
         let installIdentifier = Self.loadInstallIdentifier(from: defaults)
         clientIdentifier = Self.loadClientIdentifier(from: defaults, installIdentifier: installIdentifier)
@@ -89,8 +97,8 @@ final class PlexSettingsStore {
         selectedServerName = defaults.string(forKey: DefaultsKeys.selectedServerName)
         userToken = keychain.read(account: KeychainAccounts.userToken) ?? ""
         serverToken = keychain.read(account: KeychainAccounts.serverToken) ?? ""
-        pollIntervalSeconds = Self.normalizedPollIntervalSeconds(
-            defaults.object(forKey: DefaultsKeys.pollIntervalSeconds) as? Int ?? AppConstants.defaultPollIntervalSeconds
+        connectionRecheckIntervalSeconds = Self.normalizedConnectionRecheckIntervalSeconds(
+            defaults.object(forKey: DefaultsKeys.connectionRecheckIntervalSeconds) as? Int ?? AppConstants.defaultConnectionRecheckIntervalSeconds
         )
         historyPollIntervalSeconds = Self.normalizedHistoryPollIntervalSeconds(
             defaults.object(forKey: DefaultsKeys.historyPollIntervalSeconds) as? Int ?? AppConstants.defaultHistoryPollIntervalSeconds
@@ -98,7 +106,7 @@ final class PlexSettingsStore {
     }
 
     var normalizedServerURL: URL? {
-        PlexURLBuilder.normalizeServerURL(serverURLString)
+        PlexURLBuilder.normalizeServerURL(cachedConnectionURLString)
     }
 
     var trimmedUserToken: String {
@@ -110,15 +118,19 @@ final class PlexSettingsStore {
     }
 
     var hasValidConfiguration: Bool {
-        normalizedServerURL != nil && !trimmedServerToken.isEmpty
+        selectedServerIdentifier?.nilIfBlank != nil && !trimmedServerToken.isEmpty
     }
 
     var hasAuthenticatedAccount: Bool {
         !trimmedUserToken.isEmpty
     }
 
-    var pollIntervalDuration: Duration {
-        .seconds(pollIntervalSeconds)
+    var connectionRecheckIntervalDuration: Duration? {
+        guard connectionRecheckIntervalSeconds > 0 else {
+            return nil
+        }
+
+        return .seconds(connectionRecheckIntervalSeconds)
     }
 
     var historyPollIntervalDuration: Duration {
@@ -132,14 +144,24 @@ final class PlexSettingsStore {
     func saveServerSelection(_ server: PlexServerResource) {
         selectedServerIdentifier = server.id
         selectedServerName = server.name
-        serverURLString = server.selectedURL?.absoluteString ?? ""
         serverToken = server.accessToken
+        clearCachedConnection()
+    }
+
+    func saveResolvedConnection(_ connection: PlexResolvedConnection) {
+        cachedConnectionURLString = connection.url.absoluteString
+        cachedConnectionKind = connection.kind
+    }
+
+    func clearCachedConnection() {
+        cachedConnectionURLString = ""
+        cachedConnectionKind = nil
     }
 
     func clearAuthentication() {
         selectedServerIdentifier = nil
         selectedServerName = nil
-        serverURLString = ""
+        clearCachedConnection()
         userToken = ""
         serverToken = ""
     }
@@ -173,8 +195,12 @@ final class PlexSettingsStore {
         keychain.write(trimmedToken, account: KeychainAccounts.serverToken)
     }
 
-    private static func normalizedPollIntervalSeconds(_ value: Int) -> Int {
-        min(max(value, AppConstants.minimumPollIntervalSeconds), AppConstants.maximumPollIntervalSeconds)
+    private static func normalizedConnectionRecheckIntervalSeconds(_ value: Int) -> Int {
+        guard AppConstants.allowedConnectionRecheckIntervalSeconds.contains(value) else {
+            return AppConstants.defaultConnectionRecheckIntervalSeconds
+        }
+
+        return value
     }
 
     private static func normalizedHistoryPollIntervalSeconds(_ value: Int) -> Int {

@@ -8,7 +8,7 @@ struct PlexServerPreviewStoreTests {
     @Test func keepsExistingServerLoadAliveWhenAnotherServerStarts() async throws {
         let responder = PreviewStoreResponder()
         let session = makePreviewStoreSession(responder: responder)
-        let store = PlexServerPreviewStore(client: PlexAPIClient(session: session))
+        let store = makePreviewStore(session: session)
 
         let firstServer = makeServer(id: "server-1", host: "plex.local")
         let secondServer = makeServer(id: "server-2", host: "plex-2.local")
@@ -35,7 +35,7 @@ struct PlexServerPreviewStoreTests {
         responder.failFirstPreviewRequest(forHost: "plex.local")
 
         let session = makePreviewStoreSession(responder: responder)
-        let store = PlexServerPreviewStore(client: PlexAPIClient(session: session))
+        let store = makePreviewStore(session: session)
         let server = makeServer(id: "server-1", host: "plex.local")
 
         store.loadPreviewsIfNeeded(for: [server], clientIdentifier: "client-123")
@@ -58,7 +58,7 @@ struct PlexServerPreviewStoreTests {
     @Test func refreshPreviewsReloadsAlreadyLoadedServers() async throws {
         let responder = PreviewStoreResponder()
         let session = makePreviewStoreSession(responder: responder)
-        let store = PlexServerPreviewStore(client: PlexAPIClient(session: session))
+        let store = makePreviewStore(session: session)
         let server = makeServer(id: "server-1", host: "plex.local")
 
         store.loadPreviewsIfNeeded(for: [server], clientIdentifier: "client-123")
@@ -92,6 +92,17 @@ struct PlexServerPreviewStoreTests {
             ]
         )
     }
+}
+
+@MainActor
+private func makePreviewStore(session: URLSession) -> PlexServerPreviewStore {
+    PlexServerPreviewStore(
+        client: PlexAPIClient(session: session),
+        resolver: PlexConnectionResolver(
+            client: PlexAPIClient(session: session),
+            probeTimeoutInterval: 0.1
+        )
+    )
 }
 
 @MainActor
@@ -193,6 +204,22 @@ private final class PreviewStoreResponder: @unchecked Sendable {
         guard let url = request.url,
               let host = url.host else {
             completion(.failure(URLError(.badURL)))
+            return
+        }
+
+        if url.path == "/identity" {
+            completion(.success((
+                response: HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                data: #"""
+                {
+                  "MediaContainer": {
+                    "claimed": true,
+                    "machineIdentifier": "\#(host == "plex.local" ? "server-1" : "server-2")",
+                    "version": "1.0.0"
+                  }
+                }
+                """#.data(using: .utf8)!
+            )))
             return
         }
 

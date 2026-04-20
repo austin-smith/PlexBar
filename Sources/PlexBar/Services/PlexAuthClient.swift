@@ -32,7 +32,7 @@ struct PlexAuthClient {
 
     func fetchServers(userToken: String, clientContext: PlexClientContext) async throws -> [PlexServerResource] {
         let request = PlexRequestBuilder(clientContext: clientContext).request(
-            url: URL(string: "https://plex.tv/api/resources?includeHttps=1")!,
+            url: URL(string: "https://plex.tv/api/resources?includeHttps=1&includeRelay=1&includeIPv6=1")!,
             accept: "application/xml",
             token: userToken
         )

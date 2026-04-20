@@ -3,6 +3,7 @@ import SwiftUI
 
 struct StreamCardView: View {
     let session: PlexSession
+    let serverURL: URL?
     let settingsStore: PlexSettingsStore
     let snapshotDate: Date?
 
@@ -92,7 +93,7 @@ struct StreamCardView: View {
                         userName: session.userDisplayName,
                         playerName: session.playerDisplayName,
                         thumb: session.user?.thumb,
-                        serverURL: settingsStore.normalizedServerURL,
+                        serverURL: serverURL,
                         serverToken: settingsStore.trimmedServerToken,
                         userToken: settingsStore.trimmedUserToken,
                         clientContext: clientContext
@@ -115,7 +116,7 @@ struct StreamCardView: View {
     }
 
     private var posterURL: URL? {
-        guard let serverURL = settingsStore.normalizedServerURL else {
+        guard let serverURL else {
             return nil
         }
 
@@ -126,7 +127,7 @@ struct StreamCardView: View {
     }
 
     private var transcodedPosterURL: URL? {
-        guard let serverURL = settingsStore.normalizedServerURL else {
+        guard let serverURL else {
             return nil
         }
 
@@ -269,7 +270,11 @@ private struct PosterThumbnailView: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(12)
-                .background(.ultraThinMaterial, in: Circle())
+                .background {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.75)
+                }
         }
         .allowsHitTesting(false)
     }

@@ -4,7 +4,8 @@ This file defines project constraints for coding agents working in this reposito
 
 ## Reference Documentation
 
-- Plex API documentation: `https://developer.plex.tv/pms/`
+- [Plex API OpenAPI spec](docs/plex/openapi.json)
+- [Plex API documentation](https://developer.plex.tv/pms/)
 
 ## Platform + App Contract
 

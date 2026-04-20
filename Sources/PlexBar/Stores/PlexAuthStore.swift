@@ -6,6 +6,7 @@ import Observation
 @Observable
 final class PlexAuthStore {
     private let settings: PlexSettingsStore
+    private let connectionStore: PlexConnectionStore
     private let sessionStore: PlexSessionStore
     private let historyStore: PlexHistoryStore
     private let libraryStore: PlexLibraryStore
@@ -21,16 +22,22 @@ final class PlexAuthStore {
 
     init(
         settings: PlexSettingsStore,
+        connectionStore: PlexConnectionStore,
         sessionStore: PlexSessionStore,
         historyStore: PlexHistoryStore,
         libraryStore: PlexLibraryStore,
         client: PlexAuthClient = PlexAuthClient()
     ) {
         self.settings = settings
+        self.connectionStore = connectionStore
         self.sessionStore = sessionStore
         self.historyStore = historyStore
         self.libraryStore = libraryStore
         self.client = client
+
+        if settings.hasValidConfiguration {
+            sessionStore.didChangeConfiguration()
+        }
 
         if settings.hasAuthenticatedAccount {
             Task {
@@ -73,6 +80,7 @@ final class PlexAuthStore {
             }
 
             availableServers = servers
+            connectionStore.updateAvailableServers(servers)
 
             if autoSelectStoredServer,
                let selectedServerIdentifier = settings.selectedServerIdentifier,
@@ -107,13 +115,15 @@ final class PlexAuthStore {
         remainingSeconds = nil
         availableServers = []
         settings.clearAuthentication()
-        sessionStore.refreshNow()
+        connectionStore.updateAvailableServers([])
+        sessionStore.didChangeConfiguration()
         historyStore.refreshNow()
     }
 
     private func selectServer(_ server: PlexServerResource) {
         settings.saveServerSelection(server)
-        sessionStore.refreshNow()
+        connectionStore.didSelectServer()
+        sessionStore.didChangeConfiguration()
         historyStore.refreshNow()
     }
 

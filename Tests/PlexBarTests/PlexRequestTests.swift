@@ -43,6 +43,121 @@ struct PlexRequestTests {
         #expect(request.value(forHTTPHeaderField: "X-Plex-Device-Name") == "Mac (\(AppConstants.appName))")
     }
 
+    @Test func fetchSessionUsesSessionKeyQueryParameter() async throws {
+        let capture = RequestCapture()
+        let session = makeMockSession { request in
+            capture.record(request)
+
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"{"MediaContainer":{"Metadata":[]}}"#.data(using: .utf8))
+            return (response, data)
+        }
+
+        let client = PlexAPIClient(session: session)
+        let serverURL = try #require(PlexURLBuilder.normalizeServerURL("http://plex.local:32400"))
+        let clientContext = PlexClientContext(clientIdentifier: "client-123")
+
+        let fetchedSession = try await client.fetchSession(using: PlexConnectionConfiguration(
+            serverURL: serverURL,
+            token: "server-token",
+            clientContext: clientContext
+        ), sessionKey: "77")
+
+        #expect(fetchedSession == nil)
+
+        let request = try #require(capture.request)
+        let requestURL = try #require(request.url)
+        let components = try #require(URLComponents(url: requestURL, resolvingAgainstBaseURL: false))
+        #expect(components.path == "/status/sessions")
+        #expect(components.queryItems?.contains(where: { $0.name == "sessionKey" && $0.value == "77" }) == true)
+    }
+
+    @Test func fetchSessionReturnsOnlyTheMatchingSessionKey() async throws {
+        let session = makeMockSession { request in
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            {
+              "MediaContainer": {
+                "Metadata": [
+                  {
+                    "type": "episode",
+                    "sessionKey": "44",
+                    "title": "Wrong Session",
+                    "Session": { "id": "wrong", "key": "44" },
+                    "Player": { "title": "Safari", "product": "Safari", "state": "playing", "platform": "macOS" },
+                    "User": { "title": "smitty_", "id": "1" },
+                    "key": "/library/metadata/900",
+                    "ratingKey": "900",
+                    "viewOffset": 1000
+                  },
+                  {
+                    "type": "episode",
+                    "sessionKey": "77",
+                    "title": "Right Session",
+                    "Session": { "id": "right", "key": "77" },
+                    "Player": { "title": "Safari", "product": "Safari", "state": "playing", "platform": "macOS" },
+                    "User": { "title": "smitty_", "id": "1" },
+                    "key": "/library/metadata/901",
+                    "ratingKey": "901",
+                    "viewOffset": 2000
+                  }
+                ]
+              }
+            }
+            """#.data(using: .utf8))
+            return (response, data)
+        }
+
+        let client = PlexAPIClient(session: session)
+        let serverURL = try #require(PlexURLBuilder.normalizeServerURL("http://plex.local:32400"))
+        let clientContext = PlexClientContext(clientIdentifier: "client-123")
+
+        let fetchedSession = try await client.fetchSession(using: PlexConnectionConfiguration(
+            serverURL: serverURL,
+            token: "server-token",
+            clientContext: clientContext
+        ), sessionKey: "77")
+
+        #expect(fetchedSession?.canonicalSessionKey == "77")
+        #expect(fetchedSession?.title == "Right Session")
+    }
+
+    @Test func notificationsWebSocketURLUsesVerifiedPath() async throws {
+        let serverURL = try #require(PlexURLBuilder.normalizeServerURL("https://plex.local:32400"))
+        let configuration = PlexConnectionConfiguration(
+            serverURL: serverURL,
+            token: "server-token",
+            clientContext: PlexClientContext(clientIdentifier: "client-123")
+        )
+
+        let websocketURL = try PlexSessionEventsClient.notificationsURL(using: configuration)
+
+        #expect(websocketURL.absoluteString == "wss://plex.local:32400/:/websockets/notifications")
+    }
+
+    @Test func notificationsWebSocketURLPreservesConfiguredBasePath() async throws {
+        let serverURL = try #require(PlexURLBuilder.normalizeServerURL("https://plex.local:32400/plex"))
+        let configuration = PlexConnectionConfiguration(
+            serverURL: serverURL,
+            token: "server-token",
+            clientContext: PlexClientContext(clientIdentifier: "client-123")
+        )
+
+        let websocketURL = try PlexSessionEventsClient.notificationsURL(using: configuration)
+
+        #expect(websocketURL.absoluteString == "wss://plex.local:32400/plex/:/websockets/notifications")
+    }
+
     @Test func createPinUsesCanonicalHeadersWithoutToken() async throws {
         let capture = RequestCapture()
         let session = makeMockSession { request in
@@ -72,6 +187,52 @@ struct PlexRequestTests {
         #expect(request.value(forHTTPHeaderField: "X-Plex-Token") == nil)
         #expect(request.value(forHTTPHeaderField: "X-Plex-Client-Identifier") == "client-123")
         #expect(request.value(forHTTPHeaderField: "X-Plex-Version") == AppConstants.productVersion)
+    }
+
+    @Test func fetchServersParsesServerResourcesFromXML() async throws {
+        let capture = RequestCapture()
+        let session = makeMockSession { request in
+            capture.record(request)
+
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            <MediaContainer size="1">
+              <Device name="Test Server"
+                      clientIdentifier="server-id"
+                      provides="server,player"
+                      accessToken="server-token"
+                      productVersion="1.2.3-abc">
+                <Connection uri="https://10-0-0-2.server-id.plex.direct:32400" local="1" relay="0" />
+                <Connection uri="https://203-0-113-10.server-id.plex.direct:32400" local="0" relay="0" />
+                <Connection uri="https://203-0-113-20.server-id.plex.direct:8443" local="0" relay="1" />
+              </Device>
+            </MediaContainer>
+            """#.data(using: .utf8))
+            return (response, data)
+        }
+
+        let client = PlexAuthClient(session: session)
+        let servers = try await client.fetchServers(
+            userToken: "user-token",
+            clientContext: PlexClientContext(clientIdentifier: "client-123")
+        )
+
+        #expect(servers.count == 1)
+        #expect(servers.first?.id == "server-id")
+        #expect(servers.first?.name == "Test Server")
+        #expect(servers.first?.accessToken == "server-token")
+        #expect(servers.first?.connections.count == 3)
+        #expect(servers.first?.connections.map(\.kind) == [.local, .remote, .relay])
+
+        let request = try #require(capture.request)
+        #expect(request.url?.absoluteString == "https://plex.tv/api/resources?includeHttps=1&includeRelay=1&includeIPv6=1")
+        #expect(request.value(forHTTPHeaderField: "Accept") == "application/xml")
+        #expect(request.value(forHTTPHeaderField: "X-Plex-Token") == "user-token")
     }
 
     @Test func imageClientUsesHeaderTokenInsteadOfQueryToken() async throws {
