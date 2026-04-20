@@ -35,10 +35,6 @@ final class PlexAuthStore {
         self.libraryStore = libraryStore
         self.client = client
 
-        if settings.hasValidConfiguration {
-            sessionStore.didChangeConfiguration()
-        }
-
         if settings.hasAuthenticatedAccount {
             Task {
                 await refreshServers(autoSelectStoredServer: true)

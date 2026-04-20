@@ -21,7 +21,7 @@ final class PlexConnectionStore {
     }
 
     var activeConnectionKind: PlexConnectionKind? {
-        activeConnection?.kind ?? settings.cachedConnectionKind
+        activeConnection?.kind
     }
 
     var resolvedServerURL: URL? {

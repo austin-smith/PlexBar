@@ -44,8 +44,8 @@ struct PlexSessionStoreTests {
 }
 
 @MainActor
-@Test func fullHydratePreservesSessionsWithoutCanonicalSessionKeys() async throws {
-    let suiteName = "PlexBarTests.fullHydratePreservesSessionsWithoutCanonicalSessionKeys"
+@Test func fullHydrateDropsSessionsWithoutCanonicalSessionKeys() async throws {
+    let suiteName = "PlexBarTests.fullHydrateDropsSessionsWithoutCanonicalSessionKeys"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defaults.removePersistentDomain(forName: suiteName)
     defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -82,116 +82,15 @@ struct PlexSessionStoreTests {
     defer { stopSessionMonitoring(store: store, settings: settings) }
 
     await waitForSessionStore(store) {
-        $0.activeStreamCount == 1 &&
-        $0.sessions.first?.canonicalSessionKey == nil &&
-        $0.sessions.first?.id == "900"
+        $0.lastUpdated != nil
     }
+
+    #expect(store.activeStreamCount == 0)
 }
 
 @MainActor
-@Test func websocketFailureFallsBackToOneSnapshotHydrate() async throws {
-    let suiteName = "PlexBarTests.websocketFailureFallsBackToOneSnapshotHydrate"
-    let defaults = try #require(UserDefaults(suiteName: suiteName))
-    defaults.removePersistentDomain(forName: suiteName)
-    defer { defaults.removePersistentDomain(forName: suiteName) }
-
-    let fullHydrateCounter = RequestCounter()
-    let session = makeSessionStoreMockSession { request in
-        let url = try #require(request.url)
-
-        if url.path == "/identity" {
-            return try identityResponse(for: url)
-        }
-
-        if url.path == "/status/sessions", url.query == nil {
-            fullHydrateCounter.increment()
-            return try sessionsResponse(for: url, metadata: [
-                sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)
-            ])
-        }
-
-        throw URLError(.unsupportedURL)
-    }
-
-    let settings = makeSessionStoreSettings(defaults: defaults)
-    let store = makeSessionStore(
-        settings: settings,
-        session: session,
-        eventsClient: PlexSessionEventsClient { _, _ in
-            throw URLError(.cannotConnectToHost)
-        }
-    )
-    defer { stopSessionMonitoring(store: store, settings: settings) }
-
-    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
-
-    #expect(fullHydrateCounter.value == 1)
-    #expect(store.sessions.first?.canonicalSessionKey == "44")
-}
-
-@MainActor
-@Test func cachedReconnectsContinueWhileServerInventoryIsStillUnavailable() async throws {
-    let suiteName = "PlexBarTests.cachedReconnectsContinueWhileServerInventoryIsStillUnavailable"
-    let defaults = try #require(UserDefaults(suiteName: suiteName))
-    defaults.removePersistentDomain(forName: suiteName)
-    defer { defaults.removePersistentDomain(forName: suiteName) }
-
-    let monitorURLs = Locked<[URL]>([])
-    let remoteURL = try #require(URL(string: "https://plex.remote:32400"))
-    let session = makeSessionStoreMockSession { request in
-        let url = try #require(request.url)
-
-        if url.path == "/identity" {
-            return try identityResponse(for: url)
-        }
-
-        if url.path == "/status/sessions", url.host == "plex.remote" {
-            return try sessionsResponse(for: url, metadata: [
-                sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)
-            ])
-        }
-
-        throw URLError(.unsupportedURL)
-    }
-
-    let settings = makeSessionStoreSettings(defaults: defaults)
-    settings.cachedConnectionURLString = remoteURL.absoluteString
-    settings.cachedConnectionKind = .remote
-    settings.connectionRecheckIntervalSeconds = 0
-
-    let resolver = PlexConnectionResolver(
-        client: PlexAPIClient(session: session),
-        probeTimeoutInterval: 0.1
-    )
-    let connectionStore = PlexConnectionStore(
-        settings: settings,
-        resolver: resolver
-    )
-    let store = PlexSessionStore(
-        connectionStore: connectionStore,
-        client: PlexAPIClient(session: session),
-        eventsClient: PlexSessionEventsClient { configuration, _ in
-            monitorURLs.withValue { $0.append(configuration.serverURL) }
-            throw URLError(.cannotConnectToHost)
-        }
-    )
-    defer { stopSessionMonitoring(store: store, settings: settings) }
-
-    store.didChangeConfiguration()
-
-    await waitForSessionStore(store, timeoutNanoseconds: 3_500_000_000) { _ in
-        monitorURLs.value.count >= 2
-    }
-
-    let seenURLs = monitorURLs.value
-    #expect(seenURLs.count >= 2)
-    #expect(seenURLs.allSatisfy { $0 == remoteURL })
-    #expect(store.sessions.first?.canonicalSessionKey == "44")
-}
-
-@MainActor
-@Test func startupBootstrapsFromPersistedConfigurationBeforeServerRefreshAppliesInventory() async throws {
-    let suiteName = "PlexBarTests.startupBootstrapsFromPersistedConfigurationBeforeServerRefreshAppliesInventory"
+@Test func startupWaitsForServerRefreshBeforeStartingMonitor() async throws {
+    let suiteName = "PlexBarTests.startupWaitsForServerRefreshBeforeStartingMonitor"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defaults.removePersistentDomain(forName: suiteName)
     defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -204,12 +103,6 @@ struct PlexSessionStoreTests {
 
         if url.path == "/identity" {
             return try identityResponse(for: url)
-        }
-
-        if url.path == "/status/sessions", url.host == "plex.remote" {
-            return try sessionsResponse(for: url, metadata: [
-                sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)
-            ])
         }
 
         if url.path == "/status/sessions", url.host == "plex.local" {
@@ -256,14 +149,8 @@ struct PlexSessionStoreTests {
     )
     defer { stopSessionMonitoring(store: store, settings: settings) }
 
-    store.didChangeConfiguration()
-
-    await waitForSessionStore(store) {
-        $0.sessions.first?.canonicalSessionKey == "44"
-    }
-
     try? await Task.sleep(nanoseconds: 50_000_000)
-    #expect(monitorURLs.value == [remoteURL])
+    #expect(monitorURLs.value.isEmpty)
 
     connectionStore.updateAvailableServers([server])
     store.didChangeConfiguration()
@@ -273,7 +160,7 @@ struct PlexSessionStoreTests {
     }
 
     let seenURLs = monitorURLs.value
-    #expect(seenURLs == [remoteURL, localURL])
+    #expect(seenURLs == [localURL])
 }
 
 @MainActor
@@ -594,7 +481,17 @@ struct PlexSessionStoreTests {
         throw URLError(.unsupportedURL)
     }
 
-    let server = PlexServerResource(
+    let remoteOnlyServer = PlexServerResource(
+        id: "server-id",
+        name: "Server",
+        productVersion: nil,
+        accessToken: "server-token",
+        connections: [
+            PlexServerConnection(uri: remoteURL, local: false, relay: false)
+        ]
+    )
+
+    let upgradedServer = PlexServerResource(
         id: "server-id",
         name: "Server",
         productVersion: nil,
@@ -606,8 +503,6 @@ struct PlexSessionStoreTests {
     )
 
     let settings = makeSessionStoreSettings(defaults: defaults)
-    settings.cachedConnectionURLString = remoteURL.absoluteString
-    settings.cachedConnectionKind = .remote
     settings.connectionRecheckIntervalSeconds = 900
 
     let resolver = PlexConnectionResolver(
@@ -633,7 +528,7 @@ struct PlexSessionStoreTests {
                     try await Task.sleep(nanoseconds: 10_000_000)
                 }
                 await MainActor.run {
-                    connectionStore.updateAvailableServers([server])
+                    connectionStore.updateAvailableServers([upgradedServer])
                 }
                 return
             }
@@ -643,6 +538,7 @@ struct PlexSessionStoreTests {
     )
     defer { stopSessionMonitoring(store: store, settings: settings) }
 
+    connectionStore.updateAvailableServers([remoteOnlyServer])
     store.didChangeConfiguration()
 
     await waitForSessionStore(store) {
@@ -757,8 +653,33 @@ private func makeSessionStore(
         settings: settings,
         resolver: resolver
     )
+    let effectiveServers: [PlexServerResource]
     if !availableServers.isEmpty {
-        connectionStore.updateAvailableServers(availableServers)
+        effectiveServers = availableServers
+    } else if let cachedURL = settings.normalizedServerURL,
+              let selectedServerIdentifier = settings.selectedServerIdentifier,
+              let selectedServerName = settings.selectedServerName?.nilIfBlank ?? settings.selectedServerIdentifier {
+        effectiveServers = [
+            PlexServerResource(
+                id: selectedServerIdentifier,
+                name: selectedServerName,
+                productVersion: nil,
+                accessToken: settings.trimmedServerToken,
+                connections: [
+                    PlexServerConnection(
+                        uri: cachedURL,
+                        local: settings.cachedConnectionKind != .remote && settings.cachedConnectionKind != .relay,
+                        relay: settings.cachedConnectionKind == .relay
+                    )
+                ]
+            )
+        ]
+    } else {
+        effectiveServers = []
+    }
+
+    if !effectiveServers.isEmpty {
+        connectionStore.updateAvailableServers(effectiveServers)
     }
 
     let store = PlexSessionStore(

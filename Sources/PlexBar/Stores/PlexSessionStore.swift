@@ -79,7 +79,7 @@ final class PlexSessionStore {
 
     private func runMonitorLoop() async {
         var reconnectAttempt = 0
-        var forceRefresh = connectionStore.hasSelectedServerResource
+        var forceRefresh = true
 
         while !Task.isCancelled {
             guard connectionStore.settings.hasValidConfiguration else {
@@ -89,12 +89,8 @@ final class PlexSessionStore {
                 return
             }
 
-            var monitorConfiguration: PlexConnectionConfiguration?
             do {
-                let configuration = try await connectionStore.currentConfiguration(
-                    forceRefresh: forceRefresh && connectionStore.hasSelectedServerResource
-                )
-                monitorConfiguration = configuration
+                let configuration = try await connectionStore.currentConfiguration(forceRefresh: forceRefresh)
                 activeMonitorURL = configuration.serverURL
 
                 try await eventsClient.monitor(using: configuration) { [weak self] event in
@@ -112,19 +108,7 @@ final class PlexSessionStore {
                 return
             } catch {
                 activeMonitorURL = nil
-                let monitorErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-
-                if let monitorConfiguration {
-                    do {
-                        try await hydrateAll(using: monitorConfiguration, showLoading: sessionsByKey.isEmpty)
-                    } catch is CancellationError {
-                        return
-                    } catch {
-                        // Preserve the websocket failure below; a failed snapshot hydrate will surface on the next refresh attempt.
-                    }
-                }
-
-                errorMessage = monitorErrorMessage
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 reconnectAttempt += 1
                 forceRefresh = true
 
@@ -278,7 +262,9 @@ final class PlexSessionStore {
         var nextSessionOrder: [String] = []
 
         for session in fetchedSessions {
-            let storageKey = session.id
+            guard let storageKey = session.canonicalSessionKey else {
+                continue
+            }
 
             guard nextSessionsByKey[storageKey] == nil else {
                 continue

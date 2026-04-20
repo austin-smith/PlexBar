@@ -238,7 +238,11 @@ struct PlexSession: Decodable, Identifiable {
     }
 
     var id: String {
-        sessionKey ?? session?.id ?? ratingKey ?? key ?? [player.machineIdentifier, title].compactMap { $0 }.joined(separator: ":")
+        guard let canonicalSessionKey else {
+            preconditionFailure("PlexSession requires a canonical session key for active stream identity.")
+        }
+
+        return canonicalSessionKey
     }
 
     var canonicalSessionKey: String? {
