@@ -329,7 +329,6 @@ struct SettingsView: View {
             authStore.signOut()
         }
         .buttonStyle(.bordered)
-        .controlSize(.small)
     }
 
     private var serverMenu: some View {
@@ -430,7 +429,6 @@ struct SettingsView: View {
                         refreshServers()
                     }
                     .buttonStyle(.bordered)
-                    .controlSize(.small)
                     .disabled(authStore.isAuthenticating || authStore.isLoadingServers)
                 }
             }
