@@ -255,59 +255,7 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var accountSummary: some View {
-        if let authenticatedUser = authStore.authenticatedUser {
-            HStack(spacing: 12) {
-                PlexAvatarView(
-                    thumb: authenticatedUser.thumb,
-                    serverURL: nil,
-                    serverToken: "",
-                    userToken: settingsStore.trimmedUserToken,
-                    clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier),
-                    size: 44
-                )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(authenticatedUser.displayName)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
-                    if let displayEmail = authenticatedUser.displayEmail {
-                        Text(displayEmail)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .textSelection(.enabled)
-                    }
-
-                    if let displayUsername = authenticatedUser.displayUsername {
-                        Text(displayUsername)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                }
-
-                Spacer(minLength: 12)
-
-                signOutButton
-            }
-        } else if authStore.isLoadingAuthenticatedUser {
-            HStack(spacing: 10) {
-                ProgressView()
-                    .controlSize(.small)
-
-                Text("Loading account…")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                Spacer(minLength: 12)
-
-                signOutButton
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 4)
-        } else if let accountErrorMessage = authStore.accountErrorMessage {
+        if let accountErrorMessage = authStore.accountErrorMessage {
             VStack(alignment: .leading, spacing: 10) {
                 serverStatusBanner(message: accountErrorMessage)
 
@@ -317,10 +265,84 @@ struct SettingsView: View {
                 }
             }
         } else {
-            HStack {
-                Spacer(minLength: 0)
+            HStack(spacing: 10) {
+                accountAvatar
+
+                VStack(alignment: .leading, spacing: 4) {
+                    if let authenticatedUser = authStore.authenticatedUser {
+                        Text(authenticatedUser.displayName)
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        if let displayEmail = authenticatedUser.displayEmail {
+                            Text(displayEmail)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .textSelection(.enabled)
+                        }
+
+                        if let displayUsername = authenticatedUser.displayUsername {
+                            Text(displayUsername)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    } else if authStore.isLoadingAuthenticatedUser {
+                        Text("Loading account…")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+
+                        Text("Fetching Plex account details")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    } else {
+                        Text(settingsStore.selectedServerName ?? "Plex account connected")
+                            .font(.headline)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        Text("Account details will appear once they finish loading.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer(minLength: 12)
+
                 signOutButton
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 44, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var accountAvatar: some View {
+        if let authenticatedUser = authStore.authenticatedUser {
+            PlexAvatarView(
+                thumb: authenticatedUser.thumb,
+                serverURL: nil,
+                serverToken: "",
+                userToken: settingsStore.trimmedUserToken,
+                clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier),
+                size: 44
+            )
+        } else {
+            ZStack {
+                Circle()
+                    .fill(.quaternary)
+
+                if authStore.isLoadingAuthenticatedUser {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+            .frame(width: 44, height: 44)
         }
     }
 
