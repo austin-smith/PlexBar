@@ -35,7 +35,7 @@ import Testing
     let authURL = try #require(clientContext.authURL(for: "pin-code"))
     let absoluteString = authURL.absoluteString
 
-    #expect(absoluteString.contains("https://app.plex.tv/auth/#!?"))
+    #expect(absoluteString.contains(PlexRemoteService.authAppBaseURL.absoluteString + "/auth/#!?"))
     #expect(absoluteString.contains("clientID=client-123"))
     #expect(absoluteString.contains("code=pin-code"))
     #expect(absoluteString.contains("context%5Bdevice%5D%5BdeviceName%5D=Mac%20(PlexBar)"))

@@ -35,7 +35,7 @@ struct PlexClientContext {
             return nil
         }
 
-        return URL(string: "https://app.plex.tv/auth/#!?\(query)")
+        return PlexRemoteService.authURL(query: query)
     }
 
     private var platformVersion: String {

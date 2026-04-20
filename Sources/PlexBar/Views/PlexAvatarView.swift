@@ -134,8 +134,7 @@ struct PlexAvatarView: View {
             return nil
         }
 
-        let host = imageURL.host?.lowercased() ?? ""
-        let token = host.contains("plex.tv") ? userToken : serverToken
+        let token = PlexRemoteService.isPlexHosted(imageURL) ? userToken : serverToken
         return AvatarRequest(url: imageURL, token: token)
     }
 }

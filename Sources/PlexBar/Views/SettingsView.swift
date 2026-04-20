@@ -83,6 +83,16 @@ struct SettingsView: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 10) {
+                        Text("Account")
+                            .font(.subheadline.weight(.semibold))
+
+                        accountSummary
+                    }
+                    .padding(.vertical, 2)
+                }
+
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
                         Text("Server")
                             .font(.subheadline.weight(.semibold))
 
@@ -112,37 +122,6 @@ struct SettingsView: View {
                 }
             }
             .formStyle(.grouped)
-
-            Divider()
-
-            HStack(spacing: 8) {
-                if authStore.isLoadingServers {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-
-                Spacer()
-
-                Button("Refresh Servers") {
-                    Task {
-                        await authStore.refreshServers(autoSelectStoredServer: true)
-                        previewStore.reconcileServers(authStore.availableServers)
-                        previewStore.refreshPreviews(
-                            for: authStore.availableServers,
-                            clientIdentifier: settingsStore.clientIdentifier
-                        )
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(authStore.isAuthenticating || authStore.isLoadingServers)
-
-                Button("Sign Out") {
-                    authStore.signOut()
-                }
-                .buttonStyle(.bordered)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
         }
         .frame(width: 480)
     }
@@ -250,11 +229,99 @@ struct SettingsView: View {
         return authStore.availableServers.first(where: { $0.id == selectedServerIdentifier })
     }
 
+    @ViewBuilder
+    private var accountSummary: some View {
+        if let authenticatedUser = authStore.authenticatedUser {
+            HStack(spacing: 12) {
+                PlexAvatarView(
+                    thumb: authenticatedUser.thumb,
+                    serverURL: nil,
+                    serverToken: "",
+                    userToken: settingsStore.trimmedUserToken,
+                    clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier),
+                    size: 44
+                )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(authenticatedUser.displayName)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if let displayEmail = authenticatedUser.displayEmail {
+                        Text(displayEmail)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .textSelection(.enabled)
+                    }
+
+                    if let displayUsername = authenticatedUser.displayUsername {
+                        Text(displayUsername)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 12)
+
+                signOutButton
+            }
+        } else if authStore.isLoadingAuthenticatedUser {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+
+                Text("Loading account…")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Spacer(minLength: 12)
+
+                signOutButton
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+        } else if let accountErrorMessage = authStore.accountErrorMessage {
+            VStack(alignment: .leading, spacing: 10) {
+                serverStatusBanner(message: accountErrorMessage)
+
+                HStack {
+                    Spacer(minLength: 0)
+                    signOutButton
+                }
+            }
+        } else {
+            HStack {
+                Spacer(minLength: 0)
+                signOutButton
+            }
+        }
+    }
+
+    private var signOutButton: some View {
+        Button("Sign Out") {
+            authStore.signOut()
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+
     private var serverMenu: some View {
         Button {
             isShowingServerList.toggle()
         } label: {
             serverMenuLabel
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(.white.opacity(0.08))
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
         .popover(isPresented: $isShowingServerList, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
@@ -310,40 +377,69 @@ struct SettingsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(.white.opacity(0.08))
+    }
+
+    private func refreshServers() {
+        Task {
+            await authStore.refreshServers(autoSelectStoredServer: true)
+            previewStore.reconcileServers(authStore.availableServers)
+            previewStore.refreshPreviews(
+                for: authStore.availableServers,
+                clientIdentifier: settingsStore.clientIdentifier
+            )
         }
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private var serverListPopover: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
-                if authStore.availableServers.isEmpty {
-                    Text("No servers available")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text("Servers")
+                    .font(.headline)
+
+                Spacer()
+
+                if authStore.isLoadingServers {
+                    ProgressView()
+                        .controlSize(.small)
                 } else {
-                    ForEach(authStore.availableServers) { server in
-                        Button {
-                            authStore.selectServer(withID: server.id)
-                            isShowingServerList = false
-                        } label: {
-                            serverListRow(for: server)
-                        }
-                        .buttonStyle(.plain)
+                    Button("Refresh Servers") {
+                        refreshServers()
                     }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(authStore.isAuthenticating || authStore.isLoadingServers)
                 }
             }
-            .padding(10)
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+
+            Divider()
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    if authStore.availableServers.isEmpty {
+                        Text("No servers available")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                    } else {
+                        ForEach(authStore.availableServers) { server in
+                            Button {
+                                authStore.selectServer(withID: server.id)
+                                isShowingServerList = false
+                            } label: {
+                                serverListRow(for: server)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(10)
+            }
         }
-        .frame(minWidth: 380, idealWidth: 380, maxWidth: 380, minHeight: 120, idealHeight: 120, maxHeight: 320)
+        .frame(minWidth: 380, idealWidth: 380, maxWidth: 380, minHeight: 180, idealHeight: 220, maxHeight: 360)
         .background(.regularMaterial)
     }
 
@@ -502,6 +598,6 @@ struct SettingsView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-            )
+        )
     }
 }

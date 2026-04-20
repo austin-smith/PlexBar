@@ -85,7 +85,7 @@ import Testing
 
     let accountsByID = [
         1: PlexAccount(id: 1, name: "myveryownsarah", thumb: nil),
-        2: PlexAccount(id: 2, name: "smitty_", thumb: nil),
+        2: PlexAccount(id: 2, name: "test-user", thumb: nil),
     ]
     let seriesByEpisodeID = [
         "2001": PlexHistorySeriesIdentity(

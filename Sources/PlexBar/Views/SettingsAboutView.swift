@@ -5,7 +5,6 @@ struct SettingsAboutView: View {
     @Environment(\.openURL) private var openURL
 
     private let sourceURL = URL(string: "https://github.com/austin-smith/PlexBar")!
-    private let plexURL = URL(string: "https://www.plex.tv/")!
 
     private var versionString: String {
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? AppConstants.productVersion
@@ -79,7 +78,7 @@ struct SettingsAboutView: View {
                         .foregroundStyle(.tertiary)
 
                     Button("Plex") {
-                        openURL(plexURL)
+                        openURL(PlexRemoteService.websiteURL)
                     }
                     .buttonStyle(.plain)
                     .font(.system(size: 11, weight: .medium))

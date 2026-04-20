@@ -95,7 +95,7 @@ struct PlexRequestTests {
                     "title": "Wrong Session",
                     "Session": { "id": "wrong", "key": "44" },
                     "Player": { "title": "Safari", "product": "Safari", "state": "playing", "platform": "macOS" },
-                    "User": { "title": "smitty_", "id": "1" },
+                    "User": { "title": "test-user", "id": "1" },
                     "key": "/library/metadata/900",
                     "ratingKey": "900",
                     "viewOffset": 1000
@@ -106,7 +106,7 @@ struct PlexRequestTests {
                     "title": "Right Session",
                     "Session": { "id": "right", "key": "77" },
                     "Player": { "title": "Safari", "product": "Safari", "state": "playing", "platform": "macOS" },
-                    "User": { "title": "smitty_", "id": "1" },
+                    "User": { "title": "test-user", "id": "1" },
                     "key": "/library/metadata/901",
                     "ratingKey": "901",
                     "viewOffset": 2000
@@ -189,6 +189,54 @@ struct PlexRequestTests {
         #expect(request.value(forHTTPHeaderField: "X-Plex-Version") == AppConstants.productVersion)
     }
 
+    @Test func fetchAuthenticatedUserUsesPlexTvUserEndpoint() async throws {
+        let capture = RequestCapture()
+        let avatarURL = PlexRemoteService.apiBaseURL.absoluteString + "/users/example/avatar?c=1234567890"
+        let session = makeMockSession { request in
+            capture.record(request)
+
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require("""
+            {
+              "id": 42,
+              "username": "test-user",
+              "title": "Test User",
+              "email": "test-user@example.com",
+              "thumb": "\(avatarURL)",
+              "friendlyName": ""
+            }
+            """.data(using: .utf8))
+            return (response, data)
+        }
+
+        let client = PlexAuthClient(session: session)
+        let authenticatedUser = try await client.fetchAuthenticatedUser(
+            userToken: "user-token",
+            clientContext: PlexClientContext(clientIdentifier: "client-123")
+        )
+
+        #expect(authenticatedUser == PlexAuthenticatedUser(
+            id: 42,
+            username: "test-user",
+            title: "Test User",
+            email: "test-user@example.com",
+            thumb: avatarURL,
+            friendlyName: ""
+        ))
+
+        let request = try #require(capture.request)
+        #expect(request.httpMethod == "GET")
+        #expect(request.url == PlexRemoteService.apiURL(path: "/api/v2/user"))
+        #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
+        #expect(request.value(forHTTPHeaderField: "X-Plex-Token") == "user-token")
+        #expect(request.value(forHTTPHeaderField: "X-Plex-Client-Identifier") == "client-123")
+    }
+
     @Test func fetchServersParsesServerResourcesFromXML() async throws {
         let capture = RequestCapture()
         let session = makeMockSession { request in
@@ -230,7 +278,14 @@ struct PlexRequestTests {
         #expect(servers.first?.connections.map(\.kind) == [.local, .remote, .relay])
 
         let request = try #require(capture.request)
-        #expect(request.url?.absoluteString == "https://plex.tv/api/resources?includeHttps=1&includeRelay=1&includeIPv6=1")
+        #expect(request.url == PlexRemoteService.apiURL(
+            path: "/api/resources",
+            queryItems: [
+                URLQueryItem(name: "includeHttps", value: "1"),
+                URLQueryItem(name: "includeRelay", value: "1"),
+                URLQueryItem(name: "includeIPv6", value: "1"),
+            ]
+        ))
         #expect(request.value(forHTTPHeaderField: "Accept") == "application/xml")
         #expect(request.value(forHTTPHeaderField: "X-Plex-Token") == "user-token")
     }
@@ -365,6 +420,7 @@ struct PlexRequestTests {
 
     @Test func fetchAccountsUsesStatisticsMediaEndpoint() async throws {
         let capture = RequestCapture()
+        let avatarURL = PlexRemoteService.apiBaseURL.absoluteString + "/users/avatar"
         let session = makeMockSession { request in
             capture.record(request)
 
@@ -374,7 +430,9 @@ struct PlexRequestTests {
                 httpVersion: nil,
                 headerFields: nil
             ))
-            let data = try #require(#"{"MediaContainer":{"Account":[{"id":7,"name":"smitty_","thumb":"https://plex.tv/users/avatar"}]}}"#.data(using: .utf8))
+            let data = try #require("""
+            {"MediaContainer":{"Account":[{"id":7,"name":"test-user","thumb":"\(avatarURL)"}]}}
+            """.data(using: .utf8))
             return (response, data)
         }
 
@@ -388,7 +446,7 @@ struct PlexRequestTests {
             clientContext: clientContext
         ))
 
-        #expect(accounts == [PlexAccount(id: 7, name: "smitty_", thumb: "https://plex.tv/users/avatar")])
+        #expect(accounts == [PlexAccount(id: 7, name: "test-user", thumb: avatarURL)])
 
         let request = try #require(capture.request)
         #expect(request.url?.path == "/statistics/media")

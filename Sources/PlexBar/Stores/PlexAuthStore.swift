@@ -13,9 +13,12 @@ final class PlexAuthStore {
     private let client: PlexAuthClient
     private var signInTask: Task<Void, Never>?
 
+    var authenticatedUser: PlexAuthenticatedUser?
     var availableServers: [PlexServerResource] = []
     var isAuthenticating = false
+    var isLoadingAuthenticatedUser = false
     var isLoadingServers = false
+    var accountErrorMessage: String?
     var statusMessage: String?
     var errorMessage: String?
     var remainingSeconds: Int?
@@ -37,9 +40,35 @@ final class PlexAuthStore {
 
         if settings.hasAuthenticatedAccount {
             Task {
-                await refreshServers(autoSelectStoredServer: true)
+                await refreshAuthenticatedState(autoSelectStoredServer: true)
             }
         }
+    }
+
+    func refreshAuthenticatedUser() async {
+        guard settings.hasAuthenticatedAccount else {
+            authenticatedUser = nil
+            accountErrorMessage = nil
+            isLoadingAuthenticatedUser = false
+            return
+        }
+
+        isLoadingAuthenticatedUser = true
+        accountErrorMessage = nil
+
+        let clientContext = PlexClientContext(clientIdentifier: settings.clientIdentifier)
+
+        do {
+            authenticatedUser = try await client.fetchAuthenticatedUser(
+                userToken: settings.trimmedUserToken,
+                clientContext: clientContext
+            )
+        } catch {
+            authenticatedUser = nil
+            accountErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        }
+
+        isLoadingAuthenticatedUser = false
     }
 
     func startSignIn() {
@@ -105,7 +134,10 @@ final class PlexAuthStore {
     func signOut() {
         signInTask?.cancel()
         isAuthenticating = false
+        isLoadingAuthenticatedUser = false
         isLoadingServers = false
+        authenticatedUser = nil
+        accountErrorMessage = nil
         statusMessage = nil
         errorMessage = nil
         remainingSeconds = nil
@@ -121,6 +153,12 @@ final class PlexAuthStore {
         connectionStore.didSelectServer()
         sessionStore.didChangeConfiguration()
         historyStore.refreshNow()
+    }
+
+    private func refreshAuthenticatedState(autoSelectStoredServer: Bool) async {
+        async let authenticatedUserRefresh: Void = refreshAuthenticatedUser()
+        async let serverRefresh: Void = refreshServers(autoSelectStoredServer: autoSelectStoredServer)
+        _ = await (authenticatedUserRefresh, serverRefresh)
     }
 
     private func runSignIn(clientIdentifier: String) async {
@@ -148,7 +186,7 @@ final class PlexAuthStore {
                     statusMessage = "Authentication successful."
                     remainingSeconds = nil
                     isAuthenticating = false
-                    await refreshServers(autoSelectStoredServer: true)
+                    await refreshAuthenticatedState(autoSelectStoredServer: true)
                     return
                 }
 

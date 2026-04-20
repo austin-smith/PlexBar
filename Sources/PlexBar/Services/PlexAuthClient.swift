@@ -7,9 +7,24 @@ struct PlexAuthClient {
         self.session = session
     }
 
+    func fetchAuthenticatedUser(userToken: String, clientContext: PlexClientContext) async throws -> PlexAuthenticatedUser {
+        let request = PlexRequestBuilder(clientContext: clientContext).request(
+            url: PlexRemoteService.apiURL(path: "/api/v2/user"),
+            accept: "application/json",
+            token: userToken
+        )
+
+        let (data, response) = try await session.data(for: request)
+        try validate(response: response)
+        return try JSONDecoder().decode(PlexAuthenticatedUser.self, from: data)
+    }
+
     func createPin(clientContext: PlexClientContext) async throws -> PlexPin {
         let request = PlexRequestBuilder(clientContext: clientContext).request(
-            url: URL(string: "https://plex.tv/api/v2/pins?strong=true")!,
+            url: PlexRemoteService.apiURL(
+                path: "/api/v2/pins",
+                queryItems: [URLQueryItem(name: "strong", value: "true")]
+            ),
             method: "POST",
             accept: "application/json"
         )
@@ -21,7 +36,7 @@ struct PlexAuthClient {
 
     func fetchPin(id: String, clientContext: PlexClientContext) async throws -> PlexPin {
         let request = PlexRequestBuilder(clientContext: clientContext).request(
-            url: URL(string: "https://plex.tv/api/v2/pins/\(id)")!,
+            url: PlexRemoteService.apiURL(path: "/api/v2/pins/\(id)"),
             accept: "application/json"
         )
 
@@ -32,7 +47,14 @@ struct PlexAuthClient {
 
     func fetchServers(userToken: String, clientContext: PlexClientContext) async throws -> [PlexServerResource] {
         let request = PlexRequestBuilder(clientContext: clientContext).request(
-            url: URL(string: "https://plex.tv/api/resources?includeHttps=1&includeRelay=1&includeIPv6=1")!,
+            url: PlexRemoteService.apiURL(
+                path: "/api/resources",
+                queryItems: [
+                    URLQueryItem(name: "includeHttps", value: "1"),
+                    URLQueryItem(name: "includeRelay", value: "1"),
+                    URLQueryItem(name: "includeIPv6", value: "1"),
+                ]
+            ),
             accept: "application/xml",
             token: userToken
         )
