@@ -9,6 +9,7 @@ struct SettingsView: View {
     @Bindable var historyStore: PlexHistoryStore
     @State private var isShowingServerList = false
     @State private var selectedTab = Tab.general
+    @State private var presentedTooltip: SettingsTooltip?
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -59,6 +60,11 @@ struct SettingsView: View {
         case about
     }
 
+    private enum SettingsTooltip: Hashable {
+        case connectionRecheck
+        case historyRefresh
+    }
+
     private var generalView: some View {
         Group {
             if settingsStore.hasAuthenticatedAccount {
@@ -106,18 +112,36 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Picker("Connection Recheck", selection: connectionRecheckIntervalBinding) {
-                        Text("Off").tag(0)
-                        Text("5 minutes").tag(300)
-                        Text("15 minutes").tag(900)
-                        Text("30 minutes").tag(1_800)
-                        Text("1 hour").tag(3_600)
+                    LabeledContent {
+                        Picker("Connection Recheck", selection: connectionRecheckIntervalBinding) {
+                            Text("Off").tag(0)
+                            Text("5 minutes").tag(300)
+                            Text("15 minutes").tag(900)
+                            Text("30 minutes").tag(1_800)
+                            Text("1 hour").tag(3_600)
+                        }
+                        .labelsHidden()
+                    } label: {
+                        settingsTooltipLabel(
+                            "Connection Recheck",
+                            tooltip: "How often to reevaluate which connection to use for the selected server. A local is preferred over remote or relay when available.",
+                            kind: .connectionRecheck
+                        )
                     }
 
-                    Picker("History Refresh", selection: historyPollIntervalBinding) {
-                        Text("15 minutes").tag(900)
-                        Text("1 hour").tag(3_600)
-                        Text("24 hours").tag(86_400)
+                    LabeledContent {
+                        Picker("History Refresh", selection: historyPollIntervalBinding) {
+                            Text("15 minutes").tag(900)
+                            Text("1 hour").tag(3_600)
+                            Text("24 hours").tag(86_400)
+                        }
+                        .labelsHidden()
+                    } label: {
+                        settingsTooltipLabel(
+                            "History Refresh",
+                            tooltip: "How often to refresh watch history and library data.",
+                            kind: .historyRefresh
+                        )
                     }
                 }
             }
@@ -513,6 +537,52 @@ struct SettingsView: View {
 
     private var availableServerIDsKey: String {
         authStore.availableServers.map(\.id).sorted().joined(separator: "|")
+    }
+
+    private func settingsTooltipLabel(
+        _ title: String,
+        tooltip: String,
+        kind: SettingsTooltip
+    ) -> some View {
+        HStack(spacing: 6) {
+            Text(title)
+
+            Button {
+                presentedTooltip = presentedTooltip == kind ? nil : kind
+            } label: {
+                Image(systemName: "questionmark.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .popover(
+                isPresented: Binding(
+                    get: { presentedTooltip == kind },
+                    set: { isPresented in
+                        if isPresented {
+                            presentedTooltip = kind
+                        } else if presentedTooltip == kind {
+                            presentedTooltip = nil
+                        }
+                    }
+                ),
+                attachmentAnchor: .rect(.bounds),
+                arrowEdge: .top
+            ) {
+                settingsTooltipPopover(text: tooltip)
+            }
+            .accessibilityLabel("\(title) help")
+            .accessibilityHint("Shows more information about \(title.lowercased()).")
+        }
+    }
+
+    private func settingsTooltipPopover(text: String) -> some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(width: 220, alignment: .leading)
+            .padding(12)
     }
 
     private func serverSubtitle(for server: PlexServerResource) -> String {
