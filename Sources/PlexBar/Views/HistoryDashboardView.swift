@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HistoryDashboardView: View {
     let settingsStore: PlexSettingsStore
+    let serverURL: URL?
     let historyStore: PlexHistoryStore
 
     private var clientContext: PlexClientContext {
@@ -18,6 +19,7 @@ struct HistoryDashboardView: View {
                     seriesByEpisodeID: historyStore.seriesByEpisodeID,
                     historyWindowLabel: historyStore.historyWindowLabel,
                     settingsStore: settingsStore,
+                    serverURL: serverURL,
                     clientContext: clientContext
                 )
             }
@@ -27,6 +29,7 @@ struct HistoryDashboardView: View {
                     entries: historyStore.topTypeEntries,
                     accountsByID: historyStore.accountsByID,
                     settingsStore: settingsStore,
+                    serverURL: serverURL,
                     clientContext: clientContext
                 )
             }
@@ -36,6 +39,7 @@ struct HistoryDashboardView: View {
                     items: historyStore.recentItems,
                     historyWindowLabel: historyStore.historyWindowLabel,
                     settingsStore: settingsStore,
+                    serverURL: serverURL,
                     clientContext: clientContext,
                     accountsByID: historyStore.accountsByID
                 )
@@ -48,6 +52,7 @@ private struct RecentPlaysCard: View {
     let items: [PlexHistoryItem]
     let historyWindowLabel: String
     let settingsStore: PlexSettingsStore
+    let serverURL: URL?
     let clientContext: PlexClientContext
     let accountsByID: [Int: PlexAccount]
 
@@ -88,6 +93,7 @@ private struct RecentPlaysCard: View {
                             watcherName: item.watcherName(using: accountsByID),
                             watcherAccount: item.watcherAccount(using: accountsByID),
                             settingsStore: settingsStore,
+                            serverURL: serverURL,
                             clientContext: clientContext
                         )
                     }
@@ -117,6 +123,7 @@ private struct TopChartsCard: View {
     let seriesByEpisodeID: [String: PlexHistorySeriesIdentity]
     let historyWindowLabel: String
     let settingsStore: PlexSettingsStore
+    let serverURL: URL?
     let clientContext: PlexClientContext
 
     @State private var selectedFilter: PlexHistoryContentFilter = .all
@@ -162,6 +169,7 @@ private struct TopChartsCard: View {
                             entry: entry,
                             accountsByID: accountsByID,
                             settingsStore: settingsStore,
+                            serverURL: serverURL,
                             clientContext: clientContext
                         )
                     }
@@ -193,6 +201,7 @@ private struct TopChartRow: View {
     let entry: PlexTopChartEntry
     let accountsByID: [Int: PlexAccount]
     let settingsStore: PlexSettingsStore
+    let serverURL: URL?
     let clientContext: PlexClientContext
 
     private var watcherAccounts: [PlexAccount] {
@@ -231,6 +240,7 @@ private struct TopChartRow: View {
                     summary: entry.watcherSummary ?? entry.viewerCountLabel,
                     accounts: watcherAccounts,
                     settingsStore: settingsStore,
+                    serverURL: serverURL,
                     clientContext: clientContext,
                     avatarSize: 16,
                     font: .caption2,
@@ -250,7 +260,7 @@ private struct TopChartRow: View {
     }
 
     private var posterURL: URL? {
-        guard let serverURL = settingsStore.normalizedServerURL else {
+        guard let serverURL else {
             return nil
         }
 
@@ -258,7 +268,7 @@ private struct TopChartRow: View {
     }
 
     private var transcodedPosterURL: URL? {
-        guard let serverURL = settingsStore.normalizedServerURL else {
+        guard let serverURL else {
             return nil
         }
 
@@ -275,6 +285,7 @@ private struct HistoryMixCard: View {
     let entries: [PlexTopChartEntry]
     let accountsByID: [Int: PlexAccount]
     let settingsStore: PlexSettingsStore
+    let serverURL: URL?
     let clientContext: PlexClientContext
 
     private let columns = [
@@ -313,6 +324,7 @@ private struct HistoryMixCard: View {
                                 summary: entry.watcherSummary ?? entry.viewerCountLabel,
                                 accounts: entry.watcherAccountIDs.compactMap { accountsByID[$0] },
                                 settingsStore: settingsStore,
+                                serverURL: serverURL,
                                 clientContext: clientContext,
                                 avatarSize: 16,
                                 font: .caption2,
@@ -343,6 +355,7 @@ private struct RecentHistoryCardView: View {
     let watcherName: String?
     let watcherAccount: PlexAccount?
     let settingsStore: PlexSettingsStore
+    let serverURL: URL?
     let clientContext: PlexClientContext
 
     var body: some View {
@@ -383,6 +396,7 @@ private struct RecentHistoryCardView: View {
                     summary: watcherName,
                     accounts: watcherAccount.map { [$0] } ?? [],
                     settingsStore: settingsStore,
+                    serverURL: serverURL,
                     clientContext: clientContext,
                     avatarSize: 18,
                     font: .caption.weight(.medium),
@@ -397,7 +411,7 @@ private struct RecentHistoryCardView: View {
     }
 
     private var posterURL: URL? {
-        guard let serverURL = settingsStore.normalizedServerURL else {
+        guard let serverURL else {
             return nil
         }
 
@@ -405,7 +419,7 @@ private struct RecentHistoryCardView: View {
     }
 
     private var transcodedPosterURL: URL? {
-        guard let serverURL = settingsStore.normalizedServerURL else {
+        guard let serverURL else {
             return nil
         }
 
@@ -422,6 +436,7 @@ private struct HistoryWatcherIdentityView: View {
     let summary: String?
     let accounts: [PlexAccount]
     let settingsStore: PlexSettingsStore
+    let serverURL: URL?
     let clientContext: PlexClientContext
     let avatarSize: CGFloat
     let font: Font
@@ -438,7 +453,7 @@ private struct HistoryWatcherIdentityView: View {
                 if displayAccounts.count == 1, let account = displayAccounts.first {
                     PlexAvatarView(
                         thumb: account.thumb,
-                        serverURL: settingsStore.normalizedServerURL,
+                        serverURL: serverURL,
                         serverToken: settingsStore.trimmedServerToken,
                         userToken: settingsStore.trimmedUserToken,
                         clientContext: clientContext,
@@ -448,6 +463,7 @@ private struct HistoryWatcherIdentityView: View {
                     WatcherAvatarStack(
                         accounts: displayAccounts,
                         settingsStore: settingsStore,
+                        serverURL: serverURL,
                         clientContext: clientContext,
                         size: avatarSize
                     )
@@ -465,6 +481,7 @@ private struct HistoryWatcherIdentityView: View {
 private struct WatcherAvatarStack: View {
     let accounts: [PlexAccount]
     let settingsStore: PlexSettingsStore
+    let serverURL: URL?
     let clientContext: PlexClientContext
     let size: CGFloat
 
@@ -481,7 +498,7 @@ private struct WatcherAvatarStack: View {
             ForEach(Array(accounts.enumerated()), id: \.element.id) { index, account in
                 PlexAvatarView(
                     thumb: account.thumb,
-                    serverURL: settingsStore.normalizedServerURL,
+                    serverURL: serverURL,
                     serverToken: settingsStore.trimmedServerToken,
                     userToken: settingsStore.trimmedUserToken,
                     clientContext: clientContext,

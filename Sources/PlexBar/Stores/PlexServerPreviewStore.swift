@@ -5,12 +5,17 @@ import Observation
 @Observable
 final class PlexServerPreviewStore {
     private let client: PlexAPIClient
+    private let resolver: PlexConnectionResolver
     private var loadTasksByServerID: [String: Task<Void, Never>] = [:]
     private var loadRequestIDsByServerID: [String: UUID] = [:]
     private var statesByServerID: [String: PlexServerPreviewState] = [:]
 
-    init(client: PlexAPIClient = PlexAPIClient()) {
+    init(
+        client: PlexAPIClient = PlexAPIClient(),
+        resolver: PlexConnectionResolver = PlexConnectionResolver()
+    ) {
         self.client = client
+        self.resolver = resolver
     }
 
     func state(for serverID: String?) -> PlexServerPreviewState {
@@ -106,25 +111,23 @@ final class PlexServerPreviewStore {
         clientIdentifier: String,
         client: PlexAPIClient
     ) async -> ServerPreviewLoadResult {
-        guard let serverURL = server.selectedURL else {
-            return .failure(
-                serverID: server.id,
-                errorMessage: PlexAPIError.invalidServerURL.localizedDescription
-            )
-        }
-
-        let configuration = PlexConnectionConfiguration(
-            serverURL: serverURL,
-            token: server.accessToken,
-            clientContext: PlexClientContext(clientIdentifier: clientIdentifier)
-        )
-
         do {
+            let resolvedConnection = try await resolver.resolve(
+                server: server,
+                clientContext: PlexClientContext(clientIdentifier: clientIdentifier),
+                cachedURL: nil
+            )
+            let configuration = PlexConnectionConfiguration(
+                serverURL: resolvedConnection.url,
+                token: server.accessToken,
+                clientContext: PlexClientContext(clientIdentifier: clientIdentifier)
+            )
             let items = try await client.fetchRecentAddedPreviewItems(using: configuration)
             return .success(
                 serverID: server.id,
                 preview: PlexServerPreview(
                     serverID: server.id,
+                    serverURL: resolvedConnection.url,
                     items: items,
                     generatedAt: Date()
                 )

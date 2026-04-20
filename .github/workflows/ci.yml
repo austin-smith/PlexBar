@@ -25,10 +25,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Swift 6.3
+      - name: Setup Swift 6.3.1
         uses: swift-actions/setup-swift@v3
         with:
-          swift-version: "6.3"
+          swift-version: "6.3.1"
 
       - name: Build
         run: swift build

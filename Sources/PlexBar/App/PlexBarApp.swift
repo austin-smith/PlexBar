@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct PlexBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var settingsStore: PlexSettingsStore
+    @State private var connectionStore: PlexConnectionStore
     @State private var authStore: PlexAuthStore
     @State private var sessionStore: PlexSessionStore
     @State private var historyStore: PlexHistoryStore
@@ -20,17 +21,21 @@ struct PlexBarApp: App {
 
     init() {
         let settingsStore = PlexSettingsStore()
-        let sessionStore = PlexSessionStore(settings: settingsStore)
-        let libraryStore = PlexLibraryStore(settings: settingsStore)
-        let historyStore = PlexHistoryStore(settings: settingsStore, libraryStore: libraryStore)
-        let serverPreviewStore = PlexServerPreviewStore()
+        let resolver = PlexConnectionResolver()
+        let connectionStore = PlexConnectionStore(settings: settingsStore, resolver: resolver)
+        let sessionStore = PlexSessionStore(connectionStore: connectionStore)
+        let libraryStore = PlexLibraryStore(connectionStore: connectionStore)
+        let historyStore = PlexHistoryStore(connectionStore: connectionStore, libraryStore: libraryStore)
+        let serverPreviewStore = PlexServerPreviewStore(resolver: resolver)
         _settingsStore = State(initialValue: settingsStore)
+        _connectionStore = State(initialValue: connectionStore)
         _sessionStore = State(initialValue: sessionStore)
         _historyStore = State(initialValue: historyStore)
         _libraryStore = State(initialValue: libraryStore)
         _serverPreviewStore = State(initialValue: serverPreviewStore)
         _authStore = State(initialValue: PlexAuthStore(
             settings: settingsStore,
+            connectionStore: connectionStore,
             sessionStore: sessionStore,
             historyStore: historyStore,
             libraryStore: libraryStore
@@ -41,6 +46,7 @@ struct PlexBarApp: App {
         Window("PlexBar Settings", id: AppConstants.settingsWindowID) {
             SettingsView(
                 settingsStore: settingsStore,
+                connectionStore: connectionStore,
                 authStore: authStore,
                 previewStore: serverPreviewStore,
                 sessionStore: sessionStore,
@@ -53,6 +59,7 @@ struct PlexBarApp: App {
         MenuBarExtra {
             MenuBarContentView(
                 settingsStore: settingsStore,
+                connectionStore: connectionStore,
                 authStore: authStore,
                 sessionStore: sessionStore,
                 historyStore: historyStore,

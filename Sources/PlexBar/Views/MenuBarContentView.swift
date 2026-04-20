@@ -3,6 +3,7 @@ import SwiftUI
 
 struct MenuBarContentView: View {
     @Bindable var settingsStore: PlexSettingsStore
+    @Bindable var connectionStore: PlexConnectionStore
     @Bindable var authStore: PlexAuthStore
     @Bindable var sessionStore: PlexSessionStore
     @Bindable var historyStore: PlexHistoryStore
@@ -145,10 +146,7 @@ struct MenuBarContentView: View {
                 historyStore: historyStore,
                 libraryStore: libraryStore
             ) {
-                Text(inlineErrorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                InlineWarningBanner(message: inlineErrorMessage)
             }
         }
     }
@@ -176,6 +174,7 @@ struct MenuBarContentView: View {
                     ForEach(sessionStore.sessions) { session in
                         StreamCardView(
                             session: session,
+                            serverURL: connectionStore.resolvedServerURL,
                             settingsStore: settingsStore,
                             snapshotDate: sessionStore.lastUpdated
                         )
@@ -218,7 +217,11 @@ struct MenuBarContentView: View {
             )
         } else {
             ScrollView {
-                HistoryDashboardView(settingsStore: settingsStore, historyStore: historyStore)
+                HistoryDashboardView(
+                    settingsStore: settingsStore,
+                    serverURL: connectionStore.resolvedServerURL,
+                    historyStore: historyStore
+                )
                     .background {
                         GeometryReader { proxy in
                             Color.clear
@@ -256,7 +259,11 @@ struct MenuBarContentView: View {
             )
         } else {
             ScrollView {
-                LibrariesDashboardView(settingsStore: settingsStore, libraryStore: libraryStore)
+                LibrariesDashboardView(
+                    settingsStore: settingsStore,
+                    serverURL: connectionStore.resolvedServerURL,
+                    libraryStore: libraryStore
+                )
                     .background {
                         GeometryReader { proxy in
                             Color.clear
@@ -301,7 +308,7 @@ struct MenuBarContentView: View {
         }
 
         let serverLabel = settingsStore.selectedServerName?.nilIfBlank
-            ?? settingsStore.normalizedServerURL?.host
+            ?? connectionStore.resolvedServerURL?.host
             ?? "your server"
 
         switch selectedSection {
@@ -517,5 +524,34 @@ private struct EmptyStateView: View {
         .padding(.vertical, 20)
         .padding(.horizontal, 14)
         .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+}
+
+private struct InlineWarningBanner: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .padding(.top, 1)
+
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.orange.opacity(0.12))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.22))
+        }
     }
 }

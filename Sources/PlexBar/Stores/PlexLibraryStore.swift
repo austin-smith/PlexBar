@@ -4,7 +4,7 @@ import Observation
 @MainActor
 @Observable
 final class PlexLibraryStore {
-    private let settings: PlexSettingsStore
+    private let connectionStore: PlexConnectionStore
     private let client: PlexAPIClient
 
     var libraries: [PlexLibrary] = []
@@ -12,8 +12,8 @@ final class PlexLibraryStore {
     var errorMessage: String?
     var lastUpdated: Date?
 
-    init(settings: PlexSettingsStore, client: PlexAPIClient = PlexAPIClient()) {
-        self.settings = settings
+    init(connectionStore: PlexConnectionStore, client: PlexAPIClient = PlexAPIClient()) {
+        self.connectionStore = connectionStore
         self.client = client
     }
 
@@ -32,7 +32,7 @@ final class PlexLibraryStore {
     }
 
     func refresh() async {
-        guard settings.hasValidConfiguration else {
+        guard connectionStore.settings.hasValidConfiguration else {
             libraries = []
             errorMessage = nil
             isLoading = false
@@ -43,17 +43,9 @@ final class PlexLibraryStore {
         isLoading = true
 
         do {
-            guard let serverURL = settings.normalizedServerURL else {
-                throw PlexAPIError.invalidServerURL
+            libraries = try await connectionStore.perform { configuration in
+                try await client.fetchLibraries(using: configuration)
             }
-
-            let configuration = PlexConnectionConfiguration(
-                serverURL: serverURL,
-                token: settings.trimmedServerToken,
-                clientContext: PlexClientContext(clientIdentifier: settings.clientIdentifier)
-            )
-
-            libraries = try await client.fetchLibraries(using: configuration)
             errorMessage = nil
             lastUpdated = Date()
         } catch {

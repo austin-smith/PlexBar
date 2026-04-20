@@ -2,6 +2,7 @@ import Foundation
 
 struct PlexServerPreview: Equatable {
     let serverID: String
+    let serverURL: URL
     let items: [PlexServerPreviewItem]
     let generatedAt: Date
 }
@@ -26,6 +27,10 @@ struct PlexServerPreviewState: Equatable {
 
     var items: [PlexServerPreviewItem] {
         preview?.items ?? []
+    }
+
+    var serverURL: URL? {
+        preview?.serverURL
     }
 
     static let empty = PlexServerPreviewState()

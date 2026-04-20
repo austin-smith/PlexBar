@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LibrariesDashboardView: View {
     let settingsStore: PlexSettingsStore
+    let serverURL: URL?
     let libraryStore: PlexLibraryStore
 
     private let columns = [
@@ -14,7 +15,7 @@ struct LibrariesDashboardView: View {
             ForEach(libraryStore.libraries) { library in
                 LibraryCardView(
                     library: library,
-                    serverURL: settingsStore.normalizedServerURL,
+                    serverURL: serverURL,
                     token: settingsStore.trimmedServerToken,
                     clientContext: PlexClientContext(clientIdentifier: settingsStore.clientIdentifier)
                 )

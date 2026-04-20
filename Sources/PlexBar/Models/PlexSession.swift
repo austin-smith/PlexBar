@@ -109,6 +109,7 @@ enum PlexSessionContentKind: String, Equatable {
 }
 
 struct PlexSession: Decodable, Identifiable {
+    let sessionKey: String?
     let ratingKey: String?
     let key: String?
     let type: String?
@@ -129,9 +130,11 @@ struct PlexSession: Decodable, Identifiable {
     let user: PlexUser?
     let player: PlexPlayer
     let session: PlexPlaybackSession?
+    let transcodeSession: PlexTranscodeSession?
     let media: [PlexMedia]?
 
     enum CodingKeys: String, CodingKey {
+        case sessionKey
         case ratingKey
         case key
         case type
@@ -152,10 +155,12 @@ struct PlexSession: Decodable, Identifiable {
         case user = "User"
         case player = "Player"
         case session = "Session"
+        case transcodeSession = "TranscodeSession"
         case media = "Media"
     }
 
     init(
+        sessionKey: String? = nil,
         ratingKey: String?,
         key: String?,
         type: String?,
@@ -176,8 +181,10 @@ struct PlexSession: Decodable, Identifiable {
         user: PlexUser?,
         player: PlexPlayer,
         session: PlexPlaybackSession?,
+        transcodeSession: PlexTranscodeSession? = nil,
         media: [PlexMedia]?
     ) {
+        self.sessionKey = sessionKey
         self.ratingKey = ratingKey
         self.key = key
         self.type = type
@@ -198,12 +205,14 @@ struct PlexSession: Decodable, Identifiable {
         self.user = user
         self.player = player
         self.session = session
+        self.transcodeSession = transcodeSession
         self.media = media
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
+        sessionKey = try container.decodeIfPresent(String.self, forKey: .sessionKey)
         ratingKey = try container.decodeIfPresent(String.self, forKey: .ratingKey)
         key = try container.decodeIfPresent(String.self, forKey: .key)
         type = try container.decodeIfPresent(String.self, forKey: .type)
@@ -224,11 +233,24 @@ struct PlexSession: Decodable, Identifiable {
         user = try container.decodeIfPresent(PlexUser.self, forKey: .user)
         player = try container.decode(PlexPlayer.self, forKey: .player)
         session = try container.decodeIfPresent(PlexPlaybackSession.self, forKey: .session)
+        transcodeSession = try container.decodeIfPresent(PlexTranscodeSession.self, forKey: .transcodeSession)
         media = try container.decodeIfPresent([PlexMedia].self, forKey: .media)
     }
 
     var id: String {
-        session?.id ?? ratingKey ?? key ?? [player.machineIdentifier, title].compactMap { $0 }.joined(separator: ":")
+        guard let canonicalSessionKey else {
+            preconditionFailure("PlexSession requires a canonical session key for active stream identity.")
+        }
+
+        return canonicalSessionKey
+    }
+
+    var canonicalSessionKey: String? {
+        sessionKey?.nilIfBlank ?? session?.id?.nilIfBlank
+    }
+
+    var transcodeSessionKey: String? {
+        transcodeSession?.key?.nilIfBlank
     }
 
     var posterPath: String? {
@@ -304,6 +326,46 @@ struct PlexSession: Decodable, Identifiable {
 
     var isPaused: Bool {
         player.state?.nilIfBlank?.lowercased() == "paused"
+    }
+
+    func applying(playNotification: PlexPlaySessionStateNotification) -> PlexSession {
+        PlexSession(
+            sessionKey: playNotification.sessionKey ?? sessionKey,
+            ratingKey: playNotification.hasRatingKey ? playNotification.ratingKey : ratingKey,
+            key: playNotification.hasKey ? playNotification.key : key,
+            type: type,
+            subtype: subtype,
+            live: live,
+            title: title,
+            grandparentTitle: grandparentTitle,
+            parentTitle: parentTitle,
+            parentIndex: parentIndex,
+            index: index,
+            thumb: thumb,
+            parentThumb: parentThumb,
+            grandparentThumb: grandparentThumb,
+            art: art,
+            duration: duration,
+            viewOffset: playNotification.hasViewOffset ? playNotification.viewOffset : viewOffset,
+            year: year,
+            user: user,
+            player: player.updating(state: playNotification.state),
+            session: session,
+            transcodeSession: updatedTranscodeSession(using: playNotification),
+            media: media
+        )
+    }
+
+    private func updatedTranscodeSession(using notification: PlexPlaySessionStateNotification) -> PlexTranscodeSession? {
+        guard notification.hasTranscodeSession else {
+            return transcodeSession
+        }
+
+        guard let transcodeSessionKey = notification.transcodeSessionKey?.nilIfBlank else {
+            return nil
+        }
+
+        return PlexTranscodeSession(key: transcodeSessionKey)
     }
 
     var progress: Double? {
@@ -439,12 +501,27 @@ struct PlexPlayer: Decodable {
     let product: String?
     let state: String?
     let title: String?
+
+    func updating(state: String?) -> PlexPlayer {
+        PlexPlayer(
+            address: address,
+            machineIdentifier: machineIdentifier,
+            platform: platform,
+            product: product,
+            state: state ?? self.state,
+            title: title
+        )
+    }
 }
 
 struct PlexPlaybackSession: Decodable {
     let id: String?
     let bandwidth: Int?
     let location: String?
+}
+
+struct PlexTranscodeSession: Decodable {
+    let key: String?
 }
 
 struct PlexMedia: Decodable {

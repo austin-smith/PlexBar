@@ -13,11 +13,33 @@ import Testing
         defaults: defaults,
         keychain: KeychainStore(service: "tests.\(suiteName)")
     )
-    settings.serverURLString = "http://plex.local:32400"
+    settings.selectedServerIdentifier = "server-id"
+    settings.selectedServerName = "Server"
     settings.serverToken = "server-token"
+    settings.cachedConnectionURLString = "http://plex.local:32400"
+    settings.cachedConnectionKind = .local
 
     let session = makeMockSession { request in
         let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            {
+              "MediaContainer": {
+                "claimed": true,
+                "machineIdentifier": "server-id",
+                "version": "1.0.0"
+              }
+            }
+            """#.data(using: .utf8))
+            return (response, data)
+        }
 
         if url.path == "/status/sessions/history/all" {
             let response = try #require(HTTPURLResponse(
@@ -102,13 +124,21 @@ import Testing
         throw URLError(.unsupportedURL)
     }
 
-    let libraryStore = PlexLibraryStore(
+    let resolver = PlexConnectionResolver(
+        client: PlexAPIClient(session: session),
+        probeTimeoutInterval: 0.1
+    )
+    let connectionStore = PlexConnectionStore(
         settings: settings,
+        resolver: resolver
+    )
+    let libraryStore = PlexLibraryStore(
+        connectionStore: connectionStore,
         client: PlexAPIClient(session: session)
     )
 
     let store = PlexHistoryStore(
-        settings: settings,
+        connectionStore: connectionStore,
         libraryStore: libraryStore,
         client: PlexAPIClient(session: session)
     )

@@ -3,8 +3,8 @@ import Testing
 @testable import PlexBar
 
 @MainActor
-@Test func defaultsPollIntervalToFifteenSeconds() async throws {
-    let suiteName = "PlexBarTests.defaultsPollIntervalToFifteenSeconds"
+@Test func defaultsHistoryPollInterval() async throws {
+    let suiteName = "PlexBarTests.defaultsHistoryPollInterval"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defaults.removePersistentDomain(forName: suiteName)
     defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -14,13 +14,13 @@ import Testing
         keychain: KeychainStore(service: "tests.\(suiteName)")
     )
 
-    #expect(store.pollIntervalSeconds == AppConstants.defaultPollIntervalSeconds)
+    #expect(store.connectionRecheckIntervalSeconds == AppConstants.defaultConnectionRecheckIntervalSeconds)
     #expect(store.historyPollIntervalSeconds == AppConstants.defaultHistoryPollIntervalSeconds)
 }
 
 @MainActor
-@Test func clampsAndPersistsConfiguredPollInterval() async throws {
-    let suiteName = "PlexBarTests.clampsAndPersistsConfiguredPollInterval"
+@Test func persistsConfiguredConnectionRecheckInterval() async throws {
+    let suiteName = "PlexBarTests.persistsConfiguredConnectionRecheckInterval"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defaults.removePersistentDomain(forName: suiteName)
     defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -30,16 +30,16 @@ import Testing
         keychain: KeychainStore(service: "tests.\(suiteName)")
     )
 
-    store.pollIntervalSeconds = 999
+    store.connectionRecheckIntervalSeconds = 1_800
 
-    #expect(store.pollIntervalSeconds == AppConstants.maximumPollIntervalSeconds)
+    #expect(store.connectionRecheckIntervalSeconds == 1_800)
 
     let reloadedStore = PlexSettingsStore(
         defaults: defaults,
         keychain: KeychainStore(service: "tests.\(suiteName)")
     )
 
-    #expect(reloadedStore.pollIntervalSeconds == AppConstants.maximumPollIntervalSeconds)
+    #expect(reloadedStore.connectionRecheckIntervalSeconds == 1_800)
 }
 
 @MainActor
@@ -126,7 +126,8 @@ import Testing
     store.serverToken = "server-token"
     store.selectedServerIdentifier = "server-id"
     store.selectedServerName = "Server"
-    store.serverURLString = "http://plex.local:32400"
+    store.cachedConnectionURLString = "http://plex.local:32400"
+    store.cachedConnectionKind = .local
 
     store.clearAuthentication()
 
@@ -135,5 +136,6 @@ import Testing
     #expect(store.serverToken.isEmpty)
     #expect(store.selectedServerIdentifier == nil)
     #expect(store.selectedServerName == nil)
-    #expect(store.serverURLString.isEmpty)
+    #expect(store.cachedConnectionURLString.isEmpty)
+    #expect(store.cachedConnectionKind == nil)
 }
