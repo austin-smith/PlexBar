@@ -1,6 +1,49 @@
+import AppKit
 import SwiftUI
 
+private let streamCardSeparator = Color(nsColor: .separatorColor)
+
+private struct StreamCardTheme {
+    let baseBackground: AnyShapeStyle
+    let meshOpacity: Double
+    let contentReadabilityGradient: Gradient?
+
+    static func make(for colorScheme: ColorScheme, hasPalette: Bool) -> StreamCardTheme {
+        switch colorScheme {
+        case .light:
+            return StreamCardTheme(
+                baseBackground: hasPalette
+                    ? AnyShapeStyle(Color.white.opacity(0.82))
+                    : AnyShapeStyle(.white.opacity(0.72)),
+                meshOpacity: hasPalette ? 0.46 : 0,
+                contentReadabilityGradient: Gradient(stops: [
+                    .init(color: .clear, location: 0.0),
+                    .init(color: .clear, location: 0.24),
+                    .init(color: Color.white.opacity(0.02), location: 0.56),
+                    .init(color: Color.white.opacity(0.05), location: 1.0),
+                ])
+            )
+        case .dark:
+            return StreamCardTheme(
+                baseBackground: hasPalette
+                    ? AnyShapeStyle(Color.black.opacity(0.22))
+                    : AnyShapeStyle(.quaternary.opacity(0.3)),
+                meshOpacity: hasPalette ? 0.92 : 0,
+                contentReadabilityGradient: Gradient(stops: [
+                    .init(color: .clear, location: 0.0),
+                    .init(color: .clear, location: 0.22),
+                    .init(color: Color.black.opacity(0.12), location: 0.56),
+                    .init(color: Color.black.opacity(0.30), location: 1.0),
+                ])
+            )
+        @unknown default:
+            return make(for: .dark, hasPalette: hasPalette)
+        }
+    }
+}
+
 struct StreamCardView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let session: PlexSession
     let serverURL: URL?
     let settingsStore: PlexSettingsStore
@@ -36,6 +79,8 @@ struct StreamCardView: View {
     }
 
     var body: some View {
+        let theme = StreamCardTheme.make(for: colorScheme, hasPalette: artwork.palette != nil)
+
         HStack(alignment: .top, spacing: 12) {
             PosterThumbnailView(
                 artwork: artwork,
@@ -97,7 +142,7 @@ struct StreamCardView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Divider()
-                        .overlay(.white.opacity(0.08))
+                        .overlay(streamCardSeparator.opacity(0.45))
                         .padding(.bottom, 2)
 
                     Text(session.playbackLine)
@@ -127,7 +172,7 @@ struct StreamCardView: View {
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
         .background {
-            StreamCardBackground(palette: artwork.palette)
+            StreamCardBackground(palette: artwork.palette, theme: theme)
         }
         .task(id: requestKey) {
             await artwork.load(
@@ -269,12 +314,13 @@ struct PauseGlassBadge: View {
 
 private struct StreamCardBackground: View {
     let palette: PlexArtworkPalette?
+    let theme: StreamCardTheme
 
     private let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
 
     var body: some View {
         shape
-            .fill(baseBackground)
+            .fill(theme.baseBackground)
             .overlay {
                 if let palette {
                     MeshGradient(
@@ -288,33 +334,19 @@ private struct StreamCardBackground: View {
                         ],
                         colors: palette.swiftUIColors
                     )
-                    .opacity(0.92)
+                    .opacity(theme.meshOpacity)
                     .clipShape(shape)
                 }
             }
             .overlay {
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.06),
-                        Color.black.opacity(0.08),
-                        Color.black.opacity(0.28),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .clipShape(shape)
+                if let gradient = theme.contentReadabilityGradient {
+                    LinearGradient(gradient: gradient, startPoint: .leading, endPoint: .trailing)
+                        .clipShape(shape)
+                }
             }
             .overlay {
-                shape.strokeBorder(.white.opacity(0.08))
+                shape.strokeBorder(streamCardSeparator.opacity(0.3))
             }
-    }
-
-    private var baseBackground: AnyShapeStyle {
-        if palette == nil {
-            return AnyShapeStyle(.quaternary.opacity(0.3))
-        }
-
-        return AnyShapeStyle(Color.black.opacity(0.22))
     }
 }
 
