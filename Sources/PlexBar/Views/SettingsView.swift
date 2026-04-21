@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Bindable var settingsStore: PlexSettingsStore
     @Bindable var connectionStore: PlexConnectionStore
     @Bindable var authStore: PlexAuthStore
@@ -42,6 +43,9 @@ struct SettingsView: View {
                 )
             }
         }
+        .task {
+            settingsStore.refreshOpenAtLoginStatus()
+        }
         .onChange(of: isShowingServerList) { _, isShowingServerList in
             guard isShowingServerList else {
                 return
@@ -52,6 +56,13 @@ struct SettingsView: View {
                 for: authStore.availableServers,
                 clientIdentifier: settingsStore.clientIdentifier
             )
+        }
+        .onChange(of: scenePhase) { _, scenePhase in
+            guard scenePhase == .active else {
+                return
+            }
+
+            settingsStore.refreshOpenAtLoginStatus()
         }
     }
 
@@ -144,6 +155,11 @@ struct SettingsView: View {
                         )
                     }
                 }
+
+                Section {
+                    openAtLoginControls
+                        .padding(.vertical, 2)
+                }
             }
             .formStyle(.grouped)
         }
@@ -193,9 +209,15 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 40)
 
+            VStack(alignment: .leading, spacing: 10) {
+                openAtLoginControls
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 40)
+
             Spacer()
         }
-        .frame(width: 480, height: 280)
+        .frame(width: 480, height: 340)
     }
 
     // MARK: - Helpers
@@ -231,6 +253,19 @@ struct SettingsView: View {
 
                 settingsStore.connectionRecheckIntervalSeconds = newValue
                 sessionStore.restartConnectionRecheckTask()
+            }
+        )
+    }
+
+    private var openAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.opensAtLogin },
+            set: { newValue in
+                guard settingsStore.opensAtLogin != newValue else {
+                    return
+                }
+
+                settingsStore.setOpenAtLogin(newValue)
             }
         )
     }
@@ -318,6 +353,25 @@ struct SettingsView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(minHeight: 44, alignment: .leading)
+        }
+    }
+
+    private var openAtLoginControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Toggle("Open at Login", isOn: openAtLoginBinding)
+
+            if settingsStore.openAtLoginRequiresApproval {
+                settingsInfoBanner(message: "Finish enabling PlexBar in Login Items in System Settings.")
+
+                Button("Open System Settings") {
+                    settingsStore.openLoginItemsSystemSettings()
+                }
+                .buttonStyle(.bordered)
+            }
+
+            if let openAtLoginErrorMessage = settingsStore.openAtLoginErrorMessage {
+                serverStatusBanner(message: openAtLoginErrorMessage)
+            }
         }
     }
 
@@ -669,6 +723,32 @@ struct SettingsView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .strokeBorder(Color.orange.opacity(0.22))
+        }
+    }
+
+    @ViewBuilder
+    private func settingsInfoBanner(message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle.fill")
+                .font(.footnote)
+                .foregroundStyle(Color.accentColor)
+                .padding(.top, 1)
+
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.accentColor.opacity(0.12))
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(0.22))
         }
     }
 

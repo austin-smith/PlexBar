@@ -3,6 +3,40 @@ import Testing
 @testable import PlexBar
 
 @MainActor
+private final class TestLoginItemService: PlexLoginItemControlling {
+    var currentStatus: PlexLoginItemStatus
+    var setEnabledCalls: [Bool] = []
+    var openSystemSettingsCallCount = 0
+    var error: Error?
+
+    init(status: PlexLoginItemStatus) {
+        currentStatus = status
+    }
+
+    func status() -> PlexLoginItemStatus {
+        currentStatus
+    }
+
+    func setEnabled(_ enabled: Bool) throws {
+        setEnabledCalls.append(enabled)
+
+        if let error {
+            throw error
+        }
+
+        currentStatus = enabled ? .enabled : .notRegistered
+    }
+
+    func openSystemSettingsLoginItems() {
+        openSystemSettingsCallCount += 1
+    }
+}
+
+private struct TestLoginItemError: LocalizedError {
+    let errorDescription: String?
+}
+
+@MainActor
 @Test func defaultsHistoryPollInterval() async throws {
     let suiteName = "PlexBarTests.defaultsHistoryPollInterval"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -138,4 +172,115 @@ import Testing
     #expect(store.selectedServerName == nil)
     #expect(store.cachedConnectionURLString.isEmpty)
     #expect(store.cachedConnectionKind == nil)
+}
+
+@MainActor
+@Test func loadsOpenAtLoginStatusFromService() async throws {
+    let suiteName = "PlexBarTests.loadsOpenAtLoginStatusFromService"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let loginItemService = TestLoginItemService(status: .requiresApproval)
+    let store = PlexSettingsStore(
+        defaults: defaults,
+        keychain: KeychainStore(service: "tests.\(suiteName)"),
+        loginItemService: loginItemService
+    )
+
+    #expect(store.openAtLoginStatus == .requiresApproval)
+    #expect(store.opensAtLogin)
+    #expect(store.openAtLoginRequiresApproval)
+}
+
+@MainActor
+@Test func enablesOpenAtLoginThroughService() async throws {
+    let suiteName = "PlexBarTests.enablesOpenAtLoginThroughService"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let loginItemService = TestLoginItemService(status: .notRegistered)
+    let store = PlexSettingsStore(
+        defaults: defaults,
+        keychain: KeychainStore(service: "tests.\(suiteName)"),
+        loginItemService: loginItemService
+    )
+
+    store.setOpenAtLogin(true)
+
+    #expect(loginItemService.setEnabledCalls == [true])
+    #expect(store.openAtLoginStatus == .enabled)
+    #expect(store.opensAtLogin)
+    #expect(store.openAtLoginErrorMessage == nil)
+}
+
+@MainActor
+@Test func recordsOpenAtLoginToggleFailure() async throws {
+    let suiteName = "PlexBarTests.recordsOpenAtLoginToggleFailure"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let loginItemService = TestLoginItemService(status: .notRegistered)
+    loginItemService.error = TestLoginItemError(errorDescription: "Launch denied by user.")
+
+    let store = PlexSettingsStore(
+        defaults: defaults,
+        keychain: KeychainStore(service: "tests.\(suiteName)"),
+        loginItemService: loginItemService
+    )
+
+    store.setOpenAtLogin(true)
+
+    #expect(loginItemService.setEnabledCalls == [true])
+    #expect(store.openAtLoginStatus == .notRegistered)
+    #expect(store.openAtLoginErrorMessage == "PlexBar could not enable Open at Login. Launch denied by user.")
+}
+
+@MainActor
+@Test func opensLoginItemsSystemSettingsThroughService() async throws {
+    let suiteName = "PlexBarTests.opensLoginItemsSystemSettingsThroughService"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let loginItemService = TestLoginItemService(status: .requiresApproval)
+    let store = PlexSettingsStore(
+        defaults: defaults,
+        keychain: KeychainStore(service: "tests.\(suiteName)"),
+        loginItemService: loginItemService
+    )
+
+    store.openLoginItemsSystemSettings()
+
+    #expect(loginItemService.openSystemSettingsCallCount == 1)
+}
+
+@MainActor
+@Test func refreshingOpenAtLoginStatusClearsStaleErrorMessage() async throws {
+    let suiteName = "PlexBarTests.refreshingOpenAtLoginStatusClearsStaleErrorMessage"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let loginItemService = TestLoginItemService(status: .notRegistered)
+    loginItemService.error = TestLoginItemError(errorDescription: "Launch denied by user.")
+
+    let store = PlexSettingsStore(
+        defaults: defaults,
+        keychain: KeychainStore(service: "tests.\(suiteName)"),
+        loginItemService: loginItemService
+    )
+
+    store.setOpenAtLogin(true)
+    #expect(store.openAtLoginErrorMessage == "PlexBar could not enable Open at Login. Launch denied by user.")
+
+    loginItemService.error = nil
+    loginItemService.currentStatus = .enabled
+
+    store.refreshOpenAtLoginStatus()
+
+    #expect(store.openAtLoginStatus == .enabled)
+    #expect(store.openAtLoginErrorMessage == nil)
 }

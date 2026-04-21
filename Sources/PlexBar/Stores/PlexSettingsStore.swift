@@ -17,6 +17,7 @@ final class PlexSettingsStore {
 
     private let defaults: UserDefaults
     private let keychain: KeychainStore
+    private let loginItemService: any PlexLoginItemControlling
 
     var cachedConnectionURLString: String {
         didSet {
@@ -84,9 +85,17 @@ final class PlexSettingsStore {
         }
     }
 
-    init(defaults: UserDefaults = .standard, keychain: KeychainStore = KeychainStore(service: AppConstants.bundleIdentifier)) {
+    private(set) var openAtLoginStatus: PlexLoginItemStatus
+    var openAtLoginErrorMessage: String?
+
+    init(
+        defaults: UserDefaults = .standard,
+        keychain: KeychainStore = KeychainStore(service: AppConstants.bundleIdentifier),
+        loginItemService: any PlexLoginItemControlling = PlexLoginItemService()
+    ) {
         self.defaults = defaults
         self.keychain = keychain
+        self.loginItemService = loginItemService
         cachedConnectionURLString = defaults.string(forKey: DefaultsKeys.cachedConnectionURL) ?? ""
         cachedConnectionKind = defaults.string(forKey: DefaultsKeys.cachedConnectionKind).flatMap(PlexConnectionKind.init(rawValue:))
 
@@ -103,6 +112,8 @@ final class PlexSettingsStore {
         historyPollIntervalSeconds = Self.normalizedHistoryPollIntervalSeconds(
             defaults.object(forKey: DefaultsKeys.historyPollIntervalSeconds) as? Int ?? AppConstants.defaultHistoryPollIntervalSeconds
         )
+        openAtLoginStatus = loginItemService.status()
+        openAtLoginErrorMessage = nil
     }
 
     var normalizedServerURL: URL? {
@@ -137,6 +148,19 @@ final class PlexSettingsStore {
         return .seconds(historyPollIntervalSeconds)
     }
 
+    var opensAtLogin: Bool {
+        switch openAtLoginStatus {
+        case .enabled, .requiresApproval:
+            return true
+        case .notRegistered, .notFound:
+            return false
+        }
+    }
+
+    var openAtLoginRequiresApproval: Bool {
+        openAtLoginStatus == .requiresApproval
+    }
+
     func saveAuthenticatedUserToken(_ token: String) {
         userToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -166,6 +190,31 @@ final class PlexSettingsStore {
         serverToken = ""
     }
 
+    func refreshOpenAtLoginStatus() {
+        openAtLoginStatus = loginItemService.status()
+        openAtLoginErrorMessage = nil
+    }
+
+    func setOpenAtLogin(_ enabled: Bool) {
+        openAtLoginErrorMessage = nil
+
+        do {
+            try loginItemService.setEnabled(enabled)
+            refreshOpenAtLoginStatus()
+
+            if enabled && openAtLoginStatus == .notFound {
+                openAtLoginErrorMessage = "PlexBar could not register itself as a login item."
+            }
+        } catch {
+            refreshOpenAtLoginStatus()
+            openAtLoginErrorMessage = openAtLoginActionErrorMessage(for: enabled, error: error)
+        }
+    }
+
+    func openLoginItemsSystemSettings() {
+        loginItemService.openSystemSettingsLoginItems()
+    }
+
     @discardableResult
     func rotateClientIdentifier() -> String {
         let newIdentifier = Self.newIdentifier()
@@ -193,6 +242,16 @@ final class PlexSettingsStore {
         }
 
         keychain.write(trimmedToken, account: KeychainAccounts.serverToken)
+    }
+
+    private func openAtLoginActionErrorMessage(for enabled: Bool, error: Error) -> String {
+        let description = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+
+        if enabled {
+            return "PlexBar could not enable Open at Login. \(description)"
+        }
+
+        return "PlexBar could not disable Open at Login. \(description)"
     }
 
     private static func normalizedConnectionRecheckIntervalSeconds(_ value: Int) -> Int {
