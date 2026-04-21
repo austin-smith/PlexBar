@@ -81,7 +81,7 @@ struct StreamCardView: View {
                 placeholderSymbol: session.contentKind.contentMetaSymbolName
             )
 
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(session.headline)
                         .font(.headline)
@@ -131,18 +131,7 @@ struct StreamCardView: View {
                     }
                 }
 
-                Spacer(minLength: 14)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Divider()
-                        .overlay(.white.opacity(0.08))
-                        .padding(.bottom, 2)
-
-                    Text(session.playbackLine)
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-
+                VStack(alignment: .leading, spacing: 6) {
                     if let progress = session.progress {
                         ProgressView(value: progress)
                             .tint(.orange)
@@ -235,6 +224,12 @@ private struct PosterThumbnailView: View {
     @Bindable var artwork: PlexArtworkPresentationState
     let isPaused: Bool
     let placeholderSymbol: String
+    private let posterWidth: CGFloat = 88
+    private let posterAspectRatio: CGFloat = 2 / 3
+
+    private var posterHeight: CGFloat {
+        posterWidth / posterAspectRatio
+    }
 
     var body: some View {
         ZStack {
@@ -256,8 +251,7 @@ private struct PosterThumbnailView: View {
                 pauseOverlay
             }
         }
-        .frame(width: 88)
-        .frame(maxHeight: .infinity)
+        .frame(width: posterWidth, height: posterHeight)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
