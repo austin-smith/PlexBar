@@ -4,7 +4,6 @@ enum AppConstants {
     static let appName = "PlexBar"
     static let bundleIdentifier = "com.crapshack.PlexBar"
     static let productVersion = "0.4.0"
-    static let settingsWindowID = "settings"
     static let defaultConnectionRecheckIntervalSeconds = 900
     static let allowedConnectionRecheckIntervalSeconds = [0, 300, 900, 1_800, 3_600]
     static let defaultHistoryPollIntervalSeconds = 900

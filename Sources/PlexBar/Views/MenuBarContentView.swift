@@ -8,7 +8,7 @@ struct MenuBarContentView: View {
     @Bindable var sessionStore: PlexSessionStore
     @Bindable var historyStore: PlexHistoryStore
     @Bindable var libraryStore: PlexLibraryStore
-    @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettingsWindow
     @State private var selectedSection: DashboardSection = .streams
     @State private var streamContentHeight: CGFloat = 0
     @State private var historyContentHeight: CGFloat = 0
@@ -356,7 +356,7 @@ struct MenuBarContentView: View {
 
     private func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
-        openWindow(id: AppConstants.settingsWindowID)
+        openSettingsWindow()
     }
 
     private var streamListHeight: CGFloat {

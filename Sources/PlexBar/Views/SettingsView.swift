@@ -9,22 +9,18 @@ struct SettingsView: View {
     @Bindable var sessionStore: PlexSessionStore
     @Bindable var historyStore: PlexHistoryStore
     @State private var isShowingServerList = false
-    @State private var selectedTab = Tab.general
+    @State private var selectedTab = SettingsTab.general
     @State private var presentedTooltip: SettingsTooltip?
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            generalView
-                .tabItem {
-                    Label("General", systemImage: "gearshape")
-                }
-                .tag(Tab.general)
+            Tab("General", systemImage: "gearshape", value: .general) {
+                generalView
+            }
 
-            aboutView
-                .tabItem {
-                    Label("About", systemImage: "info.circle")
-                }
-                .tag(Tab.about)
+            Tab("About", systemImage: "info.circle", value: .about) {
+                aboutView
+            }
         }
         .task(id: availableServerIDsKey) {
             previewStore.reconcileServers(authStore.availableServers)
@@ -66,7 +62,7 @@ struct SettingsView: View {
         }
     }
 
-    private enum Tab: Hashable {
+    private enum SettingsTab: Hashable {
         case general
         case about
     }
@@ -163,7 +159,6 @@ struct SettingsView: View {
             }
             .formStyle(.grouped)
         }
-        .frame(width: 480)
     }
 
     // MARK: - Unauthenticated
@@ -217,7 +212,6 @@ struct SettingsView: View {
 
             Spacer()
         }
-        .frame(width: 480, height: 340)
     }
 
     // MARK: - Helpers

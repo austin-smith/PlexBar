@@ -43,7 +43,7 @@ struct PlexBarApp: App {
     }
 
     var body: some Scene {
-        Window("PlexBar Settings", id: AppConstants.settingsWindowID) {
+        Settings {
             SettingsView(
                 settingsStore: settingsStore,
                 connectionStore: connectionStore,
@@ -53,7 +53,7 @@ struct PlexBarApp: App {
                 historyStore: historyStore
             )
         }
-        .defaultSize(width: 480, height: 300)
+        .defaultSize(width: 480, height: 520)
         .windowResizability(.contentSize)
 
         MenuBarExtra {
