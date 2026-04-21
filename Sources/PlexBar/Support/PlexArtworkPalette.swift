@@ -142,7 +142,7 @@ struct PlexArtworkPalette: Equatable, Sendable {
     }
 }
 
-struct PlexArtworkPaletteExtractor {
+struct PlexArtworkPaletteExtractor: Sendable {
     private struct ColorBucket {
         var redTotal = 0.0
         var greenTotal = 0.0
@@ -291,6 +291,8 @@ struct PlexArtworkPaletteExtractor {
 
         var buffer = [UInt8](repeating: 0, count: width * height * bytesPerPixel)
 
+        let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue
+
         guard let context = CGContext(
             data: &buffer,
             width: width,
@@ -298,7 +300,7 @@ struct PlexArtworkPaletteExtractor {
             bitsPerComponent: bitsPerComponent,
             bytesPerRow: bytesPerRow,
             space: colorSpace,
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            bitmapInfo: bitmapInfo
         ) else {
             return nil
         }

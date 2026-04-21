@@ -2,6 +2,10 @@ import CoreGraphics
 import Observation
 import SwiftUI
 
+private struct SendableCGImageBox: @unchecked Sendable {
+    let image: CGImage
+}
+
 @MainActor
 @Observable
 final class PlexArtworkPresentationState {
@@ -55,7 +59,7 @@ final class PlexArtworkPresentationState {
 
         if let cachedImage = imageClient.cachedCGImageResult(from: candidateURLs, token: token) {
             cgImage = cachedImage.image
-            palette = wantsPalette ? resolvedPalette(for: cachedImage.image, sourceURL: cachedImage.sourceURL, token: token) : nil
+            palette = wantsPalette ? await resolvedPalette(for: cachedImage.image, sourceURL: cachedImage.sourceURL, token: token) : nil
             isLoading = false
             return
         }
@@ -75,7 +79,7 @@ final class PlexArtworkPresentationState {
             clientContext: clientContext
         ) {
             cgImage = loadedImage.image
-            palette = wantsPalette ? resolvedPalette(for: loadedImage.image, sourceURL: loadedImage.sourceURL, token: token) : nil
+            palette = wantsPalette ? await resolvedPalette(for: loadedImage.image, sourceURL: loadedImage.sourceURL, token: token) : nil
             isLoading = false
             return
         }
@@ -83,12 +87,18 @@ final class PlexArtworkPresentationState {
         isLoading = false
     }
 
-    private func resolvedPalette(for image: CGImage, sourceURL: URL, token: String) -> PlexArtworkPalette? {
+    private func resolvedPalette(for image: CGImage, sourceURL: URL, token: String) async -> PlexArtworkPalette? {
         if let cachedPalette = imageClient.cachedPalette(for: sourceURL, token: token) {
             return cachedPalette
         }
 
-        guard let extractedPalette = paletteExtractor.extract(from: image) else {
+        let extractor = paletteExtractor
+        let imageBox = SendableCGImageBox(image: image)
+        let extractionTask = Task.detached(priority: .userInitiated) {
+            extractor.extract(from: imageBox.image)
+        }
+
+        guard let extractedPalette = await extractionTask.value else {
             return nil
         }
 
@@ -108,7 +118,7 @@ final class PlexArtworkPresentationState {
 
         cgImage = cachedImage.image
         palette = wantsPalette
-            ? resolvedPalette(for: cachedImage.image, sourceURL: cachedImage.sourceURL, token: token)
+            ? imageClient.cachedPalette(for: cachedImage.sourceURL, token: token)
             : nil
     }
 }
