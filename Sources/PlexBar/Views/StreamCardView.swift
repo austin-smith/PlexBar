@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct StreamCardView: View {
@@ -7,6 +6,30 @@ struct StreamCardView: View {
     let settingsStore: PlexSettingsStore
     let snapshotDate: Date?
     let resolvedLocation: String?
+    @State private var artwork: PlexArtworkPresentationState
+
+    init(
+        session: PlexSession,
+        serverURL: URL?,
+        settingsStore: PlexSettingsStore,
+        snapshotDate: Date?,
+        resolvedLocation: String?
+    ) {
+        self.session = session
+        self.serverURL = serverURL
+        self.settingsStore = settingsStore
+        self.snapshotDate = snapshotDate
+        self.resolvedLocation = resolvedLocation
+
+        let posterURL = Self.posterURL(serverURL: serverURL, posterPath: session.posterPath)
+        let transcodedPosterURL = Self.transcodedPosterURL(serverURL: serverURL, posterPath: session.posterPath)
+        _artwork = State(initialValue: PlexArtworkPresentationState(
+            primaryImageURL: posterURL,
+            fallbackImageURL: transcodedPosterURL,
+            token: settingsStore.trimmedServerToken,
+            wantsPalette: true
+        ))
+    }
 
     private var clientContext: PlexClientContext {
         PlexClientContext(clientIdentifier: settingsStore.clientIdentifier)
@@ -15,10 +38,7 @@ struct StreamCardView: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             PosterThumbnailView(
-                primaryImageURL: posterURL,
-                fallbackImageURL: transcodedPosterURL,
-                token: settingsStore.trimmedServerToken,
-                clientContext: clientContext,
+                artwork: artwork,
                 isPaused: session.isPaused,
                 placeholderSymbol: session.contentKind.contentMetaSymbolName
             )
@@ -106,7 +126,18 @@ struct StreamCardView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
-        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background {
+            StreamCardBackground(palette: artwork.palette)
+        }
+        .task(id: requestKey) {
+            await artwork.load(
+                primaryImageURL: posterURL,
+                fallbackImageURL: transcodedPosterURL,
+                token: settingsStore.trimmedServerToken,
+                clientContext: clientContext,
+                wantsPalette: true
+            )
+        }
     }
 
     private var playbackTimingSummary: String? {
@@ -118,24 +149,43 @@ struct StreamCardView: View {
     }
 
     private var posterURL: URL? {
+        Self.posterURL(serverURL: serverURL, posterPath: session.posterPath)
+    }
+
+    private var transcodedPosterURL: URL? {
+        Self.transcodedPosterURL(serverURL: serverURL, posterPath: session.posterPath)
+    }
+
+    private var requestKey: String {
+        [
+            posterURL?.absoluteString,
+            transcodedPosterURL?.absoluteString,
+            clientContext.clientIdentifier,
+            settingsStore.trimmedServerToken,
+        ]
+        .compactMap { $0 }
+        .joined(separator: "|")
+    }
+
+    private static func posterURL(serverURL: URL?, posterPath: String?) -> URL? {
         guard let serverURL else {
             return nil
         }
 
         return PlexURLBuilder.mediaURL(
             serverURL: serverURL,
-            path: session.posterPath
+            path: posterPath
         )
     }
 
-    private var transcodedPosterURL: URL? {
+    private static func transcodedPosterURL(serverURL: URL?, posterPath: String?) -> URL? {
         guard let serverURL else {
             return nil
         }
 
         return PlexURLBuilder.transcodedArtworkURL(
             serverURL: serverURL,
-            path: session.posterPath,
+            path: posterPath,
             width: 176,
             height: 264
         )
@@ -144,50 +194,20 @@ struct StreamCardView: View {
 }
 
 private struct PosterThumbnailView: View {
-    let primaryImageURL: URL?
-    let fallbackImageURL: URL?
-    let token: String
-    let clientContext: PlexClientContext
+    @Bindable var artwork: PlexArtworkPresentationState
     let isPaused: Bool
     let placeholderSymbol: String
-    let imageClient: PlexImageClient
-
-    @State private var image: Image?
-    @State private var isLoading = false
-
-    init(
-        primaryImageURL: URL?,
-        fallbackImageURL: URL?,
-        token: String,
-        clientContext: PlexClientContext,
-        isPaused: Bool,
-        placeholderSymbol: String,
-        imageClient: PlexImageClient = PlexImageClient()
-    ) {
-        self.primaryImageURL = primaryImageURL
-        self.fallbackImageURL = fallbackImageURL
-        self.token = token
-        self.clientContext = clientContext
-        self.isPaused = isPaused
-        self.placeholderSymbol = placeholderSymbol
-        self.imageClient = imageClient
-        let cachedImage = imageClient.cachedImage(
-            from: [primaryImageURL, fallbackImageURL].compactMap { $0 },
-            token: token
-        )
-        _image = State(initialValue: cachedImage.map(Image.init(nsImage:)))
-    }
 
     var body: some View {
         ZStack {
-            if let image {
+            if let image = artwork.image {
                 image
                     .resizable()
                     .scaledToFill()
             } else {
                 placeholder
                     .overlay {
-                        if isLoading {
+                        if artwork.isLoading {
                             ProgressView()
                                 .controlSize(.small)
                         }
@@ -201,56 +221,6 @@ private struct PosterThumbnailView: View {
         .frame(width: 88)
         .frame(maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .task(id: requestKey) {
-            await loadImage()
-        }
-    }
-
-    private var requestKey: String {
-        [
-            primaryImageURL?.absoluteString,
-            fallbackImageURL?.absoluteString,
-            clientContext.clientIdentifier,
-            token,
-        ]
-        .compactMap { $0 }
-        .joined(separator: "|")
-    }
-
-    @MainActor
-    private func loadImage() async {
-        let candidateURLs = [primaryImageURL, fallbackImageURL].compactMap { $0 }
-        guard !candidateURLs.isEmpty else {
-            image = nil
-            isLoading = false
-            return
-        }
-
-        if let cachedImage = imageClient.cachedImage(from: candidateURLs, token: token) {
-            image = Image(nsImage: cachedImage)
-            isLoading = false
-            return
-        }
-
-        isLoading = true
-        image = nil
-
-        if Task.isCancelled {
-            isLoading = false
-            return
-        }
-
-        if let loadedImage = await imageClient.fetchImage(
-            from: candidateURLs,
-            token: token,
-            clientContext: clientContext
-        ) {
-            image = Image(nsImage: loadedImage)
-            isLoading = false
-            return
-        }
-
-        isLoading = false
     }
 
     private var placeholder: some View {
@@ -268,17 +238,83 @@ private struct PosterThumbnailView: View {
             Rectangle()
                 .fill(.black.opacity(0.28))
 
-            Image(systemName: "pause.fill")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(12)
-                .background {
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .opacity(0.75)
-                }
+            PauseGlassBadge(
+                font: .system(size: 20, weight: .semibold),
+                size: 44
+            )
         }
         .allowsHitTesting(false)
+    }
+}
+
+struct PauseGlassBadge: View {
+    let font: Font
+    let size: CGFloat
+
+    var body: some View {
+        Image(systemName: "pause.fill")
+            .font(font)
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background {
+                Circle()
+                    .fill(Color.white.opacity(0.08))
+            }
+            .overlay {
+                Circle()
+                    .strokeBorder(.white.opacity(0.16), lineWidth: 0.8)
+            }
+    }
+}
+
+private struct StreamCardBackground: View {
+    let palette: PlexArtworkPalette?
+
+    private let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+
+    var body: some View {
+        shape
+            .fill(baseBackground)
+            .overlay {
+                if let palette {
+                    MeshGradient(
+                        width: 2,
+                        height: 2,
+                        points: [
+                            SIMD2<Float>(0, 0),
+                            SIMD2<Float>(1, 0),
+                            SIMD2<Float>(0, 1),
+                            SIMD2<Float>(1, 1),
+                        ],
+                        colors: palette.swiftUIColors
+                    )
+                    .opacity(0.92)
+                    .clipShape(shape)
+                }
+            }
+            .overlay {
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.06),
+                        Color.black.opacity(0.08),
+                        Color.black.opacity(0.28),
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .clipShape(shape)
+            }
+            .overlay {
+                shape.strokeBorder(.white.opacity(0.08))
+            }
+    }
+
+    private var baseBackground: AnyShapeStyle {
+        if palette == nil {
+            return AnyShapeStyle(.quaternary.opacity(0.3))
+        }
+
+        return AnyShapeStyle(Color.black.opacity(0.22))
     }
 }
 
