@@ -1,27 +1,19 @@
-import AppKit
 import SwiftUI
-
-private let streamCardSeparator = Color(nsColor: .separatorColor)
 
 private struct StreamCardTheme {
     let baseBackground: AnyShapeStyle
     let meshOpacity: Double
     let contentReadabilityGradient: Gradient?
+    let showsBorder: Bool
 
     static func make(for colorScheme: ColorScheme, hasPalette: Bool) -> StreamCardTheme {
         switch colorScheme {
         case .light:
             return StreamCardTheme(
-                baseBackground: hasPalette
-                    ? AnyShapeStyle(Color.white.opacity(0.82))
-                    : AnyShapeStyle(.white.opacity(0.72)),
-                meshOpacity: hasPalette ? 0.46 : 0,
-                contentReadabilityGradient: Gradient(stops: [
-                    .init(color: .clear, location: 0.0),
-                    .init(color: .clear, location: 0.24),
-                    .init(color: Color.white.opacity(0.02), location: 0.56),
-                    .init(color: Color.white.opacity(0.05), location: 1.0),
-                ])
+                baseBackground: AnyShapeStyle(.quaternary.opacity(0.3)),
+                meshOpacity: 0,
+                contentReadabilityGradient: nil,
+                showsBorder: false
             )
         case .dark:
             return StreamCardTheme(
@@ -34,7 +26,8 @@ private struct StreamCardTheme {
                     .init(color: .clear, location: 0.22),
                     .init(color: Color.black.opacity(0.12), location: 0.56),
                     .init(color: Color.black.opacity(0.30), location: 1.0),
-                ])
+                ]),
+                showsBorder: true
             )
         @unknown default:
             return make(for: .dark, hasPalette: hasPalette)
@@ -142,7 +135,7 @@ struct StreamCardView: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Divider()
-                        .overlay(streamCardSeparator.opacity(0.45))
+                        .overlay(.white.opacity(0.08))
                         .padding(.bottom, 2)
 
                     Text(session.playbackLine)
@@ -345,7 +338,9 @@ private struct StreamCardBackground: View {
                 }
             }
             .overlay {
-                shape.strokeBorder(streamCardSeparator.opacity(0.3))
+                if theme.showsBorder {
+                    shape.strokeBorder(.white.opacity(0.08))
+                }
             }
     }
 }
