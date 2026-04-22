@@ -680,7 +680,7 @@ private struct PlexLibrarySection: Decodable {
     }
 
     var isBrowsableLibrary: Bool {
-        hidden != true && content != false && directory != false
+        content != false && directory != false
     }
 
     func librarySummary(
