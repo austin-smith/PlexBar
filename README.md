@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="docs/images/plexbar-app-icon.png" width="128" alt="PlexBar Icon">
+  <img src="docs/images/plexbar-app-icon-fuzzy.png" width="128" alt="PlexBar Icon">
   <br><span style="font-family: monospace;">PlexBar</span>
 </h1>
 

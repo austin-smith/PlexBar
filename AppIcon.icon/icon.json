@@ -6,8 +6,21 @@
     {
       "layers" : [
         {
-          "glass" : true,
+          "glass" : false,
           "hidden" : false,
+          "image-name" : "ribbon-fuzzy.png",
+          "name" : "ribbon-fuzzy",
+          "position" : {
+            "scale" : 0.8,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "glass" : true,
+          "hidden" : true,
           "image-name" : "ribbon.png",
           "name" : "ribbon",
           "position" : {
