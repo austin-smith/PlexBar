@@ -1,13 +1,25 @@
 {
   "fill" : {
-    "automatic-gradient" : "display-p3:0.85889,0.63916,0.22742,1.00000"
+    "automatic-gradient" : "display-p3:0.10492,0.10492,0.10492,1.00000"
   },
   "groups" : [
     {
       "layers" : [
         {
           "glass" : false,
-          "hidden" : false,
+          "image-name" : "ribbon-fuzzy-brand.png",
+          "name" : "ribbon-fuzzy-brand",
+          "position" : {
+            "scale" : 0.8,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        },
+        {
+          "glass" : false,
+          "hidden" : true,
           "image-name" : "ribbon-fuzzy.png",
           "name" : "ribbon-fuzzy",
           "position" : {
