@@ -204,12 +204,6 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 40)
 
-            VStack(alignment: .leading, spacing: 10) {
-                openAtLoginControls
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 40)
-
             Spacer()
         }
     }
