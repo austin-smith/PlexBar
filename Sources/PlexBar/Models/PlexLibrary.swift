@@ -1,5 +1,37 @@
 import Foundation
 
+enum PlexMediaIcon: Equatable {
+    case movie
+    case show
+    case music
+    case photo
+    case clip
+    case liveTV
+    case other
+    case library
+
+    var symbolName: String {
+        switch self {
+        case .movie:
+            "film"
+        case .show:
+            "tv"
+        case .music:
+            "music.note.list"
+        case .photo:
+            "photo.on.rectangle"
+        case .clip:
+            "play.rectangle"
+        case .liveTV:
+            "antenna.radiowaves.left.and.right"
+        case .other:
+            "play.square"
+        case .library:
+            "books.vertical"
+        }
+    }
+}
+
 struct PlexLibrary: Identifiable, Equatable {
     let id: String
     let title: String
@@ -108,19 +140,23 @@ enum PlexLibraryType: Equatable {
     }
 
     var symbolName: String {
+        icon.symbolName
+    }
+
+    private var icon: PlexMediaIcon {
         switch self {
         case .movie:
-            "film"
+            .movie
         case .show:
-            "tv"
+            .show
         case .artist, .album:
-            "music.note.list"
+            .music
         case .photo, .photoAlbum:
-            "photo.on.rectangle"
+            .photo
         case .clip:
-            "play.rectangle"
+            .clip
         case .unknown:
-            "books.vertical"
+            .library
         }
     }
 

@@ -51,22 +51,7 @@ enum PlexSessionContentKind: String, Equatable {
     }
 
     var contentMetaSymbolName: String {
-        switch self {
-        case .movie:
-            "film"
-        case .tv:
-            "tv"
-        case .liveTV:
-            "antenna.radiowaves.left.and.right"
-        case .track:
-            "music.note"
-        case .photo:
-            "photo"
-        case .clip:
-            "play.rectangle"
-        case .other:
-            "play.square"
-        }
+        symbolName
     }
 
     var contentMetaLabel: String {
@@ -89,21 +74,25 @@ enum PlexSessionContentKind: String, Equatable {
     }
 
     var symbolName: String {
+        icon.symbolName
+    }
+
+    private var icon: PlexMediaIcon {
         switch self {
         case .movie:
-            "film"
+            .movie
         case .tv:
-            "tv"
+            .show
         case .liveTV:
-            "antenna.radiowaves.left.and.right"
+            .liveTV
         case .track:
-            "music.note"
+            .music
         case .photo:
-            "photo"
+            .photo
         case .clip:
-            "play.rectangle"
+            .clip
         case .other:
-            "play.square"
+            .other
         }
     }
 }
