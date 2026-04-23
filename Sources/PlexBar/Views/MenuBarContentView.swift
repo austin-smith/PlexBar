@@ -13,6 +13,8 @@ struct MenuBarContentView: View {
     @State private var streamContentHeight: CGFloat = 0
     @State private var historyContentHeight: CGFloat = 0
     @State private var libraryContentHeight: CGFloat = 0
+    @State private var terminatePrompt: TerminatePlaybackPrompt?
+    @State private var terminateMessage = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -23,6 +25,7 @@ struct MenuBarContentView: View {
         }
         .padding(16)
         .frame(width: 420)
+        .animation(.snappy(duration: 0.18), value: terminatePrompt?.id)
     }
 
     private var header: some View {
@@ -174,6 +177,12 @@ struct MenuBarContentView: View {
                     ForEach(sessionStore.sessions) { session in
                         StreamCardView(
                             session: session,
+                            sessionStore: sessionStore,
+                            onRequestTerminate: presentTerminatePrompt,
+                            isShowingTerminatePrompt: terminatePrompt?.id == session.id,
+                            terminateMessage: $terminateMessage,
+                            onCancelTerminate: dismissTerminatePrompt,
+                            onConfirmTerminate: confirmTerminate,
                             serverURL: connectionStore.resolvedServerURL,
                             settingsStore: settingsStore,
                             snapshotDate: sessionStore.lastUpdated,
@@ -354,6 +363,25 @@ struct MenuBarContentView: View {
         historyStore.refreshNow()
     }
 
+    private func presentTerminatePrompt(for session: PlexSession) {
+        terminateMessage = ""
+        terminatePrompt = TerminatePlaybackPrompt(session: session)
+    }
+
+    private func dismissTerminatePrompt() {
+        terminatePrompt = nil
+        terminateMessage = ""
+    }
+
+    private func confirmTerminate(_ session: PlexSession) {
+        let reason = terminateMessage
+        dismissTerminatePrompt()
+
+        Task {
+            await sessionStore.terminate(session, reason: reason)
+        }
+    }
+
     private func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
         openSettingsWindow()
@@ -479,6 +507,14 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
 
             return libraryStore.errorMessage
         }
+    }
+}
+
+private struct TerminatePlaybackPrompt: Identifiable {
+    let session: PlexSession
+
+    var id: String {
+        session.id
     }
 }
 

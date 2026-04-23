@@ -220,6 +220,556 @@ struct PlexSessionStoreTests {
 }
 
 @MainActor
+@Test func terminateSessionPostsToPlexAndRemovesSession() async throws {
+    let suiteName = "PlexBarTests.terminateSessionPostsToPlexAndRemovesSession"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let requestCapture = RequestCapture()
+    let sessionsCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            sessionsCounter.increment()
+            let metadata = sessionsCounter.value == 1
+                ? [sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)]
+                : []
+            return try sessionsResponse(for: url, metadata: metadata)
+        }
+
+        if url.path == "/status/sessions/terminate" {
+            requestCapture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"{}"#.data(using: .utf8))
+            return (response, data)
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+
+    await store.terminate(try #require(store.sessions.first))
+
+    #expect(store.activeStreamCount == 0)
+
+    let request = try #require(requestCapture.request)
+    #expect(request.httpMethod == "POST")
+
+    let url = try #require(request.url)
+    let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+    let queryItems = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+    #expect(components.path == "/status/sessions/terminate")
+    #expect(queryItems["sessionId"] == "44")
+    #expect(queryItems["reason"] == nil)
+}
+
+@MainActor
+@Test func terminateSessionMarksSessionAsStoppingWhileRequestIsInFlight() async throws {
+    let suiteName = "PlexBarTests.terminateSessionMarksSessionAsStoppingWhileRequestIsInFlight"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let terminateRequestStarted = RequestCounter()
+    let sessionsCounter = RequestCounter()
+    let terminateGate = DispatchSemaphore(value: 0)
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            sessionsCounter.increment()
+            let metadata = sessionsCounter.value == 1
+                ? [sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)]
+                : []
+            return try sessionsResponse(for: url, metadata: metadata)
+        }
+
+        if url.path == "/status/sessions/terminate" {
+            terminateRequestStarted.increment()
+            terminateGate.wait()
+
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"{}"#.data(using: .utf8))
+            return (response, data)
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+    let activeSession = try #require(store.sessions.first)
+
+    let terminateTask = Task {
+        await store.terminate(activeSession)
+    }
+
+    await waitForSessionStore(store) {
+        terminateRequestStarted.value == 1 && $0.activeStreamCount == 1 && $0.isTerminating(activeSession)
+    }
+
+    terminateGate.signal()
+    await terminateTask.value
+
+    #expect(store.activeStreamCount == 0)
+}
+
+@MainActor
+@Test func terminateSessionClearsStoppingStateWhenRefreshStillReturnsSession() async throws {
+    let suiteName = "PlexBarTests.terminateSessionClearsStoppingStateWhenRefreshStillReturnsSession"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let sessionsCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            sessionsCounter.increment()
+            return try sessionsResponse(
+                for: url,
+                metadata: [sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)]
+            )
+        }
+
+        if url.path == "/status/sessions/terminate" {
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"{}"#.data(using: .utf8))
+            return (response, data)
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+    let activeSession = try #require(store.sessions.first)
+
+    await store.terminate(activeSession)
+
+    #expect(store.activeStreamCount == 1)
+    #expect(store.isTerminating(activeSession) == false)
+    #expect(sessionsCounter.value >= 2)
+}
+
+@MainActor
+@Test func terminateSessionClearsStoppingStateWhenRefreshFails() async throws {
+    let suiteName = "PlexBarTests.terminateSessionClearsStoppingStateWhenRefreshFails"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let sessionsCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            sessionsCounter.increment()
+
+            if sessionsCounter.value == 1 {
+                return try sessionsResponse(
+                    for: url,
+                    metadata: [sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)]
+                )
+            }
+
+            throw URLError(.timedOut)
+        }
+
+        if url.path == "/status/sessions/terminate" {
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"{}"#.data(using: .utf8))
+            return (response, data)
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+    let activeSession = try #require(store.sessions.first)
+
+    await store.terminate(activeSession)
+
+    #expect(store.activeStreamCount == 1)
+    #expect(store.isTerminating(activeSession) == false)
+    #expect(store.errorMessage?.isEmpty == false)
+    #expect(sessionsCounter.value >= 2)
+}
+
+@MainActor
+@Test func terminateSessionDoesNotRetryPostOnConnectivityFailure() async throws {
+    let suiteName = "PlexBarTests.terminateSessionDoesNotRetryPostOnConnectivityFailure"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let terminateCounter = RequestCounter()
+    let sessionsCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            sessionsCounter.increment()
+            return try sessionsResponse(
+                for: url,
+                metadata: [sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)]
+            )
+        }
+
+        if url.path == "/status/sessions/terminate" {
+            terminateCounter.increment()
+            throw URLError(.networkConnectionLost)
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+    let activeSession = try #require(store.sessions.first)
+
+    await store.terminate(activeSession)
+
+    #expect(terminateCounter.value == 1)
+    #expect(store.activeStreamCount == 1)
+    #expect(store.isTerminating(activeSession) == false)
+    #expect(store.errorMessage?.isEmpty == false)
+    #expect(sessionsCounter.value == 1)
+}
+
+@MainActor
+@Test func terminateSessionUsesFreshResolvedConnectionWhenCachedConnectionTurnsStale() async throws {
+    let suiteName = "PlexBarTests.terminateSessionUsesFreshResolvedConnectionWhenCachedConnectionTurnsStale"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let localURL = try #require(URL(string: "http://plex.local:32400"))
+    let remoteURL = try #require(URL(string: "https://plex.remote:32400"))
+    let staleLocal = Locked(false)
+    let localTerminateCounter = RequestCounter()
+    let remoteTerminateCounter = RequestCounter()
+    let remoteSessionsCounter = RequestCounter()
+
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            if url.host == "plex.local", staleLocal.value {
+                throw URLError(.timedOut)
+            }
+
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            if url.host == "plex.local", staleLocal.value {
+                throw URLError(.timedOut)
+            }
+
+            if url.host == "plex.remote" {
+                remoteSessionsCounter.increment()
+                return try sessionsResponse(for: url, metadata: [])
+            }
+
+            return try sessionsResponse(
+                for: url,
+                metadata: [sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)]
+            )
+        }
+
+        if url.path == "/status/sessions/terminate" {
+            if url.host == "plex.local" {
+                localTerminateCounter.increment()
+                throw URLError(.timedOut)
+            }
+
+            if url.host == "plex.remote" {
+                remoteTerminateCounter.increment()
+                let response = try #require(HTTPURLResponse(
+                    url: url,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: nil
+                ))
+                let data = try #require(#"{}"#.data(using: .utf8))
+                return (response, data)
+            }
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    settings.cachedConnectionURLString = localURL.absoluteString
+    settings.cachedConnectionKind = .local
+
+    let resolver = PlexConnectionResolver(
+        client: PlexAPIClient(session: session),
+        probeTimeoutInterval: 0.1
+    )
+    let connectionStore = PlexConnectionStore(
+        settings: settings,
+        resolver: resolver
+    )
+    let initialServer = PlexServerResource(
+        id: "server-id",
+        name: "Server",
+        productVersion: nil,
+        accessToken: "server-token",
+        connections: [
+            PlexServerConnection(uri: localURL, local: true, relay: false)
+        ]
+    )
+    connectionStore.updateAvailableServers([initialServer])
+
+    let store = PlexSessionStore(
+        connectionStore: connectionStore,
+        client: PlexAPIClient(session: session),
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    store.didChangeConfiguration()
+
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+    let activeSession = try #require(store.sessions.first)
+
+    staleLocal.withValue { $0 = true }
+    let upgradedServer = PlexServerResource(
+        id: "server-id",
+        name: "Server",
+        productVersion: nil,
+        accessToken: "server-token",
+        connections: [
+            PlexServerConnection(uri: localURL, local: true, relay: false),
+            PlexServerConnection(uri: remoteURL, local: false, relay: false)
+        ]
+    )
+    connectionStore.updateAvailableServers([upgradedServer])
+
+    await store.terminate(activeSession)
+
+    #expect(localTerminateCounter.value == 0)
+    #expect(remoteTerminateCounter.value == 1)
+    #expect(store.activeStreamCount == 0)
+}
+
+@MainActor
+@Test func terminateSessionIncludesProvidedReason() async throws {
+    let suiteName = "PlexBarTests.terminateSessionIncludesProvidedReason"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let requestCapture = RequestCapture()
+    let sessionsCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            sessionsCounter.increment()
+            let metadata = sessionsCounter.value == 1
+                ? [sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)]
+                : []
+            return try sessionsResponse(for: url, metadata: metadata)
+        }
+
+        if url.path == "/status/sessions/terminate" {
+            requestCapture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"{}"#.data(using: .utf8))
+            return (response, data)
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+
+    await store.terminate(try #require(store.sessions.first), reason: "Stopped by admin")
+
+    let request = try #require(requestCapture.request)
+    let url = try #require(request.url)
+    let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+    let queryItems = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+    #expect(queryItems["reason"] == "Stopped by admin")
+}
+
+@MainActor
+@Test func terminateSessionWithoutServerSessionIDSurfacesConcreteError() async throws {
+    let suiteName = "PlexBarTests.terminateSessionWithoutServerSessionIDSurfacesConcreteError"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let terminateCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            return try sessionsResponse(for: url, metadata: [
+                sessionJSON(
+                    sessionKey: "44",
+                    ratingKey: "900",
+                    state: "playing",
+                    viewOffset: 1000,
+                    includeSessionID: false
+                )
+            ])
+        }
+
+        if url.path == "/status/sessions/terminate" {
+            terminateCounter.increment()
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+
+    await store.terminate(try #require(store.sessions.first))
+
+    #expect(store.activeStreamCount == 1)
+    #expect(store.errorMessage == "Unable to terminate session: missing Plex session id.")
+    #expect(terminateCounter.value == 0)
+}
+
+@MainActor
 @Test func lanSessionsResolveGeoLocationWhenPlexProvidesRemotePublicAddress() async throws {
     let suiteName = "PlexBarTests.lanSessionsResolveGeoLocationWhenPlexProvidesRemotePublicAddress"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -1024,6 +1574,7 @@ private func sessionJSON(
     ratingKey: String,
     state: String,
     viewOffset: Int,
+    includeSessionID: Bool = true,
     transcodeSessionKey: String? = nil,
     sessionLocation: String = "lan",
     playerAddress: String? = nil,
@@ -1031,6 +1582,7 @@ private func sessionJSON(
     playerLocal: Bool? = nil,
     playerRelayed: Bool? = nil
 ) -> String {
+    let sessionIDJSON = includeSessionID ? "\n        \"id\": \"\(sessionKey)\"," : ""
     let transcodeSessionJSON = transcodeSessionKey.map { key in
         ",\n      \"TranscodeSession\": {\n        \"key\": \"\(key)\"\n      }"
     } ?? ""
@@ -1052,7 +1604,7 @@ private func sessionJSON(
         "state": "\#(state)"\#(playerAddressJSON)\#(remotePublicAddressJSON)\#(playerLocalJSON)\#(playerRelayedJSON)
       },
       "Session": {
-        "id": "\#(sessionKey)",
+        \#(sessionIDJSON)
         "location": "\#(sessionLocation)"
       }\#(transcodeSessionJSON)
     }

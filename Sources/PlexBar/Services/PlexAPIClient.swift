@@ -132,6 +132,36 @@ struct PlexAPIClient {
         }
     }
 
+    func terminateSession(
+        using configuration: PlexConnectionConfiguration,
+        sessionID: String,
+        reason: String? = nil
+    ) async throws {
+        guard let endpoint = PlexURLBuilder.endpointURL(serverURL: configuration.serverURL, path: "/status/sessions/terminate"),
+              var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw PlexAPIError.invalidServerURL
+        }
+
+        var queryItems = [URLQueryItem(name: "sessionId", value: sessionID)]
+        if let reason = reason?.nilIfBlank {
+            queryItems.append(URLQueryItem(name: "reason", value: reason))
+        }
+        components.queryItems = queryItems
+
+        guard let terminateURL = components.url else {
+            throw PlexAPIError.invalidServerURL
+        }
+
+        let request = PlexRequestBuilder(clientContext: configuration.clientContext).request(
+            url: terminateURL,
+            method: "POST",
+            accept: "application/json",
+            token: configuration.token
+        )
+
+        _ = try await responseData(for: request)
+    }
+
     func fetchHistory(
         using configuration: PlexConnectionConfiguration,
         since: Date,

@@ -31,6 +31,7 @@ final class PlexSessionStore {
     private var resolvedLocationsBySessionKey: [String: String] = [:]
     private var sessionsByKey: [String: PlexSession] = [:]
     private var sessionOrder: [String] = []
+    private var terminatingSessionKeys: Set<String> = []
     private var activeServerIdentifier: String?
     private var activeMonitorURL: URL?
 
@@ -59,12 +60,59 @@ final class PlexSessionStore {
     }
 
     var activeStreamCount: Int {
-        sessionsByKey.count
+        sessionOrder.count
+    }
+
+    func isTerminating(_ session: PlexSession) -> Bool {
+        guard let sessionKey = session.canonicalSessionKey else {
+            return false
+        }
+
+        return terminatingSessionKeys.contains(sessionKey)
     }
 
     func refreshNow() {
         Task {
             await performFullHydrate()
+        }
+    }
+
+    func terminate(_ session: PlexSession, reason: String? = nil) async {
+        guard let sessionKey = session.canonicalSessionKey else {
+            errorMessage = PlexSessionStoreError.missingSessionKey.errorDescription
+            return
+        }
+
+        guard !terminatingSessionKeys.contains(sessionKey) else {
+            return
+        }
+
+        terminatingSessionKeys.insert(sessionKey)
+        defer {
+            terminatingSessionKeys.remove(sessionKey)
+        }
+
+        do {
+            guard let serverSessionID = session.serverSessionID else {
+                throw PlexSessionStoreError.missingServerSessionID
+            }
+
+            let configuration = try await connectionStore.currentConfiguration(forceRefresh: true)
+            try await client.terminateSession(
+                using: configuration,
+                sessionID: serverSessionID,
+                reason: reason
+            )
+
+            do {
+                try await connectionStore.perform { configuration in
+                    try await hydrateAll(using: configuration, showLoading: false)
+                }
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            }
+        } catch {
+            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 
@@ -323,6 +371,7 @@ final class PlexSessionStore {
     private func removeSession(for sessionKey: String) {
         sessionsByKey.removeValue(forKey: sessionKey)
         sessionOrder.removeAll { $0 == sessionKey }
+        terminatingSessionKeys.remove(sessionKey)
         refreshResolvedLocationsIfNeeded()
         errorMessage = nil
         lastUpdated = Date()
@@ -331,6 +380,7 @@ final class PlexSessionStore {
     private func clearSessions(resetTimestamp: Bool) {
         sessionsByKey = [:]
         sessionOrder = []
+        terminatingSessionKeys.removeAll()
         refreshResolvedLocationsIfNeeded()
 
         if resetTimestamp {
@@ -463,6 +513,20 @@ final class PlexSessionStore {
         geoLookupTasksByIP.removeAll()
         geoLookupStateByIP.removeAll()
         resolvedLocationsBySessionKey.removeAll()
+    }
+}
+
+private enum PlexSessionStoreError: LocalizedError {
+    case missingSessionKey
+    case missingServerSessionID
+
+    var errorDescription: String? {
+        switch self {
+        case .missingSessionKey:
+            return "Unable to terminate session: missing Plex session key."
+        case .missingServerSessionID:
+            return "Unable to terminate session: missing Plex session id."
+        }
     }
 }
 

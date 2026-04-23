@@ -38,20 +38,39 @@ private struct StreamCardTheme {
 struct StreamCardView: View {
     @Environment(\.colorScheme) private var colorScheme
     let session: PlexSession
+    let sessionStore: PlexSessionStore
+    let onRequestTerminate: (PlexSession) -> Void
+    let isShowingTerminatePrompt: Bool
+    @Binding var terminateMessage: String
+    let onCancelTerminate: () -> Void
+    let onConfirmTerminate: (PlexSession) -> Void
     let serverURL: URL?
     let settingsStore: PlexSettingsStore
     let snapshotDate: Date?
     let resolvedLocation: String?
     @State private var artwork: PlexArtworkPresentationState
+    @State private var isShowingActionsPopover = false
 
     init(
         session: PlexSession,
+        sessionStore: PlexSessionStore,
+        onRequestTerminate: @escaping (PlexSession) -> Void,
+        isShowingTerminatePrompt: Bool,
+        terminateMessage: Binding<String>,
+        onCancelTerminate: @escaping () -> Void,
+        onConfirmTerminate: @escaping (PlexSession) -> Void,
         serverURL: URL?,
         settingsStore: PlexSettingsStore,
         snapshotDate: Date?,
         resolvedLocation: String?
     ) {
         self.session = session
+        self.sessionStore = sessionStore
+        self.onRequestTerminate = onRequestTerminate
+        self.isShowingTerminatePrompt = isShowingTerminatePrompt
+        self._terminateMessage = terminateMessage
+        self.onCancelTerminate = onCancelTerminate
+        self.onConfirmTerminate = onConfirmTerminate
         self.serverURL = serverURL
         self.settingsStore = settingsStore
         self.snapshotDate = snapshotDate
@@ -73,7 +92,76 @@ struct StreamCardView: View {
 
     var body: some View {
         let theme = StreamCardTheme.make(for: colorScheme, hasPalette: artwork.palette != nil)
+        let isTerminating = sessionStore.isTerminating(session)
+        defaultCardContent(isTerminating: isTerminating)
+        .opacity(isShowingTerminatePrompt ? 0.38 : 1)
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
+        .background {
+            StreamCardBackground(palette: artwork.palette, theme: theme)
+        }
+        .overlay {
+            if isShowingTerminatePrompt {
+                terminatePromptOverlay
+            } else if isTerminating {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(.black.opacity(colorScheme == .dark ? 0.34 : 0.12))
+                    .overlay {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .controlSize(.small)
 
+                            Text("Stopping playback…")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(.regularMaterial, in: Capsule())
+                    }
+                    .allowsHitTesting(false)
+            }
+        }
+        .task(id: requestKey) {
+            await artwork.load(
+                primaryImageURL: posterURL,
+                fallbackImageURL: transcodedPosterURL,
+                token: settingsStore.trimmedServerToken,
+                clientContext: clientContext,
+                wantsPalette: true
+            )
+        }
+    }
+
+    private var playbackTimingSummary: String? {
+        guard let snapshotDate else {
+            return nil
+        }
+
+        return session.playbackTimingSummary(referenceDate: snapshotDate)
+    }
+
+    private var posterURL: URL? {
+        Self.posterURL(serverURL: serverURL, posterPath: session.posterPath)
+    }
+
+    private var transcodedPosterURL: URL? {
+        Self.transcodedPosterURL(serverURL: serverURL, posterPath: session.posterPath)
+    }
+
+    private var requestKey: String {
+        [
+            posterURL?.absoluteString,
+            transcodedPosterURL?.absoluteString,
+            clientContext.clientIdentifier,
+            settingsStore.trimmedServerToken,
+        ]
+        .compactMap { $0 }
+        .joined(separator: "|")
+    }
+
+    @ViewBuilder
+    private func defaultCardContent(isTerminating: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
             PosterThumbnailView(
                 artwork: artwork,
@@ -83,9 +171,31 @@ struct StreamCardView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(session.headline)
-                        .font(.headline)
-                        .lineLimit(2)
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(session.headline)
+                            .font(.headline)
+                            .lineLimit(2)
+
+                        Spacer(minLength: 8)
+
+                        Button {
+                            isShowingActionsPopover.toggle()
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 28, height: 28)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isTerminating || isShowingTerminatePrompt)
+                        .popover(isPresented: $isShowingActionsPopover, arrowEdge: .top) {
+                            SessionActionsPopover {
+                                isShowingActionsPopover = false
+                                onRequestTerminate(session)
+                            }
+                        }
+                    }
 
                     if session.contentKind == .tv || session.contentKind == .liveTV,
                        let metaLine = session.contentMetaLine,
@@ -151,47 +261,79 @@ struct StreamCardView: View {
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
-        .background {
-            StreamCardBackground(palette: artwork.palette, theme: theme)
-        }
-        .task(id: requestKey) {
-            await artwork.load(
-                primaryImageURL: posterURL,
-                fallbackImageURL: transcodedPosterURL,
-                token: settingsStore.trimmedServerToken,
-                clientContext: clientContext,
-                wantsPalette: true
-            )
-        }
     }
 
-    private var playbackTimingSummary: String? {
-        guard let snapshotDate else {
-            return nil
-        }
+    private var terminatePromptOverlay: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(.black.opacity(colorScheme == .dark ? 0.08 : 0.02))
+            .overlay {
+                GlassEffectContainer(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Stop Playback")
+                            .font(.headline)
 
-        return session.playbackTimingSummary(referenceDate: snapshotDate)
-    }
+                        Text("\(session.userDisplayName) • \(session.headline)")
+                            .font(.footnote.weight(.medium))
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
 
-    private var posterURL: URL? {
-        Self.posterURL(serverURL: serverURL, posterPath: session.posterPath)
-    }
+                        TextField("Optional message to user", text: $terminateMessage)
+                            .textFieldStyle(.plain)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .background {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color.white.opacity(0.01))
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .strokeBorder(.white.opacity(0.06), lineWidth: 0.8)
+                                    }
+                            }
+                            .glassEffect(.regular.tint(.white.opacity(0.02)).interactive(), in: .rect(cornerRadius: 12))
 
-    private var transcodedPosterURL: URL? {
-        Self.transcodedPosterURL(serverURL: serverURL, posterPath: session.posterPath)
-    }
+                        HStack(spacing: 8) {
+                            Spacer()
 
-    private var requestKey: String {
-        [
-            posterURL?.absoluteString,
-            transcodedPosterURL?.absoluteString,
-            clientContext.clientIdentifier,
-            settingsStore.trimmedServerToken,
-        ]
-        .compactMap { $0 }
-        .joined(separator: "|")
+                            Button("Cancel") {
+                                onCancelTerminate()
+                            }
+                            .buttonStyle(.glass)
+                            .controlSize(.small)
+                            .keyboardShortcut(.cancelAction)
+
+                            Button("Stop", role: .destructive) {
+                                onConfirmTerminate(session)
+                            }
+                            .buttonStyle(.glassProminent)
+                            .controlSize(.small)
+                            .keyboardShortcut(.defaultAction)
+                            }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(colorScheme == .dark ? 0.04 : 0.12),
+                                        Color.white.opacity(colorScheme == .dark ? 0.008 : 0.03),
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(.white.opacity(colorScheme == .dark ? 0.08 : 0.12), lineWidth: 0.8)
+                    }
+                    .glassEffect(.regular.tint(.white.opacity(0.02)), in: .rect(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.06), radius: 12, y: 5)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(12)
+            }
     }
 
     private static func posterURL(serverURL: URL?, posterPath: String?) -> URL? {
@@ -218,6 +360,24 @@ struct StreamCardView: View {
         )
     }
 
+}
+
+private struct SessionActionsPopover: View {
+    let onRequestTerminate: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button(role: .destructive) {
+                onRequestTerminate()
+            } label: {
+                Label("Stop Playback…", systemImage: "stop.circle")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .frame(width: 220, alignment: .leading)
+    }
 }
 
 private struct PosterThumbnailView: View {

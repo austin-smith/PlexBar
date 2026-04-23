@@ -242,6 +242,10 @@ struct PlexSession: Decodable, Identifiable {
         transcodeSession?.key?.nilIfBlank
     }
 
+    var serverSessionID: String? {
+        session?.id?.nilIfBlank
+    }
+
     var posterPath: String? {
         preferredPosterCandidates
             .compactMap { $0?.nilIfBlank }
