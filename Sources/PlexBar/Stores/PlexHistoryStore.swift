@@ -42,6 +42,18 @@ final class PlexHistoryStore {
         PlexHistoryAnalytics.topTypeEntries(from: recentItems, accountsByID: accountsByID, limit: 4)
     }
 
+    var topUserEntries: [PlexUserActivityEntry] {
+        PlexHistoryAnalytics.topUserEntries(from: recentItems, accountsByID: accountsByID, limit: 5)
+    }
+
+    var recentViewerEntries: [PlexUserActivityEntry] {
+        PlexHistoryAnalytics.recentViewerEntries(from: recentItems, accountsByID: accountsByID, limit: 6)
+    }
+
+    var distinctViewerCount: Int {
+        Set(recentItems.compactMap(\.accountID)).count
+    }
+
     var totalPlayCount: Int {
         recentItems.count
     }

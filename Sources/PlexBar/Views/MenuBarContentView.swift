@@ -12,6 +12,7 @@ struct MenuBarContentView: View {
     @State private var selectedSection: DashboardSection = .streams
     @State private var streamContentHeight: CGFloat = 0
     @State private var historyContentHeight: CGFloat = 0
+    @State private var usersContentHeight: CGFloat = 0
     @State private var libraryContentHeight: CGFloat = 0
     @State private var terminatePrompt: TerminatePlaybackPrompt?
     @State private var terminateMessage = ""
@@ -54,6 +55,26 @@ struct MenuBarContentView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 10) {
                     Text("Watch History")
+                        .font(.headline)
+
+                    Spacer()
+
+                    if historyStore.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        case .users:
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 10) {
+                    Text("Users")
                         .font(.headline)
 
                     Spacer()
@@ -140,6 +161,8 @@ struct MenuBarContentView: View {
                 streamsContent
             case .history:
                 historyContent
+            case .users:
+                usersContent
             case .libraries:
                 librariesContent
             }
@@ -251,6 +274,48 @@ struct MenuBarContentView: View {
     }
 
     @ViewBuilder
+    private var usersContent: some View {
+        if let errorMessage = historyStore.errorMessage, historyStore.recentItems.isEmpty {
+            EmptyStateView(
+                icon: "person.2",
+                title: "Couldn’t Load Users",
+                message: errorMessage,
+                actionTitle: "Refresh"
+            ) {
+                refreshAllData()
+            }
+        } else if historyStore.recentItems.isEmpty {
+            EmptyStateView(
+                icon: "person.2",
+                title: "No User Activity Yet",
+                message: "User activity will appear here after people watch something on this server."
+            )
+        } else {
+            ScrollView {
+                UsersDashboardView(
+                    settingsStore: settingsStore,
+                    serverURL: connectionStore.resolvedServerURL,
+                    historyStore: historyStore
+                )
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(key: MenuBarContentHeightPreferenceKey.self, value: proxy.size.height)
+                    }
+                }
+            }
+            .frame(height: usersListHeight, alignment: .top)
+            .onPreferenceChange(MenuBarContentHeightPreferenceKey.self) { newHeight in
+                guard abs(usersContentHeight - newHeight) > 0.5 else {
+                    return
+                }
+
+                usersContentHeight = newHeight
+            }
+        }
+    }
+
+    @ViewBuilder
     private var librariesContent: some View {
         if let errorMessage = libraryStore.errorMessage, libraryStore.libraries.isEmpty {
             EmptyStateView(
@@ -342,6 +407,17 @@ struct MenuBarContentView: View {
             }
 
             return "\(historyLabel) on \(serverLabel)"
+        case .users:
+            let viewerCount = historyStore.distinctViewerCount
+            let userLabel = viewerCount == 1
+                ? "1 user in \(historyStore.historyWindowLabel.lowercased())"
+                : "\(viewerCount) users in \(historyStore.historyWindowLabel.lowercased())"
+
+            if let lastUpdated = historyStore.lastUpdated {
+                return "\(userLabel) on \(serverLabel) • Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))"
+            }
+
+            return "\(userLabel) on \(serverLabel)"
         case .libraries:
             let libraryLabel = libraryStore.libraryCount == 1
                 ? "1 library"
@@ -395,6 +471,10 @@ struct MenuBarContentView: View {
         boundedHeight(for: historyContentHeight, minimum: 320)
     }
 
+    private var usersListHeight: CGFloat {
+        boundedHeight(for: usersContentHeight, minimum: 320)
+    }
+
     private var libraryListHeight: CGFloat {
         boundedHeight(for: libraryContentHeight, minimum: 320)
     }
@@ -428,6 +508,7 @@ struct MenuBarContentView: View {
 private enum DashboardSection: String, CaseIterable, Identifiable {
     case streams
     case history
+    case users
     case libraries
 
     var id: String { rawValue }
@@ -438,6 +519,8 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
             "Active Streams"
         case .history:
             "Watch History"
+        case .users:
+            "Users"
         case .libraries:
             "Libraries"
         }
@@ -449,6 +532,8 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
             "Streams"
         case .history:
             "History"
+        case .users:
+            "Users"
         case .libraries:
             "Libraries"
         }
@@ -460,6 +545,8 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
             "play.rectangle.on.rectangle"
         case .history:
             "clock.arrow.circlepath"
+        case .users:
+            "person.2"
         case .libraries:
             "books.vertical"
         }
@@ -475,6 +562,8 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
         case .streams:
             sessionStore.isLoading
         case .history:
+            historyStore.isLoading
+        case .users:
             historyStore.isLoading
         case .libraries:
             libraryStore.isLoading
@@ -495,6 +584,12 @@ private enum DashboardSection: String, CaseIterable, Identifiable {
 
             return sessionStore.errorMessage
         case .history:
+            guard !historyStore.recentItems.isEmpty else {
+                return nil
+            }
+
+            return historyStore.errorMessage
+        case .users:
             guard !historyStore.recentItems.isEmpty else {
                 return nil
             }

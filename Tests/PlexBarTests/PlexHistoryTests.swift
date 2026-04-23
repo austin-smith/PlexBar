@@ -557,7 +557,8 @@ import Testing
       "title": "Bob's Burgers",
       "type": "episode",
       "grandparentTitle": "Bob's Burgers",
-      "viewedAt": 1712452410
+      "viewedAt": 1712452410,
+      "accountID": 42
     }
     """#
 
@@ -566,6 +567,7 @@ import Testing
 
     #expect(item.id == "/status/sessions/history/9")
     #expect(item.viewedAt != nil)
+    #expect(item.accountID == 42)
     #expect(item.headline == "Bob's Burgers")
 }
 
@@ -594,4 +596,149 @@ import Testing
     ])
 
     #expect(watcher == "alexcaro3")
+}
+
+@Test func ranksTopUsersByPlayCountThenName() async throws {
+    let firstAlexPlay = PlexHistoryItem(
+        historyKey: "/status/sessions/history/1",
+        key: "/library/metadata/101",
+        ratingKey: "101",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        accountID: 2
+    )
+    let secondAlexPlay = PlexHistoryItem(
+        historyKey: "/status/sessions/history/2",
+        key: "/library/metadata/102",
+        ratingKey: "102",
+        title: "Collateral",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "2004-08-06",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_100),
+        accountID: 2
+    )
+    let samPlay = PlexHistoryItem(
+        historyKey: "/status/sessions/history/3",
+        key: "/library/metadata/201",
+        ratingKey: "201",
+        title: "Pilot",
+        type: "episode",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: "Severance",
+        parentTitle: "Season 1",
+        parentIndex: 1,
+        index: 1,
+        originallyAvailableAt: "2022-02-18",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_200),
+        accountID: 1
+    )
+
+    let topUsers = PlexHistoryAnalytics.topUserEntries(
+        from: [firstAlexPlay, secondAlexPlay, samPlay],
+        accountsByID: [
+            1: PlexAccount(id: 1, name: "Sam", thumb: nil),
+            2: PlexAccount(id: 2, name: "Alex", thumb: "/users/alex"),
+        ],
+        limit: 5
+    )
+
+    #expect(topUsers.count == 2)
+    #expect(topUsers.first?.name == "Alex")
+    #expect(topUsers.first?.playCount == 2)
+    #expect(topUsers.first?.moviePlayCount == 2)
+    #expect(topUsers.first?.tvPlayCount == 0)
+    #expect(topUsers.first?.thumb == "/users/alex")
+    #expect(topUsers.last?.name == "Sam")
+}
+
+@Test func recentViewerEntriesPreferLatestPlaybackPerUser() async throws {
+    let olderTaylorPlay = PlexHistoryItem(
+        historyKey: "/status/sessions/history/1",
+        key: "/library/metadata/101",
+        ratingKey: "101",
+        title: "Heat",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "1995-12-15",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        accountID: 1
+    )
+    let latestTaylorPlay = PlexHistoryItem(
+        historyKey: "/status/sessions/history/2",
+        key: "/library/metadata/102",
+        ratingKey: "102",
+        title: "Collateral",
+        type: "movie",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: nil,
+        parentTitle: nil,
+        parentIndex: nil,
+        index: nil,
+        originallyAvailableAt: "2004-08-06",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_300),
+        accountID: 1
+    )
+    let jordanPlay = PlexHistoryItem(
+        historyKey: "/status/sessions/history/3",
+        key: "/library/metadata/201",
+        ratingKey: "201",
+        title: "Pilot",
+        type: "episode",
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        grandparentTitle: "Severance",
+        parentTitle: "Season 1",
+        parentIndex: 1,
+        index: 1,
+        originallyAvailableAt: "2022-02-18",
+        viewedAt: Date(timeIntervalSince1970: 1_700_000_200),
+        accountID: 2
+    )
+
+    let recentViewers = PlexHistoryAnalytics.recentViewerEntries(
+        from: [olderTaylorPlay, latestTaylorPlay, jordanPlay],
+        accountsByID: [
+            1: PlexAccount(id: 1, name: "Taylor", thumb: nil),
+            2: PlexAccount(id: 2, name: "Jordan", thumb: nil),
+        ],
+        limit: 5
+    )
+
+    #expect(recentViewers.count == 2)
+    #expect(recentViewers.first?.name == "Taylor")
+    #expect(recentViewers.first?.lastPlayedTitle == "Collateral")
+    #expect(recentViewers.last?.name == "Jordan")
 }

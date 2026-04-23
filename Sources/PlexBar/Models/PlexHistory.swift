@@ -290,6 +290,20 @@ struct PlexTopChartEntry: Identifiable, Equatable {
     let viewerCountLabel: String?
 }
 
+struct PlexUserActivityEntry: Identifiable, Equatable {
+    let accountID: Int
+    let name: String
+    let thumb: String?
+    let playCount: Int
+    let moviePlayCount: Int
+    let tvPlayCount: Int
+    let musicPlayCount: Int
+    let lastPlayedTitle: String?
+    let lastViewedAt: Date?
+
+    var id: Int { accountID }
+}
+
 enum PlexHistoryContentFilter: String, CaseIterable, Identifiable {
     case all
     case movies
@@ -431,6 +445,39 @@ enum PlexHistoryAnalytics {
             .map { $0 }
     }
 
+    static func topUserEntries(
+        from items: [PlexHistoryItem],
+        accountsByID: [Int: PlexAccount],
+        limit: Int
+    ) -> [PlexUserActivityEntry] {
+        rankedUsers(from: items, accountsByID: accountsByID)
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    static func recentViewerEntries(
+        from items: [PlexHistoryItem],
+        accountsByID: [Int: PlexAccount],
+        limit: Int
+    ) -> [PlexUserActivityEntry] {
+        rankedUsers(from: items, accountsByID: accountsByID)
+            .sorted { lhs, rhs in
+                let lhsViewedAt = lhs.lastViewedAt ?? .distantPast
+                let rhsViewedAt = rhs.lastViewedAt ?? .distantPast
+                if lhsViewedAt != rhsViewedAt {
+                    return lhsViewedAt > rhsViewedAt
+                }
+
+                if lhs.playCount != rhs.playCount {
+                    return lhs.playCount > rhs.playCount
+                }
+
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
+            .prefix(limit)
+            .map { $0 }
+    }
+
     private static func chartSubtitle(
         for items: [PlexHistoryItem],
         representative: PlexHistoryItem
@@ -525,6 +572,39 @@ enum PlexHistoryAnalytics {
 
                 return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
             }
+    }
+
+    private static func rankedUsers(
+        from items: [PlexHistoryItem],
+        accountsByID: [Int: PlexAccount]
+    ) -> [PlexUserActivityEntry] {
+        Dictionary(grouping: items.compactMap { item in
+            item.accountID.map { ($0, item) }
+        }, by: \.0)
+        .map { accountID, groupedItems in
+            let items = groupedItems.map(\.1)
+            let account = accountsByID[accountID]
+            let mostRecentItem = mostRecentItem(in: items)
+
+            return PlexUserActivityEntry(
+                accountID: accountID,
+                name: account?.name ?? "Account \(accountID)",
+                thumb: account?.thumb,
+                playCount: items.count,
+                moviePlayCount: items.filter { $0.contentKind == .movie }.count,
+                tvPlayCount: items.filter { $0.contentKind == .tv || $0.contentKind == .liveTV }.count,
+                musicPlayCount: items.filter { $0.contentKind == .track }.count,
+                lastPlayedTitle: mostRecentItem?.headline,
+                lastViewedAt: mostRecentItem?.viewedAt
+            )
+        }
+        .sorted {
+            if $0.playCount != $1.playCount {
+                return $0.playCount > $1.playCount
+            }
+
+            return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
     }
 
     private static func mostRecentItem(in items: some Sequence<PlexHistoryItem>) -> PlexHistoryItem? {
