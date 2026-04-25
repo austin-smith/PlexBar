@@ -424,8 +424,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sparkle-appcast-${{ github.ref_name }}
-          path: |
-            pages/appcast.xml
+          path: pages
 
   deploy-appcast:
     name: Deploy appcast
