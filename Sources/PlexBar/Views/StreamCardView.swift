@@ -171,31 +171,10 @@ struct StreamCardView: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .top, spacing: 8) {
-                        Text(session.headline)
-                            .font(.headline)
-                            .lineLimit(2)
-
-                        Spacer(minLength: 8)
-
-                        Button {
-                            isShowingActionsPopover.toggle()
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 28, height: 28)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isTerminating || isShowingTerminatePrompt)
-                        .popover(isPresented: $isShowingActionsPopover, arrowEdge: .top) {
-                            SessionActionsPopover {
-                                isShowingActionsPopover = false
-                                onRequestTerminate(session)
-                            }
-                        }
-                    }
+                    Text(session.headline)
+                        .font(.headline)
+                        .lineLimit(2)
+                        .padding(.trailing, 36)
 
                     if session.contentKind == .tv || session.contentKind == .liveTV,
                        let metaLine = session.contentMetaLine,
@@ -260,6 +239,29 @@ struct StreamCardView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
+            .overlay(alignment: .topTrailing) {
+                actionsButton(isTerminating: isTerminating)
+            }
+        }
+    }
+
+    private func actionsButton(isTerminating: Bool) -> some View {
+        Button {
+            isShowingActionsPopover.toggle()
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isTerminating || isShowingTerminatePrompt)
+        .popover(isPresented: $isShowingActionsPopover, arrowEdge: .top) {
+            SessionActionsPopover {
+                isShowingActionsPopover = false
+                onRequestTerminate(session)
+            }
         }
     }
 
