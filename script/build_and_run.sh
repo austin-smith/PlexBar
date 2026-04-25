@@ -31,8 +31,6 @@ INFO_PLIST="$APP_CONTENTS/Info.plist"
 APP_ICON_NAME="AppIcon"
 APP_ICON_SOURCE="$ROOT_DIR/$APP_ICON_NAME.icon"
 ACTOOL="$(xcrun --find actool)"
-DEFAULT_MARKETING_VERSION="$(sed -n 's/.*static let productVersion = "\([^"]*\)".*/\1/p' "$ROOT_DIR/Sources/PlexBar/Support/AppConstants.swift" | head -n 1)"
-PLIST_MARKETING_VERSION="${APP_MARKETING_VERSION:-$DEFAULT_MARKETING_VERSION}"
 
 case "$BUILD_CONFIGURATION" in
   debug|release)
@@ -42,6 +40,11 @@ case "$BUILD_CONFIGURATION" in
     exit 2
     ;;
 esac
+
+if [[ -z "$SPARKLE_APPCAST_URL" || -z "$SPARKLE_PUBLIC_KEY" ]]; then
+  echo "Missing required Sparkle build metadata: SPARKLE_APPCAST_URL and SPARKLE_PUBLIC_KEY." >&2
+  exit 2
+fi
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
@@ -92,23 +95,18 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
-if [[ -n "$PLIST_MARKETING_VERSION" ]]; then
-  /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $PLIST_MARKETING_VERSION" "$INFO_PLIST"
+if [[ -n "$APP_MARKETING_VERSION" ]]; then
+  /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_MARKETING_VERSION" "$INFO_PLIST"
 fi
 
 if [[ -n "$APP_BUILD_VERSION" ]]; then
   /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD_VERSION" "$INFO_PLIST"
 fi
 
-if [[ -n "$SPARKLE_APPCAST_URL" ]]; then
-  /usr/libexec/PlistBuddy -c "Add :SUFeedURL string $SPARKLE_APPCAST_URL" "$INFO_PLIST"
-fi
-
-if [[ -n "$SPARKLE_PUBLIC_KEY" ]]; then
-  /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$INFO_PLIST"
-  /usr/libexec/PlistBuddy -c "Add :SUVerifyUpdateBeforeExtraction bool true" "$INFO_PLIST"
-  /usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool true" "$INFO_PLIST"
-fi
+/usr/libexec/PlistBuddy -c "Add :SUFeedURL string $SPARKLE_APPCAST_URL" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :SUVerifyUpdateBeforeExtraction bool true" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool true" "$INFO_PLIST"
 
 if [[ -d "$APP_ICON_SOURCE" ]]; then
   ASSET_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/AppIcon.XXXXXX")"
