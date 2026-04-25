@@ -231,6 +231,9 @@ jobs:
           DMG_BACKGROUND_PATH=".github/release-assets/background.png"
           APP_PATH="dist/PlexBar.app"
           VOLUME_ICON_PATH="$(find "$APP_PATH/Contents/Resources" -maxdepth 1 -type f -name '*.icns' -print -quit)"
+          SETFILE_TOOL="$(xcrun --find SetFile)"
+          REZ_TOOL="$(xcrun --find Rez)"
+          DEREZ_TOOL="$(xcrun --find DeRez)"
 
           if [[ ! -d "$APP_PATH" ]]; then
             echo "App bundle not found at $APP_PATH"
@@ -264,6 +267,13 @@ jobs:
             --app-drop-link 480 165 \
             "$DMG_PATH" \
             "dmg-contents/"
+
+          ICON_RESOURCE="$(mktemp "${RUNNER_TEMP}/PlexBarDMGIcon.XXXXXX")"
+          /usr/bin/sips -i "$VOLUME_ICON_PATH" >/dev/null
+          "$DEREZ_TOOL" -only icns "$VOLUME_ICON_PATH" > "$ICON_RESOURCE"
+          "$REZ_TOOL" -append "$ICON_RESOURCE" -o "$DMG_PATH"
+          "$SETFILE_TOOL" -a C "$DMG_PATH"
+          rm -f "$ICON_RESOURCE"
 
       - name: Sign DMG
         run: |
