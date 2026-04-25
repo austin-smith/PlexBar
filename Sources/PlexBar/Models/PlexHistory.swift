@@ -283,7 +283,7 @@ struct PlexTopChartEntry: Identifiable, Equatable {
     let subtitle: String
     let playCount: Int
     let posterPath: String?
-    let symbolName: String?
+    let symbolName: String
     let watcherSummary: String?
     let watcherAccountIDs: [Int]
     let coverageLabel: String?

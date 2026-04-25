@@ -220,7 +220,7 @@ private struct TopChartRow: View {
                 fallbackImageURL: transcodedPosterURL,
                 token: settingsStore.trimmedServerToken,
                 clientContext: clientContext,
-                placeholderSymbol: entry.symbolName ?? "play.square",
+                placeholderSymbol: entry.symbolName,
                 width: 40,
                 height: 56,
                 cornerRadius: 10
@@ -307,13 +307,16 @@ private struct HistoryMixCard: View {
             LazyVGrid(columns: columns, spacing: 10) {
                 ForEach(entries) { entry in
                     VStack(alignment: .leading, spacing: 12) {
-                        Image(systemName: entry.symbolName ?? "play.square")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(entry.title)
-                                .font(.subheadline.weight(.semibold))
+                            HStack(spacing: 8) {
+                                Image(systemName: entry.symbolName)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+
+                                Text(entry.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
+                            }
 
                             Text(entry.subtitle)
                                 .font(.caption)
