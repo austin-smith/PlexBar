@@ -6,16 +6,15 @@ on:
       - "v*"
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 jobs:
   release:
+    permissions:
+      contents: write
+    outputs:
+      is_prerelease: ${{ steps.metadata.outputs.is_prerelease }}
     runs-on: macos-26
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -25,6 +24,7 @@ jobs:
           fetch-tags: true
 
       - name: Derive release metadata
+        id: metadata
         run: |
           TAG="$GITHUB_REF_NAME"
 
@@ -44,6 +44,10 @@ jobs:
           echo "BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
           echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_ENV"
           echo "DMG_PATH=$RUNNER_TEMP/PlexBar-${TAG}-arm64.dmg" >> "$GITHUB_ENV"
+          echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "release_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_number=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
 
       - name: Load Sparkle build settings
         env:
@@ -424,17 +428,45 @@ jobs:
             pages/appcast.xml
             ${{ runner.temp }}/generate-appcast.log
 
+  deploy-appcast:
+    name: Deploy appcast
+    needs: release
+    if: needs.release.outputs.is_prerelease == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Download generated appcast artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: sparkle-appcast-${{ github.ref_name }}
+          path: downloaded-appcast
+
+      - name: Prepare Pages content
+        run: |
+          mkdir -p pages
+
+          if [[ ! -f "downloaded-appcast/pages/appcast.xml" ]]; then
+            echo "Expected appcast artifact at downloaded-appcast/pages/appcast.xml"
+            find downloaded-appcast -maxdepth 3 -type f | sort
+            exit 1
+          fi
+
+          cp "downloaded-appcast/pages/appcast.xml" "pages/appcast.xml"
+
       - name: Configure GitHub Pages
-        if: env.IS_PRERELEASE == 'false'
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
-        if: env.IS_PRERELEASE == 'false'
         uses: actions/upload-pages-artifact@v3
         with:
           path: pages
 
       - name: Deploy to GitHub Pages
-        if: env.IS_PRERELEASE == 'false'
         id: deployment
         uses: actions/deploy-pages@v4
