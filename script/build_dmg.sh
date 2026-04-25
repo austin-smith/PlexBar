@@ -9,9 +9,6 @@ STAGING_DIR="$(mktemp -d "${TMPDIR:-/tmp}/${APP_NAME}DMG.XXXXXX")"
 DMG_BACKGROUND_PATH="$ROOT_DIR/.github/release-assets/background.png"
 OUTPUT_DMG="${1:-$DIST_DIR/$APP_NAME.dmg}"
 VOLUME_ICON_PATH=""
-SETFILE_TOOL="$(xcrun --find SetFile)"
-REZ_TOOL="$(xcrun --find Rez)"
-DEREZ_TOOL="$(xcrun --find DeRez)"
 
 usage() {
   cat <<EOF
@@ -23,23 +20,6 @@ cleanup() {
   rm -rf "$STAGING_DIR"
 }
 trap cleanup EXIT
-
-set_custom_file_icon() {
-  local target_path="$1"
-  local icon_path="$2"
-  local icon_resource
-  local icon_copy
-
-  icon_resource="$(mktemp "${TMPDIR:-/tmp}/${APP_NAME}DMGIcon.XXXXXX")"
-  icon_copy="$(mktemp "${TMPDIR:-/tmp}/${APP_NAME}DMGIconSource.XXXXXX").icns"
-  trap 'rm -f "$icon_resource" "$icon_copy"' RETURN
-
-  cp "$icon_path" "$icon_copy"
-  /usr/bin/sips -i "$icon_copy" >/dev/null
-  "$DEREZ_TOOL" -only icns "$icon_copy" > "$icon_resource"
-  "$REZ_TOOL" -append "$icon_resource" -o "$target_path"
-  "$SETFILE_TOOL" -a C "$target_path"
-}
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   usage
@@ -80,8 +60,5 @@ create-dmg \
   --app-drop-link 480 165 \
   "$OUTPUT_DMG" \
   "$STAGING_DIR"
-
-# `--volicon` only affects the mounted volume. Stamp the DMG file icon too.
-set_custom_file_icon "$OUTPUT_DMG" "$VOLUME_ICON_PATH"
 
 printf 'Created DMG at %s\n' "$OUTPUT_DMG"
