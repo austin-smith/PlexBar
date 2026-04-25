@@ -18,6 +18,7 @@ struct PlexBarApp: App {
     @State private var historyStore: PlexHistoryStore
     @State private var libraryStore: PlexLibraryStore
     @State private var serverPreviewStore: PlexServerPreviewStore
+    private let updateService: PlexUpdateService
 
     init() {
         let settingsStore = PlexSettingsStore()
@@ -40,6 +41,7 @@ struct PlexBarApp: App {
             historyStore: historyStore,
             libraryStore: libraryStore
         ))
+        updateService = PlexUpdateService()
     }
 
     var body: some Scene {
@@ -50,7 +52,8 @@ struct PlexBarApp: App {
                 authStore: authStore,
                 previewStore: serverPreviewStore,
                 sessionStore: sessionStore,
-                historyStore: historyStore
+                historyStore: historyStore,
+                updateService: updateService
             )
         }
         .defaultSize(width: 480, height: 520)

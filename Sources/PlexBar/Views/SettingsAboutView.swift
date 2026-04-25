@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsAboutView: View {
     @Environment(\.openURL) private var openURL
+    let updateService: PlexUpdateService
 
     private let sourceURL = URL(string: "https://github.com/austin-smith/PlexBar")!
 
@@ -61,8 +62,15 @@ struct SettingsAboutView: View {
             }
 
             VStack(spacing: 8) {
-                Button("GitHub") {
-                    openURL(sourceURL)
+                HStack(spacing: 8) {
+                    Button("Check for Updates") {
+                        updateService.checkForUpdates()
+                    }
+                    .disabled(!updateService.canCheckForUpdates)
+
+                    Button("GitHub") {
+                        openURL(sourceURL)
+                    }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)

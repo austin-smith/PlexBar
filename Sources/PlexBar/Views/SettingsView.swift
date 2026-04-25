@@ -8,6 +8,7 @@ struct SettingsView: View {
     @Bindable var previewStore: PlexServerPreviewStore
     @Bindable var sessionStore: PlexSessionStore
     @Bindable var historyStore: PlexHistoryStore
+    let updateService: PlexUpdateService
     @State private var isShowingServerList = false
     @State private var selectedTab = SettingsTab.general
     @State private var presentedTooltip: SettingsTooltip?
@@ -84,7 +85,7 @@ struct SettingsView: View {
 
     private var aboutView: some View {
         ScrollView {
-            SettingsAboutView()
+            SettingsAboutView(updateService: updateService)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

@@ -7,10 +7,15 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   release:
     runs-on: macos-26
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -39,6 +44,30 @@ jobs:
           echo "BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
           echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_ENV"
           echo "DMG_PATH=$RUNNER_TEMP/PlexBar-${TAG}-arm64.dmg" >> "$GITHUB_ENV"
+
+      - name: Load Sparkle build settings
+        env:
+          SPARKLE_APPCAST_URL: ${{ vars.SPARKLE_APPCAST_URL }}
+          SPARKLE_PUBLIC_KEY: ${{ vars.SPARKLE_PUBLIC_KEY }}
+        run: |
+          if [[ -z "${SPARKLE_APPCAST_URL:-}" ]]; then
+            echo "Missing required repository variable: SPARKLE_APPCAST_URL"
+            exit 1
+          fi
+
+          if [[ -z "${SPARKLE_PUBLIC_KEY:-}" ]]; then
+            echo "Missing required repository variable: SPARKLE_PUBLIC_KEY"
+            exit 1
+          fi
+
+          if [[ ! "${SPARKLE_APPCAST_URL}" =~ ^https://.+/appcast\.xml$ ]]; then
+            echo "SPARKLE_APPCAST_URL must be an HTTPS URL ending in /appcast.xml"
+            echo "Current value: ${SPARKLE_APPCAST_URL}"
+            exit 1
+          fi
+
+          echo "SPARKLE_APPCAST_URL=$SPARKLE_APPCAST_URL" >> "$GITHUB_ENV"
+          echo "SPARKLE_PUBLIC_KEY=$SPARKLE_PUBLIC_KEY" >> "$GITHUB_ENV"
 
       - name: Generate release notes
         run: |
@@ -105,18 +134,90 @@ jobs:
           APP_BUILD_VERSION: ${{ env.BUILD_NUMBER }}
         run: script/build_and_run.sh build
 
+      - name: Validate Sparkle release configuration
+        env:
+          SPARKLE_PRIVATE_KEY_BASE64: ${{ secrets.SPARKLE_PRIVATE_KEY_BASE64 }}
+        run: |
+          if [[ -z "${SPARKLE_PRIVATE_KEY_BASE64:-}" ]]; then
+            echo "Missing required Sparkle secret: SPARKLE_PRIVATE_KEY_BASE64"
+            exit 1
+          fi
+
+          EMBEDDED_FEED_URL="$(/usr/libexec/PlistBuddy -c "Print :SUFeedURL" dist/PlexBar.app/Contents/Info.plist)"
+          EMBEDDED_PUBLIC_KEY="$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" dist/PlexBar.app/Contents/Info.plist)"
+
+          if [[ "$EMBEDDED_FEED_URL" != "$SPARKLE_APPCAST_URL" ]]; then
+            echo "Embedded SUFeedURL does not match SPARKLE_APPCAST_URL"
+            echo "Expected: $SPARKLE_APPCAST_URL"
+            echo "Actual: $EMBEDDED_FEED_URL"
+            exit 1
+          fi
+
+          if [[ "$EMBEDDED_PUBLIC_KEY" != "$SPARKLE_PUBLIC_KEY" ]]; then
+            echo "Embedded SUPublicEDKey does not match SPARKLE_PUBLIC_KEY"
+            exit 1
+          fi
+
+          /usr/libexec/PlistBuddy -c "Print :SUVerifyUpdateBeforeExtraction" dist/PlexBar.app/Contents/Info.plist
+          /usr/libexec/PlistBuddy -c "Print :SUEnableAutomaticChecks" dist/PlexBar.app/Contents/Info.plist
+
       - name: Sign app bundle
         run: |
           APP_PATH="dist/PlexBar.app"
+          SPARKLE_FRAMEWORK="$APP_PATH/Contents/Frameworks/Sparkle.framework"
+          CODE_SIGN_IDENTITY="Developer ID Application"
+
           if [[ ! -d "$APP_PATH" ]]; then
             echo "App bundle not found at $APP_PATH"
             exit 1
           fi
 
+          if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then
+            echo "Sparkle framework not found at $SPARKLE_FRAMEWORK"
+            exit 1
+          fi
+
           codesign --force \
-            --deep \
             --options runtime \
-            --sign "Developer ID Application" \
+            --sign "$CODE_SIGN_IDENTITY" \
+            --keychain "$KEYCHAIN_PATH" \
+            --timestamp \
+            "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Installer.xpc"
+
+          if [[ -d "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Downloader.xpc" ]]; then
+            codesign --force \
+              --options runtime \
+              --preserve-metadata=entitlements \
+              --sign "$CODE_SIGN_IDENTITY" \
+              --keychain "$KEYCHAIN_PATH" \
+              --timestamp \
+              "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Downloader.xpc"
+          fi
+
+          codesign --force \
+            --options runtime \
+            --sign "$CODE_SIGN_IDENTITY" \
+            --keychain "$KEYCHAIN_PATH" \
+            --timestamp \
+            "$SPARKLE_FRAMEWORK/Versions/B/Autoupdate"
+
+          codesign --force \
+            --options runtime \
+            --sign "$CODE_SIGN_IDENTITY" \
+            --keychain "$KEYCHAIN_PATH" \
+            --timestamp \
+            "$SPARKLE_FRAMEWORK/Versions/B/Updater.app"
+
+          codesign --force \
+            --options runtime \
+            --sign "$CODE_SIGN_IDENTITY" \
+            --keychain "$KEYCHAIN_PATH" \
+            --timestamp \
+            "$SPARKLE_FRAMEWORK"
+
+          codesign --force \
+            --options runtime \
+            --sign "$CODE_SIGN_IDENTITY" \
             --keychain "$KEYCHAIN_PATH" \
             --timestamp \
             "$APP_PATH"
@@ -249,3 +350,91 @@ jobs:
                 "$DMG_PATH"
             fi
           fi
+
+      - name: Generate Sparkle appcast
+        if: env.IS_PRERELEASE == 'false'
+        env:
+          SPARKLE_PRIVATE_KEY_BASE64: ${{ secrets.SPARKLE_PRIVATE_KEY_BASE64 }}
+        run: |
+          SPARKLE_BIN=".build/artifacts/sparkle/Sparkle/bin/generate_appcast"
+          APPCAST_WORK_DIR="appcast-work"
+          PAGES_DIR="pages"
+          SPARKLE_KEY_PATH="$RUNNER_TEMP/sparkle-ed25519-private-key"
+          DMG_FILENAME="$(basename "$DMG_PATH")"
+          DOWNLOAD_PREFIX="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/"
+          RELEASE_LINK="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
+
+          if [[ ! -x "$SPARKLE_BIN" ]]; then
+            echo "Sparkle generate_appcast tool not found at $SPARKLE_BIN"
+            exit 1
+          fi
+
+          rm -rf "$APPCAST_WORK_DIR" "$PAGES_DIR"
+          mkdir -p "$APPCAST_WORK_DIR" "$PAGES_DIR"
+
+          if curl -fsSL "$SPARKLE_APPCAST_URL" -o "$APPCAST_WORK_DIR/appcast.xml"; then
+            echo "Using existing appcast.xml from $SPARKLE_APPCAST_URL"
+          else
+            echo "No existing appcast.xml found; generating a new feed"
+          fi
+
+          cp "$DMG_PATH" "$APPCAST_WORK_DIR/$DMG_FILENAME"
+          printf '%s' "$SPARKLE_PRIVATE_KEY_BASE64" | base64 -D -o "$SPARKLE_KEY_PATH"
+          chmod 600 "$SPARKLE_KEY_PATH"
+
+          "$SPARKLE_BIN" \
+            --ed-key-file "$SPARKLE_KEY_PATH" \
+            --download-url-prefix "$DOWNLOAD_PREFIX" \
+            --link "$RELEASE_LINK" \
+            --maximum-deltas 0 \
+            --maximum-versions 0 \
+            "$APPCAST_WORK_DIR" | tee "$RUNNER_TEMP/generate-appcast.log"
+
+          cp "$APPCAST_WORK_DIR/appcast.xml" "$PAGES_DIR/appcast.xml"
+
+      - name: Validate appcast
+        if: env.IS_PRERELEASE == 'false'
+        run: |
+          APPCAST_PATH="pages/appcast.xml"
+          DMG_FILENAME="$(basename "$DMG_PATH")"
+
+          if [[ ! -f "$APPCAST_PATH" ]]; then
+            echo "Generated appcast.xml is missing"
+            exit 1
+          fi
+
+          xmllint --noout "$APPCAST_PATH"
+
+          if ! grep -q 'sparkle:edSignature=' "$APPCAST_PATH"; then
+            echo "Generated appcast is missing sparkle:edSignature"
+            exit 1
+          fi
+
+          if ! grep -q "$DMG_FILENAME" "$APPCAST_PATH"; then
+            echo "Generated appcast is missing the current DMG enclosure"
+            exit 1
+          fi
+
+      - name: Upload appcast build artifact
+        if: env.IS_PRERELEASE == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sparkle-appcast-${{ github.ref_name }}
+          path: |
+            pages/appcast.xml
+            ${{ runner.temp }}/generate-appcast.log
+
+      - name: Configure GitHub Pages
+        if: env.IS_PRERELEASE == 'false'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: env.IS_PRERELEASE == 'false'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages
+
+      - name: Deploy to GitHub Pages
+        if: env.IS_PRERELEASE == 'false'
+        id: deployment
+        uses: actions/deploy-pages@v4
