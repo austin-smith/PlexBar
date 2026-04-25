@@ -28,12 +28,15 @@ set_custom_file_icon() {
   local target_path="$1"
   local icon_path="$2"
   local icon_resource
+  local icon_copy
 
   icon_resource="$(mktemp "${TMPDIR:-/tmp}/${APP_NAME}DMGIcon.XXXXXX")"
-  trap 'rm -f "$icon_resource"' RETURN
+  icon_copy="$(mktemp "${TMPDIR:-/tmp}/${APP_NAME}DMGIconSource.XXXXXX").icns"
+  trap 'rm -f "$icon_resource" "$icon_copy"' RETURN
 
-  /usr/bin/sips -i "$icon_path" >/dev/null
-  "$DEREZ_TOOL" -only icns "$icon_path" > "$icon_resource"
+  cp "$icon_path" "$icon_copy"
+  /usr/bin/sips -i "$icon_copy" >/dev/null
+  "$DEREZ_TOOL" -only icns "$icon_copy" > "$icon_resource"
   "$REZ_TOOL" -append "$icon_resource" -o "$target_path"
   "$SETFILE_TOOL" -a C "$target_path"
 }
