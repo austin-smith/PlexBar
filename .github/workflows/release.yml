@@ -13,6 +13,9 @@ permissions:
 jobs:
   release:
     runs-on: macos-26
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -349,6 +352,7 @@ jobs:
           fi
 
       - name: Generate Sparkle appcast
+        if: env.IS_PRERELEASE == 'false'
         env:
           SPARKLE_PRIVATE_KEY_BASE64: ${{ secrets.SPARKLE_PRIVATE_KEY_BASE64 }}
         run: |
@@ -389,6 +393,7 @@ jobs:
           cp "$APPCAST_WORK_DIR/appcast.xml" "$PAGES_DIR/appcast.xml"
 
       - name: Validate appcast
+        if: env.IS_PRERELEASE == 'false'
         run: |
           APPCAST_PATH="pages/appcast.xml"
           DMG_FILENAME="$(basename "$DMG_PATH")"
@@ -411,6 +416,7 @@ jobs:
           fi
 
       - name: Upload appcast build artifact
+        if: env.IS_PRERELEASE == 'false'
         uses: actions/upload-artifact@v4
         with:
           name: sparkle-appcast-${{ github.ref_name }}
@@ -419,13 +425,16 @@ jobs:
             ${{ runner.temp }}/generate-appcast.log
 
       - name: Configure GitHub Pages
+        if: env.IS_PRERELEASE == 'false'
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
+        if: env.IS_PRERELEASE == 'false'
         uses: actions/upload-pages-artifact@v3
         with:
           path: pages
 
       - name: Deploy to GitHub Pages
+        if: env.IS_PRERELEASE == 'false'
         id: deployment
         uses: actions/deploy-pages@v4
