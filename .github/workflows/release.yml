@@ -426,7 +426,6 @@ jobs:
           name: sparkle-appcast-${{ github.ref_name }}
           path: |
             pages/appcast.xml
-            ${{ runner.temp }}/generate-appcast.log
 
   deploy-appcast:
     name: Deploy appcast
