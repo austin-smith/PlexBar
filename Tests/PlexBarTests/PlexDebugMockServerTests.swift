@@ -20,8 +20,28 @@ import Testing
     #expect(authenticatedUser.displayName == "D0loresH4ze")
     #expect(authenticatedUser.displayEmail == "d0loresh4ze@proton.me")
     #expect(authenticatedUser.displayUsername == nil)
+    #expect(authenticatedUser.thumb?.hasPrefix("file://") == true)
     #expect(servers.count == 1)
     #expect(servers.first?.id == "debug-mock-server")
+}
+
+@Test func mockAuthenticatedUserAvatarUsesLocalMockResourceURL() async throws {
+    let session = PlexDebugMockServer.makeSession()
+    let authClient = PlexAuthClient(session: session)
+    let authenticatedUser = try await authClient.fetchAuthenticatedUser(
+        userToken: PlexDebugMockServer.mockUserToken,
+        clientContext: PlexClientContext(clientIdentifier: "tests")
+    )
+    let thumbURL = try #require(authenticatedUser.thumb.flatMap(URL.init(string:)))
+    let imageClient = PlexImageClient()
+
+    #expect(thumbURL.isFileURL)
+    #expect(thumbURL.lastPathComponent == "darlene-alderson.png")
+    #expect(await imageClient.fetchImage(
+        from: [thumbURL],
+        token: "",
+        clientContext: PlexClientContext(clientIdentifier: "tests")
+    ) != nil)
 }
 
 @Test func loadsMockServerPayloadFromBundle() throws {

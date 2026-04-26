@@ -99,7 +99,9 @@ private struct PlexDebugMockFixture {
             kind: .local,
             validatedAt: snapshotDate
         )
-        let authenticatedUser = payload.authenticatedUser.materialize()
+        let authenticatedUser = payload.authenticatedUser.materialize(
+            thumbOverride: localAvatarResourceURL(for: payload.authenticatedUser.thumb)?.absoluteString
+        )
 
         let accountsByID = Dictionary(
             uniqueKeysWithValues: payload.users.map { userPayload in
@@ -180,7 +182,21 @@ private struct PlexDebugMockFixture {
             let cacheKey = "\(artwork.url.absoluteString)|\(server.accessToken)"
             cache.insert(artwork.image, for: cacheKey)
             cache.insert(cgImage, for: cacheKey)
+
+            if let localURL = Self.localAvatarResourceURL(for: artwork.url.path),
+               localURL.absoluteString == authenticatedUser.thumb {
+                cache.insert(artwork.image, for: localURL.absoluteString)
+                cache.insert(cgImage, for: localURL.absoluteString)
+            }
         }
+    }
+
+    private static func localAvatarResourceURL(for thumb: String?) -> URL? {
+        guard let thumb = thumb?.nilIfBlank else {
+            return nil
+        }
+
+        return PlexMockServerResourceLocator.url(for: "avatars/\(URL(fileURLWithPath: thumb).lastPathComponent)")
     }
 
     func response(for request: URLRequest) -> PlexDebugMockResponse? {

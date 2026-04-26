@@ -47,13 +47,13 @@ extension PlexMockServerPayload {
         let thumb: String?
         let friendlyName: String?
 
-        func materialize() -> PlexAuthenticatedUser {
+        func materialize(thumbOverride: String? = nil) -> PlexAuthenticatedUser {
             PlexAuthenticatedUser(
                 id: id,
                 username: username,
                 title: title?.nilIfBlank,
                 email: email?.nilIfBlank,
-                thumb: thumb?.nilIfBlank,
+                thumb: thumbOverride ?? thumb?.nilIfBlank,
                 friendlyName: friendlyName?.nilIfBlank
             )
         }
