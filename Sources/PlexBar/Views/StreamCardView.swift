@@ -174,7 +174,11 @@ struct StreamCardView: View {
                     Text(session.headline)
                         .font(.headline)
                         .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.trailing, 36)
+                        .overlay(alignment: .trailing) {
+                            actionsButton(isTerminating: isTerminating)
+                        }
 
                     if session.contentKind == .tv || session.contentKind == .liveTV,
                        let metaLine = session.contentMetaLine,
@@ -239,9 +243,6 @@ struct StreamCardView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
-            .overlay(alignment: .topTrailing) {
-                actionsButton(isTerminating: isTerminating)
-            }
         }
     }
 
