@@ -139,14 +139,7 @@ jobs:
         run: script/build_and_run.sh build
 
       - name: Validate Sparkle release configuration
-        env:
-          SPARKLE_PRIVATE_KEY_BASE64: ${{ secrets.SPARKLE_PRIVATE_KEY_BASE64 }}
         run: |
-          if [[ -z "${SPARKLE_PRIVATE_KEY_BASE64:-}" ]]; then
-            echo "Missing required Sparkle secret: SPARKLE_PRIVATE_KEY_BASE64"
-            exit 1
-          fi
-
           EMBEDDED_FEED_URL="$(/usr/libexec/PlistBuddy -c "Print :SUFeedURL" dist/PlexBar.app/Contents/Info.plist)"
           EMBEDDED_PUBLIC_KEY="$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" dist/PlexBar.app/Contents/Info.plist)"
 
@@ -370,6 +363,11 @@ jobs:
 
           if [[ ! -x "$SPARKLE_BIN" ]]; then
             echo "Sparkle generate_appcast tool not found at $SPARKLE_BIN"
+            exit 1
+          fi
+
+          if [[ -z "${SPARKLE_PRIVATE_KEY_BASE64:-}" ]]; then
+            echo "Missing required Sparkle secret: SPARKLE_PRIVATE_KEY_BASE64"
             exit 1
           fi
 
