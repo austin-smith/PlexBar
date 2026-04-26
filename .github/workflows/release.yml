@@ -448,14 +448,15 @@ jobs:
       - name: Prepare Pages content
         run: |
           mkdir -p pages
+          APPCAST_ARTIFACT_PATH="downloaded-appcast/appcast.xml"
 
-          if [[ ! -f "downloaded-appcast/pages/appcast.xml" ]]; then
-            echo "Expected appcast artifact at downloaded-appcast/pages/appcast.xml"
+          if [[ ! -f "$APPCAST_ARTIFACT_PATH" ]]; then
+            echo "Expected appcast artifact at $APPCAST_ARTIFACT_PATH"
             find downloaded-appcast -maxdepth 3 -type f | sort
             exit 1
           fi
 
-          cp "downloaded-appcast/pages/appcast.xml" "pages/appcast.xml"
+          cp "$APPCAST_ARTIFACT_PATH" "pages/appcast.xml"
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
