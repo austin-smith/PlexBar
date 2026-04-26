@@ -21,13 +21,23 @@ struct PlexBarApp: App {
     private let updateService: PlexUpdateService
 
     init() {
-        let settingsStore = PlexSettingsStore()
-        let resolver = PlexConnectionResolver()
+        let runtime = PlexAppRuntime.current()
+        let settingsStore = runtime.settingsStore
+        let resolver = runtime.connectionResolver
         let connectionStore = PlexConnectionStore(settings: settingsStore, resolver: resolver)
-        let sessionStore = PlexSessionStore(connectionStore: connectionStore)
-        let libraryStore = PlexLibraryStore(connectionStore: connectionStore)
-        let historyStore = PlexHistoryStore(connectionStore: connectionStore, libraryStore: libraryStore)
-        let serverPreviewStore = PlexServerPreviewStore(resolver: resolver)
+        let sessionStore = PlexSessionStore(
+            connectionStore: connectionStore,
+            client: runtime.apiClient,
+            geoIPClient: runtime.geoIPClient,
+            eventsClient: runtime.sessionEventsClient
+        )
+        let libraryStore = PlexLibraryStore(connectionStore: connectionStore, client: runtime.apiClient)
+        let historyStore = PlexHistoryStore(
+            connectionStore: connectionStore,
+            libraryStore: libraryStore,
+            client: runtime.apiClient
+        )
+        let serverPreviewStore = PlexServerPreviewStore(client: runtime.apiClient, resolver: resolver)
         _settingsStore = State(initialValue: settingsStore)
         _connectionStore = State(initialValue: connectionStore)
         _sessionStore = State(initialValue: sessionStore)
@@ -39,7 +49,8 @@ struct PlexBarApp: App {
             connectionStore: connectionStore,
             sessionStore: sessionStore,
             historyStore: historyStore,
-            libraryStore: libraryStore
+            libraryStore: libraryStore,
+            client: runtime.authClient
         ))
         updateService = PlexUpdateService()
     }

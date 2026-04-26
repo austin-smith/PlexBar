@@ -3,6 +3,7 @@ set -euo pipefail
 
 MODE="run"
 ENABLE_CODESIGN=0
+ENABLE_MOCK_RUNTIME=0
 APP_NAME="PlexBar"
 BUNDLE_ID="com.crapshack.PlexBar"
 MIN_SYSTEM_VERSION="26.0"
@@ -39,11 +40,14 @@ parse_args() {
       --codesign)
         ENABLE_CODESIGN=1
         ;;
+      --mock)
+        ENABLE_MOCK_RUNTIME=1
+        ;;
       build|--build|run|debug|--debug|logs|--logs|telemetry|--telemetry|verify|--verify)
         MODE="$1"
         ;;
       *)
-        echo "usage: $0 [--codesign] [build|run|--debug|--logs|--telemetry|--verify]" >&2
+        echo "usage: $0 [--codesign] [--mock] [build|run|--debug|--logs|--telemetry|--verify]" >&2
         exit 2
         ;;
     esac
@@ -193,11 +197,17 @@ SWIFT_BUILD_ARGS=(
   -Xlinker "@executable_path/../Frameworks"
 )
 
-swift build "${SWIFT_BUILD_ARGS[@]}"
 BUILD_BIN_DIR="$(swift build "${SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
-BUILD_BINARY="$BUILD_BIN_DIR/$APP_NAME"
 RESOURCE_BUNDLE_NAME="${APP_NAME}_${APP_NAME}.bundle"
 RESOURCE_BUNDLE_SOURCE="$BUILD_BIN_DIR/$RESOURCE_BUNDLE_NAME"
+BUILD_BINARY="$BUILD_BIN_DIR/$APP_NAME"
+
+# SwiftPM leaves stale files behind in processed resource bundles when resources
+# are removed from the manifest. Clear the generated bundle before rebuilding so
+# dist apps cannot accidentally ship old debug-only assets.
+rm -rf "$RESOURCE_BUNDLE_SOURCE"
+
+swift build "${SWIFT_BUILD_ARGS[@]}"
 
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_FRAMEWORKS" "$APP_RESOURCES"
@@ -293,7 +303,11 @@ if [[ "$ENABLE_CODESIGN" -eq 1 ]]; then
 fi
 
 open_app() {
-  /usr/bin/open -n "$APP_BUNDLE"
+  if [[ "$ENABLE_MOCK_RUNTIME" -eq 1 ]]; then
+    /usr/bin/open -n "$APP_BUNDLE" --args --mock
+  else
+    /usr/bin/open -n "$APP_BUNDLE"
+  fi
 }
 
 case "$MODE" in
@@ -304,7 +318,11 @@ case "$MODE" in
     open_app
     ;;
   --debug|debug)
-    lldb -- "$APP_BINARY"
+    if [[ "$ENABLE_MOCK_RUNTIME" -eq 1 ]]; then
+      lldb -- "$APP_BINARY" --mock
+    else
+      lldb -- "$APP_BINARY"
+    fi
     ;;
   --logs|logs)
     open_app
@@ -320,7 +338,7 @@ case "$MODE" in
     pgrep -x "$APP_NAME" >/dev/null
     ;;
   *)
-    echo "usage: $0 [build|run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [--mock] [build|run|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac

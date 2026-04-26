@@ -1,0 +1,437 @@
+{
+  "authenticatedUser": {
+    "id": 16,
+    "username": "D0loresH4ze",
+    "email": "d0loresh4ze@proton.me",
+    "thumb": "/mock/avatars/darlene-alderson.png"
+  },
+  "server": {
+    "id": "debug-mock-server",
+    "name": "Mock Server",
+    "productVersion": "1.41.4.9463-630c9f557",
+    "accessToken": "plexbar-debug-mock-server-token",
+    "connections": [
+      {
+        "uri": "https://demo.plexbar.local:32400",
+        "local": true,
+        "relay": false
+      }
+    ]
+  },
+  "users": [
+    {
+      "id": 11,
+      "name": "scully",
+      "avatar": "/mock/avatars/dana-scully.png"
+    },
+    {
+      "id": 12,
+      "name": "Elliot",
+      "avatar": "/mock/avatars/elliot-alderson.png"
+    },
+    {
+      "id": 13,
+      "name": "petit_prince",
+      "avatar": "/mock/avatars/le-petit-prince.png"
+    },
+    {
+      "id": 14,
+      "name": "popeye23",
+      "avatar": "/mock/avatars/popeye.png"
+    },
+    {
+      "id": 15,
+      "name": "TommyS",
+      "avatar": "/mock/avatars/tommy-shelby.png"
+    },
+    {
+      "id": 16,
+      "name": "D0loresH4ze",
+      "avatar": "/mock/avatars/darlene-alderson.png"
+    }
+  ],
+  "movies": [
+    {
+      "id": "1101",
+      "title": "Charade",
+      "year": 1963,
+      "poster": "/mock/art/movies/charade.png",
+      "art": "/mock/art/movies/charade.png",
+      "originallyAvailableAt": "1963-12-05"
+    },
+    {
+      "id": "1102",
+      "title": "Night of the Living Dead",
+      "year": 1968,
+      "poster": "/mock/art/movies/night-of-the-living-dead.png",
+      "art": "/mock/art/movies/night-of-the-living-dead.png",
+      "originallyAvailableAt": "1968-10-01"
+    },
+    {
+      "id": "1103",
+      "title": "Sherlock Jr.",
+      "year": 1924,
+      "poster": "/mock/art/movies/sherlock-jr.png",
+      "art": "/mock/art/movies/sherlock-jr.png",
+      "originallyAvailableAt": "1924-04-21"
+    }
+  ],
+  "shows": [
+    {
+      "id": "2103",
+      "title": "One Step Beyond",
+      "poster": "/mock/art/tv/one-step-beyond.png",
+      "art": "/mock/art/tv/one-step-beyond.png"
+    },
+    {
+      "id": "2102",
+      "title": "The Adventures of Ozzie and Harriet",
+      "poster": "/mock/art/tv/adventures-of-ozzie-and-harriet.png",
+      "art": "/mock/art/tv/adventures-of-ozzie-and-harriet.png"
+    },
+    {
+      "id": "2101",
+      "title": "The Abbott and Costello Show",
+      "poster": "/mock/art/tv/abbott-and-costello.png",
+      "art": "/mock/art/tv/abbott-and-costello.png"
+    }
+  ],
+  "episodes": [
+    {
+      "id": "2201",
+      "showID": "2103",
+      "title": "The Bride Possessed",
+      "seasonNumber": 1,
+      "episodeNumber": 14,
+      "originallyAvailableAt": "1959-01-20"
+    },
+    {
+      "id": "2202",
+      "showID": "2102",
+      "title": "The Girls' Club",
+      "seasonNumber": 1,
+      "episodeNumber": 5,
+      "originallyAvailableAt": "1952-11-14"
+    },
+    {
+      "id": "2203",
+      "showID": "2101",
+      "title": "The Dentist",
+      "seasonNumber": 1,
+      "episodeNumber": 3,
+      "originallyAvailableAt": "1953-01-16"
+    }
+  ],
+  "audiobooks": [
+    {
+      "id": "3101",
+      "title": "Dracula",
+      "year": 1897,
+      "cover": "/mock/art/audiobooks/dracula.png",
+      "artistTitle": "Bram Stoker",
+      "albumTitle": "Dracula",
+      "trackTitle": "Dracula"
+    },
+    {
+      "id": "3102",
+      "title": "The Time Machine",
+      "year": 1895,
+      "cover": "/mock/art/audiobooks/the-time-machine.png",
+      "artistTitle": "H. G. Wells",
+      "albumTitle": "The Time Machine",
+      "trackTitle": "The Time Machine"
+    },
+    {
+      "id": "3103",
+      "title": "The War of the Worlds",
+      "year": 1898,
+      "cover": "/mock/art/audiobooks/war-of-the-worlds.png",
+      "artistTitle": "H. G. Wells",
+      "albumTitle": "The War of the Worlds",
+      "trackTitle": "The War of the Worlds"
+    }
+  ],
+  "activeSessions": [
+    {
+      "sessionKey": "stream-1",
+      "userID": 11,
+      "mediaType": "movie",
+      "mediaID": "1101",
+      "duration": 5520000,
+      "viewOffset": 3146000,
+      "player": {
+        "address": "192.168.1.11",
+        "machineIdentifier": "den-apple-tv",
+        "platform": "tvOS",
+        "product": "Plex for Apple TV",
+        "remotePublicAddress": "198.51.100.11",
+        "state": "playing",
+        "title": "Living Room Apple TV",
+        "local": true,
+        "relayed": false,
+        "secure": true
+      },
+      "session": {
+        "id": "playback-1",
+        "bandwidth": 12000,
+        "location": "lan"
+      },
+      "mediaDecision": "direct play"
+    },
+    {
+      "sessionKey": "stream-2",
+      "userID": 12,
+      "mediaType": "movie",
+      "mediaID": "1102",
+      "duration": 4560000,
+      "viewOffset": 3750000,
+      "player": {
+        "address": "172.16.0.41",
+        "machineIdentifier": "elliot-android",
+        "platform": "Linux",
+        "product": "Plex Web",
+        "remotePublicAddress": "203.0.113.24",
+        "state": "paused",
+        "title": "Iceweasel",
+        "local": false,
+        "relayed": false,
+        "secure": true
+      },
+      "session": {
+        "id": "playback-2",
+        "bandwidth": 8400,
+        "location": "wan"
+      },
+      "transcodeSession": {
+        "key": "transcode-2"
+      },
+      "mediaDecision": "transcode"
+    },
+    {
+      "sessionKey": "stream-3",
+      "userID": 13,
+      "mediaType": "movie",
+      "mediaID": "1103",
+      "duration": 2700000,
+      "viewOffset": 1458000,
+      "player": {
+        "address": "10.0.0.18",
+        "machineIdentifier": "office-safari",
+        "platform": "macOS",
+        "product": "Plex Web",
+        "remotePublicAddress": "198.51.100.73",
+        "state": "playing",
+        "title": "Safari",
+        "local": true,
+        "relayed": false,
+        "secure": true
+      },
+      "session": {
+        "id": "playback-3",
+        "bandwidth": 10200,
+        "location": "lan"
+      },
+      "mediaDecision": "direct play"
+    },
+    {
+      "sessionKey": "stream-4",
+      "userID": 15,
+      "mediaType": "audiobook",
+      "mediaID": "3103",
+      "duration": 1314000,
+      "viewOffset": 486000,
+      "player": {
+        "address": "10.20.0.44",
+        "machineIdentifier": "tommy-plexamp",
+        "platform": "iOS",
+        "product": "Prologue",
+        "remotePublicAddress": "203.0.113.91",
+        "state": "playing",
+        "title": "iPhone",
+        "local": false,
+        "relayed": false,
+        "secure": true
+      },
+      "session": {
+        "id": "playback-4",
+        "bandwidth": 320,
+        "location": "wan"
+      },
+      "mediaDecision": "direct play"
+    }
+  ],
+  "resolvedLocationsBySessionKey": {
+    "stream-1": "Portland, OR",
+    "stream-2": "Brooklyn, NY",
+    "stream-3": "Lyon, France",
+    "stream-4": "Birmingham, UK"
+  },
+  "historyEvents": [
+    {
+      "historyKey": "/status/sessions/history/801",
+      "userID": 11,
+      "mediaType": "movie",
+      "mediaID": "1101",
+      "viewedAtSecondsAgo": 3600,
+      "deviceID": 1
+    },
+    {
+      "historyKey": "/status/sessions/history/802",
+      "userID": 12,
+      "mediaType": "movie",
+      "mediaID": "1102",
+      "viewedAtSecondsAgo": 7200,
+      "deviceID": 2
+    },
+    {
+      "historyKey": "/status/sessions/history/803",
+      "userID": 13,
+      "mediaType": "movie",
+      "mediaID": "1103",
+      "viewedAtSecondsAgo": 43200,
+      "deviceID": 3
+    },
+    {
+      "historyKey": "/status/sessions/history/804",
+      "userID": 14,
+      "mediaType": "movie",
+      "mediaID": "1101",
+      "viewedAtSecondsAgo": 86400,
+      "deviceID": 4
+    },
+    {
+      "historyKey": "/status/sessions/history/805",
+      "userID": 15,
+      "mediaType": "movie",
+      "mediaID": "1102",
+      "viewedAtSecondsAgo": 172800,
+      "deviceID": 5
+    },
+    {
+      "historyKey": "/status/sessions/history/806",
+      "userID": 11,
+      "mediaType": "movie",
+      "mediaID": "1103",
+      "viewedAtSecondsAgo": 345600,
+      "deviceID": 1
+    },
+    {
+      "historyKey": "/status/sessions/history/807",
+      "userID": 15,
+      "mediaType": "episode",
+      "mediaID": "2201",
+      "viewedAtSecondsAgo": 10800,
+      "deviceID": 5
+    },
+    {
+      "historyKey": "/status/sessions/history/808",
+      "userID": 14,
+      "mediaType": "episode",
+      "mediaID": "2202",
+      "viewedAtSecondsAgo": 216000,
+      "deviceID": 4
+    },
+    {
+      "historyKey": "/status/sessions/history/809",
+      "userID": 12,
+      "mediaType": "episode",
+      "mediaID": "2203",
+      "viewedAtSecondsAgo": 259200,
+      "deviceID": 2
+    },
+    {
+      "historyKey": "/status/sessions/history/810",
+      "userID": 16,
+      "mediaType": "episode",
+      "mediaID": "2201",
+      "viewedAtSecondsAgo": 14400,
+      "deviceID": 6
+    },
+    {
+      "historyKey": "/status/sessions/history/811",
+      "userID": 16,
+      "mediaType": "movie",
+      "mediaID": "1102",
+      "viewedAtSecondsAgo": 129600,
+      "deviceID": 6
+    }
+  ],
+  "libraries": [
+    {
+      "id": "library-movies",
+      "title": "Movies",
+      "type": "movie",
+      "updatedAtSecondsAgo": 10800,
+      "scannedAtSecondsAgo": 9600,
+      "contentChangedAtSecondsAgo": 7200,
+      "entries": [
+        {
+          "mediaID": "1101",
+          "addedAtSecondsAgo": 5400
+        },
+        {
+          "mediaID": "1102",
+          "addedAtSecondsAgo": 25200
+        },
+        {
+          "mediaID": "1103",
+          "addedAtSecondsAgo": 43200
+        }
+      ]
+    },
+    {
+      "id": "library-tv-shows",
+      "title": "TV Shows",
+      "type": "show",
+      "updatedAtSecondsAgo": 21600,
+      "scannedAtSecondsAgo": 20400,
+      "contentChangedAtSecondsAgo": 18000,
+      "entries": [
+        {
+          "mediaID": "2103",
+          "addedAtSecondsAgo": 14400
+        },
+        {
+          "mediaID": "2102",
+          "addedAtSecondsAgo": 18000
+        },
+        {
+          "mediaID": "2101",
+          "addedAtSecondsAgo": 21600
+        }
+      ],
+      "secondarySummary": {
+        "queryType": 3,
+        "count": 19,
+        "label": "seasons"
+      }
+    },
+    {
+      "id": "library-audiobooks",
+      "title": "Audiobooks",
+      "type": "artist",
+      "updatedAtSecondsAgo": 36000,
+      "scannedAtSecondsAgo": 34200,
+      "contentChangedAtSecondsAgo": 28800,
+      "entries": [
+        {
+          "mediaID": "3101",
+          "addedAtSecondsAgo": 25200
+        },
+        {
+          "mediaID": "3102",
+          "addedAtSecondsAgo": 28800
+        },
+        {
+          "mediaID": "3103",
+          "addedAtSecondsAgo": 36000
+        }
+      ],
+      "secondarySummary": {
+        "queryType": 9,
+        "count": 3,
+        "label": "albums"
+      }
+    }
+  ]
+}
