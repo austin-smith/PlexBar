@@ -5,16 +5,20 @@ import Sparkle
 @MainActor
 @Observable
 final class PlexUpdateService {
-    private let updaterController: SPUStandardUpdaterController
+    private let updaterController: SPUStandardUpdaterController?
     @ObservationIgnored private var canCheckForUpdatesObservation: NSKeyValueObservation?
     private(set) var canCheckForUpdates = false
 
     init() {
-        updaterController = SPUStandardUpdaterController(
+#if DEBUG
+        updaterController = nil
+#else
+        let updaterController = SPUStandardUpdaterController(
             startingUpdater: true,
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
+        self.updaterController = updaterController
 
         canCheckForUpdatesObservation = updaterController.updater.observe(
             \.canCheckForUpdates,
@@ -24,9 +28,10 @@ final class PlexUpdateService {
                 self?.canCheckForUpdates = updater.canCheckForUpdates
             }
         }
+#endif
     }
 
     func checkForUpdates() {
-        updaterController.checkForUpdates(nil)
+        updaterController?.checkForUpdates(nil)
     }
 }

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MODE="${1:-run}"
+MODE="run"
+ENABLE_CODESIGN=0
 APP_NAME="PlexBar"
 BUNDLE_ID="com.crapshack.PlexBar"
 MIN_SYSTEM_VERSION="26.0"
@@ -15,10 +16,9 @@ if [[ -f "$ROOT_DIR/.env.local" ]]; then
 fi
 
 BUILD_CONFIGURATION="${BUILD_CONFIGURATION:-debug}"
-APP_MARKETING_VERSION="${APP_MARKETING_VERSION:-}"
-APP_BUILD_VERSION="${APP_BUILD_VERSION:-}"
 SPARKLE_APPCAST_URL="${SPARKLE_APPCAST_URL:-}"
 SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-}"
+APPLE_TEAM_ID="${APPLE_TEAM_ID:-}"
 
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
@@ -32,6 +32,131 @@ APP_ICON_NAME="AppIcon"
 APP_ICON_SOURCE="$ROOT_DIR/$APP_ICON_NAME.icon"
 ACTOOL="$(xcrun --find actool)"
 
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --codesign)
+        ENABLE_CODESIGN=1
+        ;;
+      build|--build|run|debug|--debug|logs|--logs|telemetry|--telemetry|verify|--verify)
+        MODE="$1"
+        ;;
+      *)
+        echo "usage: $0 [--codesign] [build|run|--debug|--logs|--telemetry|--verify]" >&2
+        exit 2
+        ;;
+    esac
+    shift
+  done
+}
+
+resolve_apple_development_identity() {
+  local matches=()
+  local candidate_identities=()
+  local identity_line
+  local identity_hash
+  local identity_name
+  local identity_team_id
+  local probe_dir
+  local probe_file
+
+  if [[ -z "$APPLE_TEAM_ID" ]]; then
+    echo "Missing required signing configuration: APPLE_TEAM_ID." >&2
+    echo "Set APPLE_TEAM_ID in .env.local before using --codesign." >&2
+    return 1
+  fi
+
+  while IFS= read -r identity_line; do
+    if [[ "$identity_line" == *"\"Apple Development:"* ]]; then
+      candidate_identities+=("$identity_line")
+    fi
+  done < <(security find-identity -p codesigning -v 2>/dev/null || true)
+
+  probe_dir="$(mktemp -d "${TMPDIR:-/tmp}/PlexBarCodesignProbe.XXXXXX")"
+  probe_file="$probe_dir/probe"
+  trap 'rm -rf "$probe_dir"' RETURN
+
+  printf '#!/bin/sh\nexit 0\n' > "$probe_file"
+  chmod +x "$probe_file"
+
+  for identity_line in "${candidate_identities[@]}"; do
+    identity_hash="$(printf '%s\n' "$identity_line" | sed -E 's/^[[:space:]]*[0-9]+\) ([0-9A-F]+) .*/\1/')"
+    identity_name="${identity_line#*\"}"
+    identity_name="${identity_name%\"*}"
+
+    rm -f "$probe_file"
+    printf '#!/bin/sh\nexit 0\n' > "$probe_file"
+    chmod +x "$probe_file"
+
+    if ! codesign --force --sign "$identity_hash" "$probe_file" >/dev/null 2>&1; then
+      continue
+    fi
+
+    identity_team_id="$(
+      codesign -d -vv "$probe_file" 2>&1 |
+        sed -n 's/^TeamIdentifier=//p'
+    )"
+
+    if [[ "$identity_team_id" == "$APPLE_TEAM_ID" ]]; then
+      matches+=("$identity_hash|$identity_name")
+    fi
+  done
+
+  if [[ "${#matches[@]}" -eq 1 ]]; then
+    printf '%s\n' "${matches[0]%%|*}"
+    return 0
+  fi
+
+  if [[ "${#matches[@]}" -eq 0 ]]; then
+    echo "No Apple Development signing identities matched TeamIdentifier=$APPLE_TEAM_ID." >&2
+  else
+    echo "Multiple Apple Development signing identities matched TeamIdentifier=$APPLE_TEAM_ID." >&2
+    printf 'Matches:\n' >&2
+    for identity_line in "${matches[@]}"; do
+      printf '  %s\n' "${identity_line#*|}" >&2
+    done
+  fi
+
+  return 1
+}
+
+codesign_path() {
+  local identity="$1"
+  local path="$2"
+
+  codesign --force --sign "$identity" "$path"
+}
+
+codesign_path_preserving_entitlements() {
+  local identity="$1"
+  local path="$2"
+
+  codesign --force --preserve-metadata=entitlements --sign "$identity" "$path"
+}
+
+codesign_app_bundle() {
+  local identity="$1"
+  local sparkle_framework="$APP_FRAMEWORKS/Sparkle.framework"
+
+  if [[ ! -d "$sparkle_framework" ]]; then
+    echo "Sparkle framework not found at $sparkle_framework." >&2
+    exit 1
+  fi
+
+  codesign_path "$identity" "$sparkle_framework/Versions/B/XPCServices/Installer.xpc"
+
+  if [[ -d "$sparkle_framework/Versions/B/XPCServices/Downloader.xpc" ]]; then
+    codesign_path_preserving_entitlements "$identity" "$sparkle_framework/Versions/B/XPCServices/Downloader.xpc"
+  fi
+
+  codesign_path "$identity" "$sparkle_framework/Versions/B/Autoupdate"
+  codesign_path "$identity" "$sparkle_framework/Versions/B/Updater.app"
+  codesign_path "$identity" "$sparkle_framework"
+  codesign_path "$identity" "$APP_BUNDLE"
+}
+
+parse_args "$@"
+
 case "$BUILD_CONFIGURATION" in
   debug|release)
     ;;
@@ -41,10 +166,17 @@ case "$BUILD_CONFIGURATION" in
     ;;
 esac
 
-if [[ -z "$SPARKLE_APPCAST_URL" || -z "$SPARKLE_PUBLIC_KEY" ]]; then
+if [[ "$BUILD_CONFIGURATION" == "release" && (-z "$SPARKLE_APPCAST_URL" || -z "$SPARKLE_PUBLIC_KEY") ]]; then
   echo "Missing required Sparkle build metadata: SPARKLE_APPCAST_URL and SPARKLE_PUBLIC_KEY." >&2
   exit 2
 fi
+
+APP_PRODUCT_VERSION="$(
+  sed -n -E 's/^[[:space:]]*static let productVersion = "([^"]+)".*/\1/p' \
+    "$ROOT_DIR/Sources/PlexBar/Support/AppConstants.swift" |
+    head -n 1
+)"
+[[ -n "$APP_PRODUCT_VERSION" ]] || exit 2
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
@@ -95,18 +227,15 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
-if [[ -n "$APP_MARKETING_VERSION" ]]; then
-  /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_MARKETING_VERSION" "$INFO_PLIST"
-fi
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_PRODUCT_VERSION" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_PRODUCT_VERSION" "$INFO_PLIST"
 
-if [[ -n "$APP_BUILD_VERSION" ]]; then
-  /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD_VERSION" "$INFO_PLIST"
+if [[ "$BUILD_CONFIGURATION" == "release" ]]; then
+  /usr/libexec/PlistBuddy -c "Add :SUFeedURL string $SPARKLE_APPCAST_URL" "$INFO_PLIST"
+  /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$INFO_PLIST"
+  /usr/libexec/PlistBuddy -c "Add :SUVerifyUpdateBeforeExtraction bool true" "$INFO_PLIST"
+  /usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool true" "$INFO_PLIST"
 fi
-
-/usr/libexec/PlistBuddy -c "Add :SUFeedURL string $SPARKLE_APPCAST_URL" "$INFO_PLIST"
-/usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$INFO_PLIST"
-/usr/libexec/PlistBuddy -c "Add :SUVerifyUpdateBeforeExtraction bool true" "$INFO_PLIST"
-/usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool true" "$INFO_PLIST"
 
 if [[ -d "$APP_ICON_SOURCE" ]]; then
   ASSET_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/AppIcon.XXXXXX")"
@@ -146,6 +275,14 @@ if [[ -d "$APP_ICON_SOURCE" ]]; then
 
   trap - EXIT
   cleanup_icon_workdir
+fi
+
+if [[ "$ENABLE_CODESIGN" -eq 1 ]]; then
+  if ! identity_hash="$(resolve_apple_development_identity)"; then
+    exit 2
+  fi
+
+  codesign_app_bundle "$identity_hash"
 fi
 
 open_app() {
