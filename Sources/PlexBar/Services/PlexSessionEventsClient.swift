@@ -4,6 +4,8 @@ struct PlexSessionEventsClient {
     typealias MonitorHandler = @Sendable (PlexSessionEvent) async throws -> Void
     typealias MonitorImplementation = @Sendable (PlexConnectionConfiguration, @escaping MonitorHandler) async throws -> Void
     private static let handshakeTimeout: Duration = .seconds(5)
+    private static let heartbeatInterval: Duration = .seconds(30)
+    private static let heartbeatTimeout: Duration = .seconds(10)
 
     private let monitorImplementation: MonitorImplementation
 
@@ -22,16 +24,7 @@ struct PlexSessionEventsClient {
                 try Task.checkCancellation()
                 try await Self.confirmHandshake(for: task)
                 try await onEvent(.connected)
-
-                while !Task.isCancelled {
-                    let message = try await task.receive()
-                    let data = try Self.messageData(from: message)
-
-                    for event in Self.decodeEventsIfPossible(from: data) {
-                        try Task.checkCancellation()
-                        try await onEvent(event)
-                    }
-                }
+                try await WebSocketMonitor(task: task, onEvent: onEvent).run()
             } catch is CancellationError {
                 task.cancel(with: .goingAway, reason: nil)
                 throw CancellationError()
@@ -95,10 +88,33 @@ struct PlexSessionEventsClient {
         sendPing: (@escaping @Sendable (Error?) -> Void) -> Void,
         timeout: Duration = handshakeTimeout
     ) async throws {
-        let state = HandshakeContinuationState()
+        try await confirmPong(
+            sendPing: sendPing,
+            timeout: timeout,
+            timeoutError: PlexSessionEventsError.handshakeTimedOut
+        )
+    }
+
+    static func confirmHeartbeat(
+        sendPing: (@escaping @Sendable (Error?) -> Void) -> Void,
+        timeout: Duration = heartbeatTimeout
+    ) async throws {
+        try await confirmPong(
+            sendPing: sendPing,
+            timeout: timeout,
+            timeoutError: PlexSessionEventsError.heartbeatTimedOut
+        )
+    }
+
+    private static func confirmPong(
+        sendPing: (@escaping @Sendable (Error?) -> Void) -> Void,
+        timeout: Duration,
+        timeoutError: Error
+    ) async throws {
+        let state = PingContinuationState()
         let timeoutTask = Task {
             try await Task.sleep(for: timeout)
-            state.resume(with: .failure(PlexSessionEventsError.handshakeTimedOut))
+            state.resume(with: .failure(timeoutError))
         }
 
         defer {
@@ -137,6 +153,69 @@ struct PlexSessionEventsClient {
             task.sendPing(pongReceiveHandler: completion)
         }
     }
+
+    private static func confirmHeartbeat(for task: URLSessionWebSocketTask) async throws {
+        try await confirmHeartbeat { completion in
+            task.sendPing(pongReceiveHandler: completion)
+        }
+    }
+
+    private final class WebSocketMonitor: @unchecked Sendable {
+        private let task: URLSessionWebSocketTask
+        private let onEvent: MonitorHandler
+
+        init(task: URLSessionWebSocketTask, onEvent: @escaping MonitorHandler) {
+            self.task = task
+            self.onEvent = onEvent
+        }
+
+        func run() async throws {
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    try await self.receiveLoop()
+                }
+                group.addTask {
+                    try await self.heartbeatLoop()
+                }
+
+                do {
+                    guard try await group.next() != nil else {
+                        throw CancellationError()
+                    }
+                    group.cancelAll()
+                    task.cancel(with: .goingAway, reason: nil)
+                } catch {
+                    group.cancelAll()
+                    task.cancel(with: .goingAway, reason: nil)
+                    throw error
+                }
+            }
+        }
+
+        private func receiveLoop() async throws {
+            while !Task.isCancelled {
+                let message = try await task.receive()
+                let data = try messageData(from: message)
+
+                for event in decodeEventsIfPossible(from: data) {
+                    try Task.checkCancellation()
+                    try await onEvent(event)
+                }
+            }
+
+            throw CancellationError()
+        }
+
+        private func heartbeatLoop() async throws {
+            while !Task.isCancelled {
+                try await Task.sleep(for: heartbeatInterval)
+                try Task.checkCancellation()
+                try await confirmHeartbeat(for: task)
+            }
+
+            throw CancellationError()
+        }
+    }
 }
 
 enum PlexSessionEventsError: LocalizedError {
@@ -144,6 +223,7 @@ enum PlexSessionEventsError: LocalizedError {
     case invalidMessageEncoding
     case unsupportedMessage
     case handshakeTimedOut
+    case heartbeatTimedOut
 
     var errorDescription: String? {
         switch self {
@@ -155,11 +235,13 @@ enum PlexSessionEventsError: LocalizedError {
             return "Plex returned an unsupported websocket message."
         case .handshakeTimedOut:
             return "Plex did not respond to the websocket handshake in time."
+        case .heartbeatTimedOut:
+            return "Plex did not respond to the websocket heartbeat in time."
         }
     }
 }
 
-private final class HandshakeContinuationState: @unchecked Sendable {
+private final class PingContinuationState: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<Void, Error>?
     private var result: Result<Void, Error>?

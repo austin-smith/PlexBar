@@ -112,3 +112,37 @@ import Testing
         }
     }
 }
+
+@Test func websocketHeartbeatConfirmationCompletesAfterSuccessfulPong() async throws {
+    try await PlexSessionEventsClient.confirmHeartbeat { completion in
+        completion(nil)
+    }
+}
+
+@Test func websocketHeartbeatConfirmationThrowsPingFailure() async throws {
+    let error = URLError(.networkConnectionLost)
+
+    do {
+        try await PlexSessionEventsClient.confirmHeartbeat { completion in
+            completion(error)
+        }
+        Issue.record("Expected heartbeat failure to surface")
+    } catch let receivedError as URLError {
+        #expect(receivedError.code == .networkConnectionLost)
+    }
+}
+
+@Test func websocketHeartbeatConfirmationTimesOutWhenPongNeverReturns() async throws {
+    do {
+        try await PlexSessionEventsClient.confirmHeartbeat(
+            sendPing: { _ in },
+            timeout: .milliseconds(10)
+        )
+        Issue.record("Expected heartbeat timeout to surface")
+    } catch let error as PlexSessionEventsError {
+        guard case .heartbeatTimedOut = error else {
+            Issue.record("Unexpected websocket heartbeat error: \(error)")
+            return
+        }
+    }
+}

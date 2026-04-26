@@ -1204,6 +1204,66 @@ struct PlexSessionStoreTests {
 }
 
 @MainActor
+@Test func heartbeatFailureReconnectsAndRehydratesActiveSessions() async throws {
+    let suiteName = "PlexBarTests.heartbeatFailureReconnectsAndRehydratesActiveSessions"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let fullHydrateCounter = RequestCounter()
+    let monitorStartCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            fullHydrateCounter.increment()
+
+            let metadata: [String]
+            switch fullHydrateCounter.value {
+            case 1:
+                metadata = [sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)]
+            default:
+                metadata = [sessionJSON(sessionKey: "55", ratingKey: "901", state: "playing", viewOffset: 4000)]
+            }
+
+            return try sessionsResponse(for: url, metadata: metadata)
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            monitorStartCounter.increment()
+            try await onEvent(.connected)
+
+            if monitorStartCounter.value == 1 {
+                throw PlexSessionEventsError.heartbeatTimedOut
+            }
+
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store, timeoutNanoseconds: 4_000_000_000) {
+        $0.activeStreamCount == 1 &&
+        $0.sessions.first?.canonicalSessionKey == "55" &&
+        $0.sessions.contains(where: { $0.canonicalSessionKey == "44" }) == false
+    }
+
+    #expect(monitorStartCounter.value >= 2)
+    #expect(fullHydrateCounter.value == 2)
+}
+
+@MainActor
 @Test func transcodeIdentityChangeTriggersOneTargetedHydrate() async throws {
     let suiteName = "PlexBarTests.transcodeIdentityChangeTriggersOneTargetedHydrate"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
