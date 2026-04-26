@@ -17,6 +17,8 @@ PlexBar is a lightweight macOS menu bar app for Plex server telemetry.
 
 ## Build, Run, and Package
 
+Copy `.env.example` to `.env.local` and update values as necessary.
+
 To build and run the app:
 
 ```bash

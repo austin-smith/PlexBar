@@ -8,6 +8,9 @@ DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+.env
+.env.*
+!.env.example
 
 # macOS custom folder icon
 Icon[^a-zA-Z]

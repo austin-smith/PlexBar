@@ -45,6 +45,13 @@ To build and launch the app bundle:
 script/build_and_run.sh
 ```
 
+## Sparkle Updates
+
+- PlexBar uses Sparkle for auto-updates of Developer ID releases.
+- Sparkle appcast/release workflow is documented in `docs/sparkle-updates.md`.
+- Sparkle update metadata is injected by `script/build_and_run.sh` at bundle generation time; keep it out of checked-in source plist files.
+- `script/build_and_run.sh` loads `.env.local` when present for local Sparkle build metadata.
+
 ## Testing
 
 From repo root (`/Users/austinsmith/Developer/Repos/PlexBar`), run:

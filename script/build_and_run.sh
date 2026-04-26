@@ -5,15 +5,26 @@ MODE="${1:-run}"
 APP_NAME="PlexBar"
 BUNDLE_ID="com.crapshack.PlexBar"
 MIN_SYSTEM_VERSION="26.0"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ -f "$ROOT_DIR/.env.local" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$ROOT_DIR/.env.local"
+  set +a
+fi
+
 BUILD_CONFIGURATION="${BUILD_CONFIGURATION:-debug}"
 APP_MARKETING_VERSION="${APP_MARKETING_VERSION:-}"
 APP_BUILD_VERSION="${APP_BUILD_VERSION:-}"
+SPARKLE_APPCAST_URL="${SPARKLE_APPCAST_URL:-}"
+SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-}"
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
+APP_FRAMEWORKS="$APP_CONTENTS/Frameworks"
 APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
@@ -30,21 +41,37 @@ case "$BUILD_CONFIGURATION" in
     ;;
 esac
 
+if [[ -z "$SPARKLE_APPCAST_URL" || -z "$SPARKLE_PUBLIC_KEY" ]]; then
+  echo "Missing required Sparkle build metadata: SPARKLE_APPCAST_URL and SPARKLE_PUBLIC_KEY." >&2
+  exit 2
+fi
+
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
-swift build -c "$BUILD_CONFIGURATION"
-BUILD_BIN_DIR="$(swift build -c "$BUILD_CONFIGURATION" --show-bin-path)"
+SWIFT_BUILD_ARGS=(
+  -c "$BUILD_CONFIGURATION"
+  -Xlinker -rpath
+  -Xlinker "@executable_path/../Frameworks"
+)
+
+swift build "${SWIFT_BUILD_ARGS[@]}"
+BUILD_BIN_DIR="$(swift build "${SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
 BUILD_BINARY="$BUILD_BIN_DIR/$APP_NAME"
 RESOURCE_BUNDLE_NAME="${APP_NAME}_${APP_NAME}.bundle"
 RESOURCE_BUNDLE_SOURCE="$BUILD_BIN_DIR/$RESOURCE_BUNDLE_NAME"
 
 rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_MACOS" "$APP_RESOURCES"
+mkdir -p "$APP_MACOS" "$APP_FRAMEWORKS" "$APP_RESOURCES"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 
 if [[ -d "$RESOURCE_BUNDLE_SOURCE" ]]; then
   cp -R "$RESOURCE_BUNDLE_SOURCE" "$APP_RESOURCES/$RESOURCE_BUNDLE_NAME"
+fi
+
+SPARKLE_FRAMEWORK_SOURCE="$(find "$BUILD_BIN_DIR" "$ROOT_DIR/.build" -type d -name "Sparkle.framework" -print -quit)"
+if [[ -n "${SPARKLE_FRAMEWORK_SOURCE:-}" ]]; then
+  ditto "$SPARKLE_FRAMEWORK_SOURCE" "$APP_FRAMEWORKS/Sparkle.framework"
 fi
 
 cat >"$INFO_PLIST" <<PLIST
@@ -75,6 +102,11 @@ fi
 if [[ -n "$APP_BUILD_VERSION" ]]; then
   /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD_VERSION" "$INFO_PLIST"
 fi
+
+/usr/libexec/PlistBuddy -c "Add :SUFeedURL string $SPARKLE_APPCAST_URL" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :SUVerifyUpdateBeforeExtraction bool true" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool true" "$INFO_PLIST"
 
 if [[ -d "$APP_ICON_SOURCE" ]]; then
   ASSET_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/AppIcon.XXXXXX")"
