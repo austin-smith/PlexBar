@@ -53,6 +53,7 @@ parse_args() {
 
 resolve_apple_development_identity() {
   local matches=()
+  local unique_matches=()
   local candidate_identities=()
   local identity_line
   local identity_hash
@@ -103,20 +104,22 @@ resolve_apple_development_identity() {
     fi
   done
 
-  if [[ "${#matches[@]}" -eq 1 ]]; then
-    printf '%s\n' "${matches[0]%%|*}"
+  if [[ "${#matches[@]}" -gt 0 ]]; then
+    mapfile -t unique_matches < <(
+      printf '%s\n' "${matches[@]}" |
+        LC_ALL=C sort -u
+    )
+
+    if [[ "${#unique_matches[@]}" -gt 1 ]]; then
+      echo "Multiple Apple Development signing identities matched TeamIdentifier=$APPLE_TEAM_ID." >&2
+      echo "Using ${unique_matches[0]#*|}." >&2
+    fi
+
+    printf '%s\n' "${unique_matches[0]%%|*}"
     return 0
   fi
 
-  if [[ "${#matches[@]}" -eq 0 ]]; then
-    echo "No Apple Development signing identities matched TeamIdentifier=$APPLE_TEAM_ID." >&2
-  else
-    echo "Multiple Apple Development signing identities matched TeamIdentifier=$APPLE_TEAM_ID." >&2
-    printf 'Matches:\n' >&2
-    for identity_line in "${matches[@]}"; do
-      printf '  %s\n' "${identity_line#*|}" >&2
-    done
-  fi
+  echo "No Apple Development signing identities matched TeamIdentifier=$APPLE_TEAM_ID." >&2
 
   return 1
 }
@@ -232,7 +235,7 @@ PLIST
 /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_PRODUCT_VERSION" "$INFO_PLIST"
 /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD_VERSION" "$INFO_PLIST"
 
-if [[ "$BUILD_CONFIGURATION" == "release" ]]; then
+if [[ -n "$SPARKLE_APPCAST_URL" && -n "$SPARKLE_PUBLIC_KEY" ]]; then
   /usr/libexec/PlistBuddy -c "Add :SUFeedURL string $SPARKLE_APPCAST_URL" "$INFO_PLIST"
   /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$INFO_PLIST"
   /usr/libexec/PlistBuddy -c "Add :SUVerifyUpdateBeforeExtraction bool true" "$INFO_PLIST"
