@@ -98,6 +98,8 @@ Prereleases create GitHub prereleases but do not update the stable Sparkle appca
 When `SPARKLE_APPCAST_URL` and `SPARKLE_PUBLIC_KEY` are set, the script writes:
 
 ```text
+CFBundleShortVersionString
+CFBundleVersion
 SUFeedURL
 SUPublicEDKey
 SUVerifyUpdateBeforeExtraction

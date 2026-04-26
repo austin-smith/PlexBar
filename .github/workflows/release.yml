@@ -134,14 +134,29 @@ jobs:
       - name: Build release app bundle
         env:
           BUILD_CONFIGURATION: release
-          APP_MARKETING_VERSION: ${{ env.RELEASE_VERSION }}
           APP_BUILD_VERSION: ${{ env.BUILD_NUMBER }}
         run: script/build_and_run.sh build
 
       - name: Validate Sparkle release configuration
         run: |
+          EMBEDDED_MARKETING_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" dist/PlexBar.app/Contents/Info.plist)"
+          EMBEDDED_BUILD_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" dist/PlexBar.app/Contents/Info.plist)"
           EMBEDDED_FEED_URL="$(/usr/libexec/PlistBuddy -c "Print :SUFeedURL" dist/PlexBar.app/Contents/Info.plist)"
           EMBEDDED_PUBLIC_KEY="$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" dist/PlexBar.app/Contents/Info.plist)"
+
+          if [[ "$EMBEDDED_MARKETING_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "Embedded CFBundleShortVersionString does not match release tag version"
+            echo "Expected: $RELEASE_VERSION"
+            echo "Actual: $EMBEDDED_MARKETING_VERSION"
+            exit 1
+          fi
+
+          if [[ "$EMBEDDED_BUILD_VERSION" != "$BUILD_NUMBER" ]]; then
+            echo "Embedded CFBundleVersion does not match build number"
+            echo "Expected: $BUILD_NUMBER"
+            echo "Actual: $EMBEDDED_BUILD_VERSION"
+            exit 1
+          fi
 
           if [[ "$EMBEDDED_FEED_URL" != "$SPARKLE_APPCAST_URL" ]]; then
             echo "Embedded SUFeedURL does not match SPARKLE_APPCAST_URL"
