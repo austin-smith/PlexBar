@@ -16,6 +16,7 @@ if [[ -f "$ROOT_DIR/.env.local" ]]; then
 fi
 
 BUILD_CONFIGURATION="${BUILD_CONFIGURATION:-debug}"
+APP_BUILD_VERSION="${APP_BUILD_VERSION:-}"
 SPARKLE_APPCAST_URL="${SPARKLE_APPCAST_URL:-}"
 SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-}"
 APPLE_TEAM_ID="${APPLE_TEAM_ID:-}"
@@ -177,6 +178,7 @@ APP_PRODUCT_VERSION="$(
     head -n 1
 )"
 [[ -n "$APP_PRODUCT_VERSION" ]] || exit 2
+APP_BUILD_VERSION="${APP_BUILD_VERSION:-$APP_PRODUCT_VERSION}"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
@@ -228,7 +230,7 @@ cat >"$INFO_PLIST" <<PLIST
 PLIST
 
 /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_PRODUCT_VERSION" "$INFO_PLIST"
-/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_PRODUCT_VERSION" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD_VERSION" "$INFO_PLIST"
 
 if [[ "$BUILD_CONFIGURATION" == "release" ]]; then
   /usr/libexec/PlistBuddy -c "Add :SUFeedURL string $SPARKLE_APPCAST_URL" "$INFO_PLIST"
