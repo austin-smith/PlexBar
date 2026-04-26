@@ -30,6 +30,12 @@ To build and run the app:
 script/build_and_run.sh
 ```
 
+To run with mock data:
+
+```bash
+script/build_and_run.sh --mock
+```
+
 To package the app as a `dmg`:
 
 ```bash
