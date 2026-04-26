@@ -105,7 +105,9 @@ resolve_apple_development_identity() {
   done
 
   if [[ "${#matches[@]}" -gt 0 ]]; then
-    mapfile -t unique_matches < <(
+    while IFS= read -r identity_line; do
+      unique_matches+=("$identity_line")
+    done < <(
       printf '%s\n' "${matches[@]}" |
         LC_ALL=C sort -u
     )
