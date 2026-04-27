@@ -27,8 +27,7 @@ let package = Package(
                 "Resources/MockServer"
             ],
             resources: [
-                .process("Resources/MenuBarIcon.png"),
-                .process("Resources/MenuBarIcon@2x.png")
+                .process("Resources/MenuBarIcon")
             ]
         ),
         .testTarget(
