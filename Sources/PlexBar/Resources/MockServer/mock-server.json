@@ -8,7 +8,7 @@
   "server": {
     "id": "debug-mock-server",
     "name": "Mock Server",
-    "productVersion": "1.41.4.9463-630c9f557",
+    "productVersion": "1.43.1.10611-1e34174b1",
     "accessToken": "plexbar-debug-mock-server-token",
     "connections": [
       {
