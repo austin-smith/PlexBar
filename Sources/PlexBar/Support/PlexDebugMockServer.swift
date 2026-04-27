@@ -71,6 +71,7 @@ private struct PlexDebugMockFixture {
     let server: PlexServerResource
     let activeConnection: PlexResolvedConnection
     let sessions: [PlexSession]
+    let streamLevelsByID: [Int: [Double]]
     let resolvedLocationsBySessionKey: [String: String]
     let historyItems: [PlexHistoryItem]
     let metadataItems: [PlexMetadataItem]
@@ -147,6 +148,12 @@ private struct PlexDebugMockFixture {
             server: server,
             activeConnection: activeConnection,
             sessions: sessions,
+            streamLevelsByID: Dictionary(
+                payload.activeSessions.compactMap { session in
+                    session.audioStream.map { ($0.id, $0.levels) }
+                },
+                uniquingKeysWith: { existing, _ in existing }
+            ),
             resolvedLocationsBySessionKey: payload.resolvedLocationsBySessionKey,
             historyItems: historyItems,
             metadataItems: metadataItems,
@@ -284,6 +291,20 @@ private struct PlexDebugMockFixture {
             }
 
             return jsonResponse(url: url, object: ["MediaContainer": [:]])
+        }
+
+        if let streamID = streamID(forLevelsPath: url.path),
+           let levels = streamLevelsByID[streamID] {
+            return jsonResponse(
+                url: url,
+                object: [
+                    "MediaContainer": [
+                        "size": levels.count,
+                        "totalSamples": String(levels.count),
+                        "Level": levels.map { ["v": $0] }
+                    ]
+                ]
+            )
         }
 
         if url.path == "/status/sessions/history/all" {
@@ -526,6 +547,18 @@ private struct PlexDebugMockFixture {
         return Set(components[2].split(separator: ",").map(String.init))
     }
 
+    private func streamID(forLevelsPath path: String) -> Int? {
+        let components = path.split(separator: "/")
+        guard components.count == 4,
+              components[0] == "library",
+              components[1] == "streams",
+              components[3] == "levels" else {
+            return nil
+        }
+
+        return Int(components[2])
+    }
+
     private func jsonResponse(url: URL, object: [String: Any], headers: [String: String] = [:]) -> PlexDebugMockResponse? {
         guard let data = try? JSONSerialization.data(withJSONObject: object) else {
             return nil
@@ -601,7 +634,20 @@ private struct PlexDebugMockFixture {
             object["Media"] = media.map { media in
                 [
                     "Part": (media.part ?? []).map { part in
-                        compactObject(["decision": part.decision])
+                        var partObject = compactObject(["decision": part.decision])
+
+                        if let stream = part.stream {
+                            partObject["Stream"] = stream.map { stream in
+                                compactObject([
+                                    "id": stream.id,
+                                    "streamType": stream.streamType,
+                                    "codec": stream.codec,
+                                    "selected": stream.selected,
+                                ])
+                            }
+                        }
+
+                        return partObject
                     }
                 ]
             }
@@ -705,10 +751,22 @@ private struct PlexDebugMockFixture {
             episodesByID: episodesByID,
             audiobooksByID: audiobooksByID
         )
-        let mediaParts: [PlexMedia]? = if let mediaDecision = session.mediaDecision {
-            [PlexMedia(part: [PlexPart(decision: mediaDecision)])]
+        let mediaParts: [PlexMedia]?
+        if session.mediaDecision != nil || session.audioStream != nil {
+            let stream = session.audioStream.map {
+                PlexStream(
+                    id: $0.id,
+                    streamType: $0.streamType,
+                    codec: $0.codec,
+                    selected: $0.selected
+                )
+            }
+            mediaParts = [PlexMedia(part: [PlexPart(
+                decision: session.mediaDecision,
+                stream: stream.map { [$0] }
+            )])]
         } else {
-            nil
+            mediaParts = nil
         }
 
         return PlexSession(

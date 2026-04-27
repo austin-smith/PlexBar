@@ -162,6 +162,43 @@ struct PlexAPIClient {
         _ = try await responseData(for: request)
     }
 
+    func fetchStreamLevels(
+        using configuration: PlexConnectionConfiguration,
+        streamID: Int,
+        subsample: Int
+    ) async throws -> [Double] {
+        guard let endpoint = PlexURLBuilder.endpointURL(
+            serverURL: configuration.serverURL,
+            path: "/library/streams/\(streamID)/levels"
+        ),
+              var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
+            throw PlexAPIError.invalidServerURL
+        }
+
+        components.queryItems = [
+            URLQueryItem(name: "subsample", value: String(subsample))
+        ]
+
+        guard let levelsURL = components.url else {
+            throw PlexAPIError.invalidServerURL
+        }
+
+        let request = PlexRequestBuilder(clientContext: configuration.clientContext).request(
+            url: levelsURL,
+            accept: "application/json",
+            token: configuration.token
+        )
+
+        let (data, _) = try await responseData(for: request)
+
+        do {
+            let decodedResponse = try JSONDecoder().decode(PlexStreamLevelsEnvelope.self, from: data)
+            return decodedResponse.mediaContainer.levels.compactMap(\.value)
+        } catch {
+            throw PlexAPIError.decodingFailed(error)
+        }
+    }
+
     func fetchHistory(
         using configuration: PlexConnectionConfiguration,
         since: Date,

@@ -158,6 +158,9 @@ struct StreamCardView: View {
                 wantsPalette: true
             )
         }
+        .task(id: waveformRequestKey) {
+            sessionStore.loadWaveformLevelsIfNeeded(for: session)
+        }
     }
 
     private var playbackTimingSummary: String? {
@@ -189,6 +192,15 @@ struct StreamCardView: View {
         ]
         .compactMap { $0 }
         .joined(separator: "|")
+    }
+
+    private var waveformRequestKey: String {
+        guard session.contentKind == .track,
+              let audioStreamID = session.audioStreamID else {
+            return "none"
+        }
+
+        return "\(audioStreamID)"
     }
 
     @ViewBuilder
@@ -258,8 +270,17 @@ struct StreamCardView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     if let progress = session.progress {
-                        ProgressView(value: progress)
-                            .tint(.orange)
+                        if session.contentKind == .track,
+                           let levels = sessionStore.waveformLevels(for: session) {
+                            WaveformProgressView(
+                                levels: levels,
+                                progress: progress,
+                                isPaused: session.isPaused
+                            )
+                        } else {
+                            ProgressView(value: progress)
+                                .tint(.orange)
+                        }
                     }
 
                     UserIdentityRow(

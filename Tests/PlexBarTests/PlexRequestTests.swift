@@ -132,6 +132,58 @@ struct PlexRequestTests {
         #expect(fetchedSession?.title == "Right Session")
     }
 
+    @Test func fetchStreamLevelsUsesStreamEndpointAndSubsample() async throws {
+        let capture = RequestCapture()
+        let session = makeMockSession { request in
+            capture.record(request)
+
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            {
+              "MediaContainer": {
+                "size": 3,
+                "totalSamples": "487535",
+                "Level": [
+                  { "v": -20.0 },
+                  { "v": -19.8 },
+                  { "v": -39.9 }
+                ]
+              }
+            }
+            """#.data(using: .utf8))
+            return (response, data)
+        }
+
+        let client = PlexAPIClient(session: session)
+        let serverURL = try #require(PlexURLBuilder.normalizeServerURL("http://plex.local:32400"))
+        let clientContext = PlexClientContext(clientIdentifier: "client-123")
+
+        let levels = try await client.fetchStreamLevels(
+            using: PlexConnectionConfiguration(
+                serverURL: serverURL,
+                token: "server-token",
+                clientContext: clientContext
+            ),
+            streamID: 384686,
+            subsample: 96
+        )
+
+        #expect(levels == [-20.0, -19.8, -39.9])
+
+        let request = try #require(capture.request)
+        let requestURL = try #require(request.url)
+        let components = try #require(URLComponents(url: requestURL, resolvingAgainstBaseURL: false))
+        #expect(components.path == "/library/streams/384686/levels")
+        #expect(components.queryItems?.contains(where: { $0.name == "subsample" && $0.value == "96" }) == true)
+        #expect(request.value(forHTTPHeaderField: "Accept") == "application/json")
+        #expect(request.value(forHTTPHeaderField: "X-Plex-Token") == "server-token")
+    }
+
     @Test func notificationsWebSocketURLUsesVerifiedPath() async throws {
         let serverURL = try #require(PlexURLBuilder.normalizeServerURL("https://plex.local:32400"))
         let configuration = PlexConnectionConfiguration(

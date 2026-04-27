@@ -193,6 +193,82 @@ import Testing
     #expect(session.geoLookupIPAddress == "97.115.180.233")
 }
 
+@Test func decodesAudioStreamIDFromSessionPayload() async throws {
+    let json = #"""
+    {
+      "sessionKey": "77",
+      "ratingKey": "49928",
+      "key": "/library/metadata/49928",
+      "type": "track",
+      "title": "Apple in China",
+      "Player": {
+        "title": "Prologue",
+        "state": "playing"
+      },
+      "Media": [
+        {
+          "id": 114191,
+          "audioCodec": "aac",
+          "Part": [
+            {
+              "id": 125260,
+              "Stream": [
+                {
+                  "id": 384686,
+                  "streamType": 2,
+                  "codec": "aac",
+                  "selected": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    """#
+
+    let data = try #require(json.data(using: .utf8))
+    let session = try JSONDecoder().decode(PlexSession.self, from: data)
+
+    #expect(session.contentKind == .track)
+    #expect(session.audioStreamID == 384686)
+}
+
+@Test func audioStreamIDPrefersSelectedAudioStream() async throws {
+    let session = PlexSession(
+        ratingKey: "49928",
+        key: "/library/metadata/49928",
+        type: "track",
+        subtype: nil,
+        live: false,
+        title: "Apple in China",
+        grandparentTitle: "Patrick McGee",
+        parentTitle: "Apple in China",
+        parentIndex: nil,
+        index: nil,
+        thumb: nil,
+        parentThumb: nil,
+        grandparentThumb: nil,
+        art: nil,
+        duration: nil,
+        viewOffset: nil,
+        year: nil,
+        user: nil,
+        player: PlexPlayer(address: nil, machineIdentifier: nil, platform: nil, product: nil, state: nil, title: nil),
+        session: nil,
+        media: [
+            PlexMedia(part: [
+                PlexPart(decision: nil, stream: [
+                    PlexStream(id: 100, streamType: 2, codec: "aac", selected: false),
+                    PlexStream(id: 200, streamType: 2, codec: "aac", selected: true),
+                ])
+            ])
+        ]
+    )
+
+    #expect(session.audioStreamID == 200)
+}
+
 @Test func playbackLineOmitsPlayingStateText() async throws {
     let session = PlexSession(
         ratingKey: "42",

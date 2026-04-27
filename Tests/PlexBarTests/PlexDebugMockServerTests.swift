@@ -57,12 +57,14 @@ import Testing
     #expect(payload.server.name == "Mock Server")
     #expect(payload.activeSessions.count == 4)
     #expect(payload.libraries.map(\.title) == ["Movies", "TV Shows", "Audiobooks"])
-    #expect(payload.users.map(\.name) == ["scully", "Elliot", "petit_prince", "popeye23", "TommyS", "D0loresH4ze", "Scrump Toggins"])
+    #expect(payload.users.map(\.name) == ["scully", "Elliot", "petit_prince", "popeye23", "TommyS", "D0loresH4ze", "scrump-toggins"])
     #expect(payload.users.last?.avatar == "/mock/avatars/scrump-toggins.png")
     #expect(payload.historyEvents.filter { $0.userID == 17 }.count == 3)
     #expect(historyCountsByUser == [11: 4, 12: 3, 13: 1, 14: 2, 15: 3, 16: 2, 17: 3])
     #expect(payload.historyEvents.contains(where: { $0.mediaType == "episode" }))
     #expect(hasTommyAudiobookSession)
+    #expect(payload.activeSessions.first(where: { $0.sessionKey == "stream-4" })?.audioStream?.id == 3_103_001)
+    #expect(payload.activeSessions.first(where: { $0.sessionKey == "stream-4" })?.audioStream?.levels.count == 96)
     #expect(payload.episodes.count == 3)
     #expect(payload.shows.count == 3)
 }
@@ -157,6 +159,30 @@ import Testing
     #expect(tommySession.thumb == "/mock/art/audiobooks/war-of-the-worlds.png")
     #expect(tommySession.player.product == "Prologue")
     #expect(tommySession.player.title == "iPhone")
+    #expect(tommySession.audioStreamID == 3_103_001)
+}
+
+@Test func mockServerReturnsAudiobookStreamLevels() async throws {
+    let client = PlexAPIClient(session: PlexDebugMockServer.makeSession())
+    let configuration = PlexConnectionConfiguration(
+        serverURL: URL(string: "https://demo.plexbar.local:32400")!,
+        token: "plexbar-debug-mock-server-token",
+        clientContext: PlexClientContext(clientIdentifier: "tests")
+    )
+
+    let sessions = try await client.fetchSessions(using: configuration)
+    let tommySession = try #require(sessions.first(where: { $0.canonicalSessionKey == "stream-4" }))
+    let streamID = try #require(tommySession.audioStreamID)
+    let levels = try await client.fetchStreamLevels(
+        using: configuration,
+        streamID: streamID,
+        subsample: 96
+    )
+
+    #expect(streamID == 3_103_001)
+    #expect(levels.count == 96)
+    #expect(levels.min() == -39.9)
+    #expect(levels.max() == -21.2)
 }
 
 @Test func mockServerRemovesTerminatedSessions() async throws {

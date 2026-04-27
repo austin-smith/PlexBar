@@ -407,6 +407,15 @@ struct PlexSession: Decodable, Identifiable {
         return min(max(rawProgress, 0), 1)
     }
 
+    var audioStreamID: Int? {
+        let audioStreams = media?
+            .flatMap { $0.part ?? [] }
+            .flatMap { $0.stream ?? [] }
+            .filter(\.isAudio) ?? []
+
+        return audioStreams.first(where: { $0.selected == true })?.id ?? audioStreams.first?.id
+    }
+
     func playbackTimingSummary(
         referenceDate: Date,
         locale: Locale = .autoupdatingCurrent,
@@ -589,6 +598,10 @@ struct PlexTranscodeSession: Decodable {
 struct PlexMedia: Decodable {
     let part: [PlexPart]?
 
+    init(part: [PlexPart]?) {
+        self.part = part
+    }
+
     enum CodingKeys: String, CodingKey {
         case part = "Part"
     }
@@ -596,9 +609,94 @@ struct PlexMedia: Decodable {
 
 struct PlexPart: Decodable {
     let decision: String?
+    let stream: [PlexStream]?
+
+    init(decision: String?, stream: [PlexStream]? = nil) {
+        self.decision = decision
+        self.stream = stream
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case decision
+        case stream = "Stream"
+    }
+}
+
+struct PlexStream: Decodable {
+    let id: Int?
+    let streamType: Int?
+    let codec: String?
+    let selected: Bool?
+
+    var isAudio: Bool {
+        streamType == 2
+    }
+
+    init(id: Int?, streamType: Int?, codec: String? = nil, selected: Bool? = nil) {
+        self.id = id
+        self.streamType = streamType
+        self.codec = codec
+        self.selected = selected
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case streamType
+        case codec
+        case selected
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeFlexibleIntIfPresent(forKey: .id)
+        streamType = try container.decodeFlexibleIntIfPresent(forKey: .streamType)
+        codec = try container.decodeIfPresent(String.self, forKey: .codec)
+        selected = try container.decodeFlexibleBoolIfPresent(forKey: .selected)
+    }
+}
+
+struct PlexStreamLevelsEnvelope: Decodable {
+    let mediaContainer: PlexStreamLevelsContainer
+
+    enum CodingKeys: String, CodingKey {
+        case mediaContainer = "MediaContainer"
+    }
+}
+
+struct PlexStreamLevelsContainer: Decodable {
+    let levels: [PlexStreamLevel]
+
+    enum CodingKeys: String, CodingKey {
+        case levels = "Level"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        levels = try container.decodeIfPresent([PlexStreamLevel].self, forKey: .levels) ?? []
+    }
+}
+
+struct PlexStreamLevel: Decodable {
+    let value: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case value = "v"
+    }
 }
 
 private extension KeyedDecodingContainer {
+    func decodeFlexibleIntIfPresent(forKey key: Key) throws -> Int? {
+        if let intValue = try? decodeIfPresent(Int.self, forKey: key) {
+            return intValue
+        }
+
+        if let stringValue = try? decodeIfPresent(String.self, forKey: key) {
+            return Int(stringValue.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+
+        return nil
+    }
+
     func decodeFlexibleBoolIfPresent(forKey key: Key) throws -> Bool? {
         if let boolValue = try? decodeIfPresent(Bool.self, forKey: key) {
             return boolValue

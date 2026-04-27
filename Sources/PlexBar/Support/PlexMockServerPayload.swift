@@ -148,6 +148,15 @@ extension PlexMockServerPayload {
         let session: PlaybackSession?
         let transcodeSession: TranscodeSession?
         let mediaDecision: String?
+        let audioStream: AudioStream?
+    }
+
+    struct AudioStream: Decodable {
+        let id: Int
+        let streamType: Int
+        let codec: String?
+        let selected: Bool?
+        let levels: [Double]
     }
 
     struct HistoryEvent: Decodable {

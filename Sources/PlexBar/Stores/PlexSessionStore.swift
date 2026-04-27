@@ -32,6 +32,9 @@ final class PlexSessionStore {
     private var sessionsByKey: [String: PlexSession] = [:]
     private var sessionOrder: [String] = []
     private var terminatingSessionKeys: Set<String> = []
+    private var waveformLevelsByStreamID: [Int: [Double]] = [:]
+    private var waveformUnavailableStreamIDs: Set<Int> = []
+    private var waveformLevelTasksByStreamID: [Int: Task<Void, Never>] = [:]
     private var activeServerIdentifier: String?
     private var activeMonitorURL: URL?
 
@@ -124,9 +127,60 @@ final class PlexSessionStore {
         return resolvedLocationsBySessionKey[sessionKey]
     }
 
+    func waveformLevels(for session: PlexSession) -> [Double]? {
+        guard let streamID = session.audioStreamID else {
+            return nil
+        }
+
+        return waveformLevelsByStreamID[streamID]
+    }
+
+    func loadWaveformLevelsIfNeeded(for session: PlexSession, subsample: Int = 96) {
+        guard session.contentKind == .track,
+              let streamID = session.audioStreamID,
+              waveformLevelsByStreamID[streamID] == nil,
+              waveformUnavailableStreamIDs.contains(streamID) == false,
+              waveformLevelTasksByStreamID[streamID] == nil else {
+            return
+        }
+
+        let client = self.client
+        waveformLevelTasksByStreamID[streamID] = Task { [weak self] in
+            do {
+                guard let self else {
+                    return
+                }
+
+                let configuration = try await connectionStore.currentConfiguration()
+                let levels = try await client.fetchStreamLevels(
+                    using: configuration,
+                    streamID: streamID,
+                    subsample: subsample
+                )
+
+                await MainActor.run {
+                    self.finishWaveformLoad(streamID: streamID, levels: levels)
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    self?.finishCancelledWaveformLoad(streamID: streamID)
+                }
+            } catch let error as URLError where error.code == .cancelled {
+                await MainActor.run {
+                    self?.finishCancelledWaveformLoad(streamID: streamID)
+                }
+            } catch {
+                await MainActor.run {
+                    self?.finishWaveformLoad(streamID: streamID, levels: nil)
+                }
+            }
+        }
+    }
+
     func didChangeConfiguration() {
         cancelBackgroundTasks()
         clearGeoLookups()
+        clearWaveformCache()
 
         guard connectionStore.settings.hasValidConfiguration else {
             activeServerIdentifier = nil
@@ -353,6 +407,7 @@ final class PlexSessionStore {
 
         sessionsByKey = nextSessionsByKey
         sessionOrder = nextSessionOrder
+        pruneWaveformCache()
         refreshResolvedLocationsIfNeeded()
         errorMessage = nil
         lastUpdated = Date()
@@ -365,6 +420,7 @@ final class PlexSessionStore {
             sessionOrder.append(sessionKey)
         }
 
+        pruneWaveformCache()
         refreshResolvedLocationsIfNeeded()
     }
 
@@ -372,6 +428,7 @@ final class PlexSessionStore {
         sessionsByKey.removeValue(forKey: sessionKey)
         sessionOrder.removeAll { $0 == sessionKey }
         terminatingSessionKeys.remove(sessionKey)
+        pruneWaveformCache()
         refreshResolvedLocationsIfNeeded()
         errorMessage = nil
         lastUpdated = Date()
@@ -381,6 +438,7 @@ final class PlexSessionStore {
         sessionsByKey = [:]
         sessionOrder = []
         terminatingSessionKeys.removeAll()
+        pruneWaveformCache()
         refreshResolvedLocationsIfNeeded()
 
         if resetTimestamp {
@@ -400,6 +458,8 @@ final class PlexSessionStore {
         connectionRecheckTask = nil
         geoLookupTasksByIP.values.forEach { $0.cancel() }
         geoLookupTasksByIP.removeAll()
+        waveformLevelTasksByStreamID.values.forEach { $0.cancel() }
+        waveformLevelTasksByStreamID.removeAll()
     }
 
     private func startMonitorTask() {
@@ -513,6 +573,40 @@ final class PlexSessionStore {
         geoLookupTasksByIP.removeAll()
         geoLookupStateByIP.removeAll()
         resolvedLocationsBySessionKey.removeAll()
+    }
+
+    private func clearWaveformCache() {
+        waveformLevelTasksByStreamID.values.forEach { $0.cancel() }
+        waveformLevelTasksByStreamID.removeAll()
+        waveformLevelsByStreamID.removeAll()
+        waveformUnavailableStreamIDs.removeAll()
+    }
+
+    private func finishWaveformLoad(streamID: Int, levels: [Double]?) {
+        waveformLevelTasksByStreamID.removeValue(forKey: streamID)
+
+        guard let levels, !levels.isEmpty else {
+            waveformUnavailableStreamIDs.insert(streamID)
+            return
+        }
+
+        waveformLevelsByStreamID[streamID] = levels
+    }
+
+    private func finishCancelledWaveformLoad(streamID: Int) {
+        waveformLevelTasksByStreamID.removeValue(forKey: streamID)
+    }
+
+    private func pruneWaveformCache() {
+        let activeStreamIDs = Set(sessionsByKey.values.compactMap(\.audioStreamID))
+
+        waveformLevelsByStreamID = waveformLevelsByStreamID.filter { activeStreamIDs.contains($0.key) }
+        waveformUnavailableStreamIDs = waveformUnavailableStreamIDs.filter { activeStreamIDs.contains($0) }
+
+        for streamID in waveformLevelTasksByStreamID.keys where !activeStreamIDs.contains(streamID) {
+            waveformLevelTasksByStreamID[streamID]?.cancel()
+            waveformLevelTasksByStreamID.removeValue(forKey: streamID)
+        }
     }
 }
 

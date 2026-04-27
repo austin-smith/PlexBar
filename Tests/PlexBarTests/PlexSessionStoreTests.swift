@@ -89,6 +89,141 @@ struct PlexSessionStoreTests {
 }
 
 @MainActor
+@Test func configurationChangeClearsUnavailableWaveformCache() async throws {
+    let suiteName = "PlexBarTests.configurationChangeClearsUnavailableWaveformCache"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let levelsRequestCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            return try sessionsResponse(for: url, metadata: [
+                trackSessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000, streamID: 123)
+            ])
+        }
+
+        if url.path == "/library/streams/123/levels" {
+            levelsRequestCounter.increment()
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 404,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"{"error":"not found"}"#.data(using: .utf8))
+            return (response, data)
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+    let trackSession = try #require(store.sessions.first)
+
+    store.loadWaveformLevelsIfNeeded(for: trackSession)
+    await waitUntil { levelsRequestCounter.value == 1 }
+
+    store.loadWaveformLevelsIfNeeded(for: trackSession)
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(levelsRequestCounter.value == 1)
+
+    store.didChangeConfiguration()
+    store.loadWaveformLevelsIfNeeded(for: trackSession)
+    await waitUntil { levelsRequestCounter.value == 2 }
+}
+
+@MainActor
+@Test func cancelledWaveformLoadDoesNotMarkStreamUnavailable() async throws {
+    let suiteName = "PlexBarTests.cancelledWaveformLoadDoesNotMarkStreamUnavailable"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let levelsRequestCounter = RequestCounter()
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+
+        if url.path == "/status/sessions", url.query == nil {
+            return try sessionsResponse(for: url, metadata: [
+                trackSessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000, streamID: 123)
+            ])
+        }
+
+        if url.path == "/library/streams/123/levels" {
+            levelsRequestCounter.increment()
+
+            if levelsRequestCounter.value == 1 {
+                throw CancellationError()
+            }
+
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"""
+            {
+              "MediaContainer": {
+                "Level": [
+                  { "v": -27.0 },
+                  { "v": -26.0 }
+                ]
+              }
+            }
+            """#.data(using: .utf8))
+            return (response, data)
+        }
+
+        throw URLError(.unsupportedURL)
+    }
+
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+    let trackSession = try #require(store.sessions.first)
+
+    store.loadWaveformLevelsIfNeeded(for: trackSession)
+    await waitUntil { levelsRequestCounter.value == 1 }
+    await waitUntil { store.waveformLevels(for: trackSession) == nil }
+
+    store.loadWaveformLevelsIfNeeded(for: trackSession)
+    await waitUntil { levelsRequestCounter.value == 2 }
+    await waitUntil { store.waveformLevels(for: trackSession) == [-27.0, -26.0] }
+}
+
+@MainActor
 @Test func startupWaitsForServerRefreshBeforeStartingMonitor() async throws {
     let suiteName = "PlexBarTests.startupWaitsForServerRefreshBeforeStartingMonitor"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -1518,6 +1653,22 @@ private func waitForSessionStore(
 }
 
 @MainActor
+private func waitUntil(
+    timeoutNanoseconds: UInt64 = 2_000_000_000,
+    condition: @escaping @MainActor () -> Bool
+) async {
+    let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+
+    while DispatchTime.now().uptimeNanoseconds < deadline {
+        if condition() {
+            return
+        }
+
+        try? await Task.sleep(nanoseconds: 10_000_000)
+    }
+}
+
+@MainActor
 private func makeSessionStore(
     settings: PlexSettingsStore,
     session: URLSession,
@@ -1667,6 +1818,50 @@ private func sessionJSON(
         \#(sessionIDJSON)
         "location": "\#(sessionLocation)"
       }\#(transcodeSessionJSON)
+    }
+    """#
+}
+
+private func trackSessionJSON(
+    sessionKey: String,
+    ratingKey: String,
+    state: String,
+    viewOffset: Int,
+    streamID: Int
+) -> String {
+    #"""
+    {
+      "sessionKey": "\#(sessionKey)",
+      "ratingKey": "\#(ratingKey)",
+      "key": "/library/metadata/\#(ratingKey)",
+      "type": "track",
+      "title": "Siddhartha",
+      "duration": 10000,
+      "viewOffset": \#(viewOffset),
+      "Player": {
+        "title": "Prologue",
+        "state": "\#(state)"
+      },
+      "Session": {
+        "id": "\#(sessionKey)",
+        "location": "wan"
+      },
+      "Media": [
+        {
+          "Part": [
+            {
+              "Stream": [
+                {
+                  "id": \#(streamID),
+                  "streamType": 2,
+                  "codec": "aac",
+                  "selected": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
     """#
 }
