@@ -95,6 +95,29 @@ enum PlexSessionContentKind: String, Equatable {
             .other
         }
     }
+
+    var streamArtworkLayout: PlexStreamArtworkLayout {
+        switch self {
+        case .track:
+            .squareCover
+        default:
+            .poster
+        }
+    }
+}
+
+enum PlexStreamArtworkLayout: Equatable {
+    case poster
+    case squareCover
+
+    var aspectRatio: Double {
+        switch self {
+        case .poster:
+            2.0 / 3.0
+        case .squareCover:
+            1.0
+        }
+    }
 }
 
 struct PlexSession: Decodable, Identifiable {
@@ -254,6 +277,10 @@ struct PlexSession: Decodable, Identifiable {
 
     var contentKind: PlexSessionContentKind {
         PlexSessionContentKind(type: type, live: isLive)
+    }
+
+    var streamArtworkLayout: PlexStreamArtworkLayout {
+        contentKind.streamArtworkLayout
     }
 
     var isLive: Bool {

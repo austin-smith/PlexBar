@@ -35,6 +35,29 @@ private struct StreamCardTheme {
     }
 }
 
+private enum StreamArtworkMetrics {
+    private static let artworkWidth: CGFloat = 88
+    static let transcodeScale = 2
+
+    static var columnHeight: CGFloat {
+        displayHeight(for: .poster)
+    }
+
+    static func displayWidth(for layout: PlexStreamArtworkLayout) -> CGFloat {
+        artworkWidth
+    }
+
+    static func displayHeight(for layout: PlexStreamArtworkLayout) -> CGFloat {
+        displayWidth(for: layout) / CGFloat(layout.aspectRatio)
+    }
+
+    static func transcodeSize(for layout: PlexStreamArtworkLayout) -> (width: Int, height: Int) {
+        let width = Int(displayWidth(for: layout)) * transcodeScale
+        let height = Int(displayHeight(for: layout)) * transcodeScale
+        return (width, height)
+    }
+}
+
 struct StreamCardView: View {
     @Environment(\.colorScheme) private var colorScheme
     let session: PlexSession
@@ -77,7 +100,11 @@ struct StreamCardView: View {
         self.resolvedLocation = resolvedLocation
 
         let posterURL = Self.posterURL(serverURL: serverURL, posterPath: session.posterPath)
-        let transcodedPosterURL = Self.transcodedPosterURL(serverURL: serverURL, posterPath: session.posterPath)
+        let transcodedPosterURL = Self.transcodedPosterURL(
+            serverURL: serverURL,
+            posterPath: session.posterPath,
+            artworkLayout: session.streamArtworkLayout
+        )
         _artwork = State(initialValue: PlexArtworkPresentationState(
             primaryImageURL: posterURL,
             fallbackImageURL: transcodedPosterURL,
@@ -146,7 +173,11 @@ struct StreamCardView: View {
     }
 
     private var transcodedPosterURL: URL? {
-        Self.transcodedPosterURL(serverURL: serverURL, posterPath: session.posterPath)
+        Self.transcodedPosterURL(
+            serverURL: serverURL,
+            posterPath: session.posterPath,
+            artworkLayout: session.streamArtworkLayout
+        )
     }
 
     private var requestKey: String {
@@ -163,10 +194,11 @@ struct StreamCardView: View {
     @ViewBuilder
     private func defaultCardContent(isTerminating: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            PosterThumbnailView(
+            StreamArtworkView(
                 artwork: artwork,
                 isPaused: session.isPaused,
-                placeholderSymbol: session.contentKind.contentMetaSymbolName
+                placeholderSymbol: session.contentKind.contentMetaSymbolName,
+                artworkLayout: session.streamArtworkLayout
             )
 
             VStack(alignment: .leading, spacing: 10) {
@@ -350,16 +382,21 @@ struct StreamCardView: View {
         )
     }
 
-    private static func transcodedPosterURL(serverURL: URL?, posterPath: String?) -> URL? {
+    private static func transcodedPosterURL(
+        serverURL: URL?,
+        posterPath: String?,
+        artworkLayout: PlexStreamArtworkLayout
+    ) -> URL? {
         guard let serverURL else {
             return nil
         }
 
+        let transcodeSize = StreamArtworkMetrics.transcodeSize(for: artworkLayout)
         return PlexURLBuilder.transcodedArtworkURL(
             serverURL: serverURL,
             path: posterPath,
-            width: 176,
-            height: 264
+            width: transcodeSize.width,
+            height: transcodeSize.height
         )
     }
 
@@ -383,39 +420,46 @@ private struct SessionActionsPopover: View {
     }
 }
 
-private struct PosterThumbnailView: View {
+private struct StreamArtworkView: View {
     @Bindable var artwork: PlexArtworkPresentationState
     let isPaused: Bool
     let placeholderSymbol: String
-    private let posterWidth: CGFloat = 88
-    private let posterAspectRatio: CGFloat = 2 / 3
+    let artworkLayout: PlexStreamArtworkLayout
 
-    private var posterHeight: CGFloat {
-        posterWidth / posterAspectRatio
+    private var artworkHeight: CGFloat {
+        StreamArtworkMetrics.displayHeight(for: artworkLayout)
+    }
+
+    private var artworkWidth: CGFloat {
+        StreamArtworkMetrics.displayWidth(for: artworkLayout)
     }
 
     var body: some View {
         ZStack {
-            if let image = artwork.image {
-                image
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                placeholder
-                    .overlay {
-                        if artwork.isLoading {
-                            ProgressView()
-                                .controlSize(.small)
+            ZStack {
+                if let image = artwork.image {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    placeholder
+                        .overlay {
+                            if artwork.isLoading {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
                         }
-                    }
-            }
 
-            if isPaused {
-                pauseOverlay
+                }
+
+                if isPaused {
+                    pauseOverlay
+                }
             }
+            .frame(width: artworkWidth, height: artworkHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .frame(width: posterWidth, height: posterHeight)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .frame(width: artworkWidth, height: StreamArtworkMetrics.columnHeight)
     }
 
     private var placeholder: some View {
