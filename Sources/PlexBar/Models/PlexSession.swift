@@ -262,8 +262,10 @@ struct PlexSession: Decodable, Identifiable {
 
     var headline: String {
         switch contentKind {
-        case .tv, .liveTV, .track:
+        case .tv, .liveTV:
             return grandparentTitle ?? title
+        case .track:
+            return title
         default:
             return title
         }
@@ -290,7 +292,7 @@ struct PlexSession: Decodable, Identifiable {
         case .tv, .liveTV:
             return title.nilIfBlank
         case .track:
-            return title.nilIfBlank
+            return nil
         default:
             return nil
         }
@@ -301,7 +303,7 @@ struct PlexSession: Decodable, Identifiable {
         case .tv, .liveTV:
             return seasonEpisodeLine
         case .track:
-            return parentTitle?.nilIfBlank
+            return grandparentTitle?.nilIfBlank
         case .movie:
             return year.map(String.init)
         default:
