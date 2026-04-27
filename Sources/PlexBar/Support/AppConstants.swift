@@ -3,7 +3,7 @@ import Foundation
 enum AppConstants {
     static let appName = "PlexBar"
     static let bundleIdentifier = "com.crapshack.PlexBar"
-    static let productVersion = "0.7.3"
+    static let productVersion = "0.8.0"
     static let defaultConnectionRecheckIntervalSeconds = 900
     static let allowedConnectionRecheckIntervalSeconds = [0, 300, 900, 1_800, 3_600]
     static let defaultHistoryPollIntervalSeconds = 900
