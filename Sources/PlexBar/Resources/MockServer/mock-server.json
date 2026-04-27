@@ -48,6 +48,11 @@
       "id": 16,
       "name": "D0loresH4ze",
       "avatar": "/mock/avatars/darlene-alderson.png"
+    },
+    {
+      "id": 17,
+      "name": "scrump-toggins",
+      "avatar": "/mock/avatars/scrump-toggins.png"
     }
   ],
   "movies": [
@@ -354,6 +359,62 @@
       "mediaID": "1102",
       "viewedAtSecondsAgo": 129600,
       "deviceID": 6
+    },
+    {
+      "historyKey": "/status/sessions/history/812",
+      "userID": 17,
+      "mediaType": "episode",
+      "mediaID": "2203",
+      "viewedAtSecondsAgo": 1800,
+      "deviceID": 7
+    },
+    {
+      "historyKey": "/status/sessions/history/813",
+      "userID": 17,
+      "mediaType": "movie",
+      "mediaID": "1101",
+      "viewedAtSecondsAgo": 28800,
+      "deviceID": 7
+    },
+    {
+      "historyKey": "/status/sessions/history/814",
+      "userID": 17,
+      "mediaType": "episode",
+      "mediaID": "2202",
+      "viewedAtSecondsAgo": 604800,
+      "deviceID": 7
+    },
+    {
+      "historyKey": "/status/sessions/history/815",
+      "userID": 11,
+      "mediaType": "episode",
+      "mediaID": "2202",
+      "viewedAtSecondsAgo": 93600,
+      "deviceID": 1
+    },
+    {
+      "historyKey": "/status/sessions/history/816",
+      "userID": 11,
+      "mediaType": "movie",
+      "mediaID": "1102",
+      "viewedAtSecondsAgo": 432000,
+      "deviceID": 1
+    },
+    {
+      "historyKey": "/status/sessions/history/817",
+      "userID": 12,
+      "mediaType": "movie",
+      "mediaID": "1101",
+      "viewedAtSecondsAgo": 691200,
+      "deviceID": 2
+    },
+    {
+      "historyKey": "/status/sessions/history/818",
+      "userID": 15,
+      "mediaType": "movie",
+      "mediaID": "1103",
+      "viewedAtSecondsAgo": 777600,
+      "deviceID": 5
     }
   ],
   "libraries": [

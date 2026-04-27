@@ -49,11 +49,18 @@ import Testing
     let hasTommyAudiobookSession = payload.activeSessions.contains { session in
         session.userID == 15 && session.mediaType == "audiobook" && session.mediaID == "3103"
     }
+    let historyCountsByUser = Dictionary(
+        uniqueKeysWithValues: Dictionary(grouping: payload.historyEvents, by: \.userID)
+            .map { ($0.key, $0.value.count) }
+    )
 
     #expect(payload.server.name == "Mock Server")
     #expect(payload.activeSessions.count == 4)
     #expect(payload.libraries.map(\.title) == ["Movies", "TV Shows", "Audiobooks"])
-    #expect(payload.users.map(\.name) == ["scully", "Elliot", "petit_prince", "popeye23", "TommyS", "D0loresH4ze"])
+    #expect(payload.users.map(\.name) == ["scully", "Elliot", "petit_prince", "popeye23", "TommyS", "D0loresH4ze", "Scrump Toggins"])
+    #expect(payload.users.last?.avatar == "/mock/avatars/scrump-toggins.png")
+    #expect(payload.historyEvents.filter { $0.userID == 17 }.count == 3)
+    #expect(historyCountsByUser == [11: 4, 12: 3, 13: 1, 14: 2, 15: 3, 16: 2, 17: 3])
     #expect(payload.historyEvents.contains(where: { $0.mediaType == "episode" }))
     #expect(hasTommyAudiobookSession)
     #expect(payload.episodes.count == 3)

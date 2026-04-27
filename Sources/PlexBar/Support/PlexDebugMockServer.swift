@@ -159,6 +159,7 @@ private struct PlexDebugMockFixture {
                 DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/elliot-alderson.png", sourceFileName: "elliot-alderson.png"),
                 DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/le-petit-prince.png", sourceFileName: "le-petit-prince.png"),
                 DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/popeye.png", sourceFileName: "popeye.png"),
+                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/scrump-toggins.png", sourceFileName: "scrump-toggins.png"),
                 DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/tommy-shelby.png", sourceFileName: "tommy-shelby.png"),
                 DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/movies/charade.png", sourceFileName: "charade.png", resourceDirectory: "Resources/MockServer/art/movies"),
                 DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/movies/night-of-the-living-dead.png", sourceFileName: "night-of-the-living-dead.png", resourceDirectory: "Resources/MockServer/art/movies"),
