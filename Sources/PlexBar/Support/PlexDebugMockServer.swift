@@ -29,7 +29,9 @@ enum PlexDebugMockServer {
     static func makeSession() -> URLSession {
         #if DEBUG
         debugFixture.seedArtworkCache()
+        let stateID = PlexDebugMockStateRegistry.shared.register(PlexDebugMockState())
         let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpAdditionalHeaders = [PlexDebugMockStateRegistry.headerName: stateID]
         configuration.protocolClasses = [PlexDebugMockURLProtocol.self]
         return URLSession(configuration: configuration)
         #else
@@ -199,13 +201,13 @@ private struct PlexDebugMockFixture {
         return PlexMockServerResourceLocator.url(for: "avatars/\(URL(fileURLWithPath: thumb).lastPathComponent)")
     }
 
-    func response(for request: URLRequest) -> PlexDebugMockResponse? {
+    func response(for request: URLRequest, state: PlexDebugMockState) -> PlexDebugMockResponse? {
         guard let url = request.url else {
             return nil
         }
 
         if isMockServer(url) {
-            return serverResponse(for: request)
+            return serverResponse(for: request, state: state)
         }
 
         if PlexRemoteService.isPlexHosted(url) {
@@ -220,7 +222,7 @@ private struct PlexDebugMockFixture {
         return url.scheme == fixtureURL.scheme && url.host == fixtureURL.host && url.port == fixtureURL.port
     }
 
-    private func serverResponse(for request: URLRequest) -> PlexDebugMockResponse? {
+    private func serverResponse(for request: URLRequest, state: PlexDebugMockState) -> PlexDebugMockResponse? {
         guard let url = request.url else {
             return nil
         }
@@ -252,6 +254,10 @@ private struct PlexDebugMockFixture {
                 .first(where: { $0.name == "sessionKey" })?
                 .value
             let filteredSessions = sessions.filter { session in
+                guard state.isTerminated(session) == false else {
+                    return false
+                }
+
                 guard let sessionKey else {
                     return true
                 }
@@ -269,6 +275,13 @@ private struct PlexDebugMockFixture {
         }
 
         if url.path == "/status/sessions/terminate" {
+            if let sessionID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "sessionId" })?
+                .value {
+                state.terminateSession(withID: sessionID)
+            }
+
             return jsonResponse(url: url, object: ["MediaContainer": [:]])
         }
 
@@ -1065,6 +1078,61 @@ private struct PlexDebugResolvedLibraryItem {
     }
 }
 
+private final class PlexDebugMockState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var terminatedSessionIDs: Set<String> = []
+
+    func terminateSession(withID sessionID: String) {
+        guard let sessionID = sessionID.nilIfBlank else {
+            return
+        }
+
+        _ = lock.withLock {
+            terminatedSessionIDs.insert(sessionID)
+        }
+    }
+
+    func isTerminated(_ session: PlexSession) -> Bool {
+        guard let serverSessionID = session.serverSessionID else {
+            return false
+        }
+
+        return lock.withLock {
+            terminatedSessionIDs.contains(serverSessionID)
+        }
+    }
+}
+
+private final class PlexDebugMockStateRegistry: @unchecked Sendable {
+    static let shared = PlexDebugMockStateRegistry()
+    static let headerName = "X-PlexBar-Mock-State-ID"
+
+    private let lock = NSLock()
+    private var states: [String: PlexDebugMockState] = [:]
+
+    private init() {}
+
+    func register(_ state: PlexDebugMockState) -> String {
+        let id = UUID().uuidString
+
+        lock.withLock {
+            states[id] = state
+        }
+
+        return id
+    }
+
+    func state(for request: URLRequest) -> PlexDebugMockState? {
+        guard let id = request.value(forHTTPHeaderField: Self.headerName) else {
+            return nil
+        }
+
+        return lock.withLock {
+            states[id]
+        }
+    }
+}
+
 private final class PlexDebugMockURLProtocol: URLProtocol, @unchecked Sendable {
     private static let forwardingSession: URLSession = {
         let configuration = URLSessionConfiguration.ephemeral
@@ -1082,7 +1150,8 @@ private final class PlexDebugMockURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func startLoading() {
-        if let response = debugFixture.response(for: request) {
+        if let state = PlexDebugMockStateRegistry.shared.state(for: request),
+           let response = debugFixture.response(for: request, state: state) {
             client?.urlProtocol(self, didReceive: response.response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: response.data)
             client?.urlProtocolDidFinishLoading(self)

@@ -152,4 +152,21 @@ import Testing
     #expect(tommySession.player.title == "iPhone")
 }
 
+@Test func mockServerRemovesTerminatedSessions() async throws {
+    let client = PlexAPIClient(session: PlexDebugMockServer.makeSession())
+    let configuration = PlexConnectionConfiguration(
+        serverURL: URL(string: "https://demo.plexbar.local:32400")!,
+        token: "plexbar-debug-mock-server-token",
+        clientContext: PlexClientContext(clientIdentifier: "tests")
+    )
+    let sessions = try await client.fetchSessions(using: configuration)
+    let session = try #require(sessions.first)
+    let sessionID = try #require(session.serverSessionID)
+
+    try await client.terminateSession(using: configuration, sessionID: sessionID)
+
+    let refreshedSessions = try await client.fetchSessions(using: configuration)
+    #expect(refreshedSessions.contains(where: { $0.serverSessionID == sessionID }) == false)
+}
+
 #endif
