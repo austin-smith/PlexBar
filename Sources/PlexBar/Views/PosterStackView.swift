@@ -46,8 +46,8 @@ struct PosterStackView: View {
     @ViewBuilder
     private func poster(for item: PlexServerPreviewItem) -> some View {
         PlexArtworkView(
-            primaryImageURL: posterURL(for: item.posterPath),
-            fallbackImageURL: posterURL(for: item.artworkPath),
+            primaryImageURL: artworkURL(for: item.posterPath),
+            fallbackImageURL: artworkURL(for: item.artworkPath),
             token: token,
             clientContext: clientContext,
             placeholderSymbol: placeholderSymbol,
@@ -116,16 +116,12 @@ struct PosterStackView: View {
         )
     }
 
-    private func posterURL(for path: String?) -> URL? {
+    private func artworkURL(for path: String?) -> URL? {
         guard let serverURL else {
             return nil
         }
 
-        return PlexURLBuilder.transcodedArtworkURL(
-            serverURL: serverURL,
-            path: path,
-            width: Int(posterWidth * 2),
-            height: Int(posterHeight * 2)
-        )
+        return PlexURLBuilder.mediaURL(serverURL: serverURL, path: path)
     }
+
 }

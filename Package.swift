@@ -23,8 +23,11 @@ let package = Package(
             dependencies: [
                 .product(name: "Sparkle", package: "Sparkle")
             ],
+            exclude: [
+                "Resources/MockServer"
+            ],
             resources: [
-                .process("Resources")
+                .process("Resources/MenuBarIcon")
             ]
         ),
         .testTarget(

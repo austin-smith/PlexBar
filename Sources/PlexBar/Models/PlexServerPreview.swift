@@ -14,8 +14,12 @@ struct PlexServerPreviewItem: Identifiable, Equatable {
     let artworkPath: String?
     let addedAt: Date
 
+    var displayArtworkPath: String? {
+        posterPath ?? artworkPath
+    }
+
     var hasArtwork: Bool {
-        posterPath != nil || artworkPath != nil
+        displayArtworkPath != nil
     }
 }
 
