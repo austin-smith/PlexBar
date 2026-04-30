@@ -133,6 +133,7 @@ struct StreamCardView: View {
         .background {
             StreamCardBackground(palette: artwork.palette, theme: theme)
         }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
             if isShowingTerminatePrompt {
                 terminatePromptOverlay
@@ -225,7 +226,7 @@ struct StreamCardView: View {
 
             if isExpanded {
                 StreamDiagnosticsPanel(diagnostics: session.streamDiagnostics)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .transition(.opacity)
             }
         }
     }
