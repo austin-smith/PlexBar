@@ -148,7 +148,51 @@ extension PlexMockServerPayload {
         let session: PlaybackSession?
         let transcodeSession: TranscodeSession?
         let mediaDecision: String?
+        let media: [Media]?
         let audioStream: AudioStream?
+    }
+
+    struct Media: Decodable {
+        let bitrate: Int?
+        let videoCodec: String?
+        let audioCodec: String?
+        let container: String?
+        let width: Int?
+        let height: Int?
+        let audioChannels: Int?
+        let videoResolution: String?
+        let videoFrameRate: String?
+        let videoProfile: String?
+        let part: [Part]?
+    }
+
+    struct Part: Decodable {
+        let decision: String?
+        let bitrate: Int?
+        let videoCodec: String?
+        let audioCodec: String?
+        let container: String?
+        let width: Int?
+        let height: Int?
+        let videoProfile: String?
+        let stream: [Stream]?
+    }
+
+    struct Stream: Decodable {
+        let id: Int?
+        let streamType: Int?
+        let codec: String?
+        let bitrate: Int?
+        let width: Int?
+        let height: Int?
+        let displayTitle: String?
+        let extendedDisplayTitle: String?
+        let decision: String?
+        let location: String?
+        let channels: Int?
+        let language: String?
+        let title: String?
+        let selected: Bool?
     }
 
     struct AudioStream: Decodable {
@@ -230,6 +274,40 @@ extension PlexMockServerPayload {
 
     struct TranscodeSession: Decodable {
         let key: String?
+        let videoDecision: String?
+        let audioDecision: String?
+        let protocolName: String?
+        let container: String?
+        let videoCodec: String?
+        let audioCodec: String?
+        let sourceVideoCodec: String?
+        let sourceAudioCodec: String?
+        let width: Int?
+        let height: Int?
+        let progress: Double?
+        let speed: Double?
+        let throttled: Bool?
+        let transcodeHwRequested: Bool?
+        let transcodeHwFullPipeline: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case key
+            case videoDecision
+            case audioDecision
+            case protocolName = "protocol"
+            case container
+            case videoCodec
+            case audioCodec
+            case sourceVideoCodec
+            case sourceAudioCodec
+            case width
+            case height
+            case progress
+            case speed
+            case throttled
+            case transcodeHwRequested
+            case transcodeHwFullPipeline
+        }
 
         func materialize() -> PlexTranscodeSession {
             PlexTranscodeSession(key: key)

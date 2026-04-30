@@ -71,6 +71,8 @@ struct StreamCardView: View {
     let settingsStore: PlexSettingsStore
     let snapshotDate: Date?
     let resolvedLocation: String?
+    let isExpanded: Bool
+    let onToggleDiagnostics: () -> Void
     @State private var artwork: PlexArtworkPresentationState
     @State private var isShowingActionsPopover = false
 
@@ -85,7 +87,9 @@ struct StreamCardView: View {
         serverURL: URL?,
         settingsStore: PlexSettingsStore,
         snapshotDate: Date?,
-        resolvedLocation: String?
+        resolvedLocation: String?,
+        isExpanded: Bool,
+        onToggleDiagnostics: @escaping () -> Void
     ) {
         self.session = session
         self.sessionStore = sessionStore
@@ -98,6 +102,8 @@ struct StreamCardView: View {
         self.settingsStore = settingsStore
         self.snapshotDate = snapshotDate
         self.resolvedLocation = resolvedLocation
+        self.isExpanded = isExpanded
+        self.onToggleDiagnostics = onToggleDiagnostics
 
         let posterURL = Self.posterURL(serverURL: serverURL, posterPath: session.posterPath)
         let transcodedPosterURL = Self.transcodedPosterURL(
@@ -120,7 +126,7 @@ struct StreamCardView: View {
     var body: some View {
         let theme = StreamCardTheme.make(for: colorScheme, hasPalette: artwork.palette != nil)
         let isTerminating = sessionStore.isTerminating(session)
-        defaultCardContent(isTerminating: isTerminating)
+        cardContent(isTerminating: isTerminating)
         .opacity(isShowingTerminatePrompt ? 0.38 : 1)
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
@@ -149,6 +155,15 @@ struct StreamCardView: View {
                     .allowsHitTesting(false)
             }
         }
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onTapGesture {
+            guard !isShowingTerminatePrompt, !isTerminating else {
+                return
+            }
+
+            onToggleDiagnostics()
+        }
+        .accessibilityHint(isExpanded ? "Click to hide stream diagnostics." : "Click to show stream diagnostics.")
         .task(id: requestKey) {
             await artwork.load(
                 primaryImageURL: posterURL,
@@ -204,6 +219,17 @@ struct StreamCardView: View {
     }
 
     @ViewBuilder
+    private func cardContent(isTerminating: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            defaultCardContent(isTerminating: isTerminating)
+
+            if isExpanded {
+                StreamDiagnosticsPanel(diagnostics: session.streamDiagnostics)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
     private func defaultCardContent(isTerminating: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
             StreamArtworkView(
@@ -266,6 +292,7 @@ struct StreamCardView: View {
                             .monospacedDigit()
                             .lineLimit(1)
                     }
+
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
@@ -311,6 +338,7 @@ struct StreamCardView: View {
         }
         .buttonStyle(.plain)
         .disabled(isTerminating || isShowingTerminatePrompt)
+        .help("Stream actions")
         .popover(isPresented: $isShowingActionsPopover, arrowEdge: .top) {
             SessionActionsPopover {
                 isShowingActionsPopover = false
@@ -421,6 +449,71 @@ struct StreamCardView: View {
         )
     }
 
+}
+
+private struct StreamDiagnosticsPanel: View {
+    let diagnostics: PlexStreamDiagnostics
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Rectangle()
+                .fill(.white.opacity(0.08))
+                .frame(height: 1)
+
+            VStack(alignment: .leading, spacing: 8) {
+                if let decisionItem = diagnostics.decisionItem {
+                    StreamDiagnosticRow(item: decisionItem)
+                }
+
+                StreamDiagnosticRows(items: diagnostics.mediaRows)
+
+                if !diagnostics.mediaRows.isEmpty && !diagnostics.connectionRows.isEmpty {
+                    Rectangle()
+                        .fill(.white.opacity(0.07))
+                        .frame(height: 1)
+                        .padding(.vertical, 2)
+                }
+
+                StreamDiagnosticRows(items: diagnostics.connectionRows)
+            }
+        }
+        .padding(.top, 2)
+    }
+}
+
+private struct StreamDiagnosticRows: View {
+    let items: [PlexStreamDiagnostics.Item]
+
+    var body: some View {
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(items) { item in
+                    StreamDiagnosticRow(item: item)
+                }
+            }
+        }
+    }
+}
+
+private struct StreamDiagnosticRow: View {
+    let item: PlexStreamDiagnostics.Item
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(item.label)
+                .font(.callout.weight(.medium))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(width: 78, alignment: .trailing)
+
+            Text(item.value)
+                .font(item.isWarning ? .callout.weight(.semibold) : .callout)
+                .foregroundStyle(item.isWarning ? .orange : .primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .padding(.vertical, 2)
+    }
 }
 
 private struct SessionActionsPopover: View {

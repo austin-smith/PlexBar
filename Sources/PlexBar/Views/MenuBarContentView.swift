@@ -14,6 +14,7 @@ struct MenuBarContentView: View {
     @State private var historyContentHeight: CGFloat = 0
     @State private var usersContentHeight: CGFloat = 0
     @State private var libraryContentHeight: CGFloat = 0
+    @State private var expandedStreamID: String?
     @State private var terminatePrompt: TerminatePlaybackPrompt?
     @State private var terminateMessage = ""
 
@@ -27,6 +28,7 @@ struct MenuBarContentView: View {
         .padding(16)
         .frame(width: 420)
         .animation(.snappy(duration: 0.18), value: terminatePrompt?.id)
+        .animation(.snappy(duration: 0.18), value: expandedStreamID)
     }
 
     private var header: some View {
@@ -209,8 +211,11 @@ struct MenuBarContentView: View {
                             serverURL: connectionStore.resolvedServerURL,
                             settingsStore: settingsStore,
                             snapshotDate: sessionStore.lastUpdated,
-                            resolvedLocation: sessionStore.resolvedLocation(for: session)
-                        )
+                            resolvedLocation: sessionStore.resolvedLocation(for: session),
+                            isExpanded: expandedStreamID == session.id
+                        ) {
+                            toggleExpandedStream(session)
+                        }
                     }
                 }
                 .background {
@@ -442,6 +447,10 @@ struct MenuBarContentView: View {
     private func presentTerminatePrompt(for session: PlexSession) {
         terminateMessage = ""
         terminatePrompt = TerminatePlaybackPrompt(session: session)
+    }
+
+    private func toggleExpandedStream(_ session: PlexSession) {
+        expandedStreamID = expandedStreamID == session.id ? nil : session.id
     }
 
     private func dismissTerminatePrompt() {

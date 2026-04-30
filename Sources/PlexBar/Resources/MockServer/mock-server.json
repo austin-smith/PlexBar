@@ -181,7 +181,52 @@
         "bandwidth": 12000,
         "location": "lan"
       },
-      "mediaDecision": "direct play"
+      "mediaDecision": "direct play",
+      "media": [
+        {
+          "bitrate": 11980,
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "container": "mp4",
+          "width": 1920,
+          "height": 1080,
+          "audioChannels": 2,
+          "videoResolution": "1080",
+          "videoFrameRate": "24p",
+          "videoProfile": "high",
+          "part": [
+            {
+              "decision": "directplay",
+              "container": "mp4",
+              "stream": [
+                {
+                  "id": 1101001,
+                  "streamType": 1,
+                  "codec": "h264",
+                  "bitrate": 11400,
+                  "width": 1920,
+                  "height": 1080,
+                  "displayTitle": "1080p (H.264)",
+                  "extendedDisplayTitle": "1080p (H.264 High)",
+                  "location": "direct"
+                },
+                {
+                  "id": 1101002,
+                  "streamType": 2,
+                  "codec": "aac",
+                  "bitrate": 320,
+                  "displayTitle": "English (AAC Stereo)",
+                  "extendedDisplayTitle": "English (AAC Stereo)",
+                  "location": "direct",
+                  "channels": 2,
+                  "language": "English",
+                  "selected": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "sessionKey": "stream-2",
@@ -208,9 +253,85 @@
         "location": "wan"
       },
       "transcodeSession": {
-        "key": "transcode-2"
+        "key": "transcode-2",
+        "videoDecision": "transcode",
+        "audioDecision": "copy",
+        "protocol": "hls",
+        "container": "mkv",
+        "videoCodec": "h264",
+        "audioCodec": "ac3",
+        "sourceVideoCodec": "hevc",
+        "sourceAudioCodec": "ac3",
+        "width": 1280,
+        "height": 720,
+        "progress": 82.0,
+        "speed": 1.4,
+        "throttled": false,
+        "transcodeHwRequested": true,
+        "transcodeHwFullPipeline": false
       },
-      "mediaDecision": "transcode"
+      "mediaDecision": "transcode",
+      "media": [
+        {
+          "bitrate": 8400,
+          "videoCodec": "hevc",
+          "audioCodec": "ac3",
+          "container": "mkv",
+          "width": 3840,
+          "height": 2160,
+          "audioChannels": 6,
+          "videoResolution": "4k",
+          "videoFrameRate": "24p",
+          "videoProfile": "main 10",
+          "part": [
+            {
+              "decision": "transcode",
+              "bitrate": 8400,
+              "container": "mkv",
+              "width": 1280,
+              "height": 720,
+              "stream": [
+                {
+                  "id": 1102001,
+                  "streamType": 1,
+                  "codec": "hevc",
+                  "bitrate": 7800,
+                  "width": 3840,
+                  "height": 2160,
+                  "displayTitle": "4K (HEVC Main 10)",
+                  "extendedDisplayTitle": "4K (HEVC Main 10)",
+                  "decision": "transcode",
+                  "location": "segments-video"
+                },
+                {
+                  "id": 1102002,
+                  "streamType": 2,
+                  "codec": "ac3",
+                  "bitrate": 640,
+                  "displayTitle": "English (AC3 5.1)",
+                  "extendedDisplayTitle": "English (AC3 5.1)",
+                  "decision": "copy",
+                  "location": "segments-audio",
+                  "channels": 6,
+                  "language": "English",
+                  "selected": true
+                },
+                {
+                  "id": 1102003,
+                  "streamType": 3,
+                  "codec": "srt",
+                  "bitrate": 0,
+                  "displayTitle": "English (SRT)",
+                  "extendedDisplayTitle": "English (SRT)",
+                  "location": "direct",
+                  "language": "English",
+                  "selected": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "sessionKey": "stream-3",
@@ -236,7 +357,51 @@
         "bandwidth": 10200,
         "location": "lan"
       },
-      "mediaDecision": "direct play"
+      "mediaDecision": "direct play",
+      "media": [
+        {
+          "bitrate": 4600,
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "container": "mkv",
+          "width": 1440,
+          "height": 1080,
+          "audioChannels": 2,
+          "videoResolution": "1080",
+          "videoFrameRate": "24p",
+          "videoProfile": "main",
+          "part": [
+            {
+              "decision": "directplay",
+              "container": "mkv",
+              "stream": [
+                {
+                  "id": 1103001,
+                  "streamType": 1,
+                  "codec": "h264",
+                  "bitrate": 4200,
+                  "width": 1440,
+                  "height": 1080,
+                  "displayTitle": "1080p (H.264)",
+                  "extendedDisplayTitle": "1080p (H.264 Main)",
+                  "location": "direct"
+                },
+                {
+                  "id": 1103002,
+                  "streamType": 2,
+                  "codec": "aac",
+                  "bitrate": 192,
+                  "displayTitle": "Unknown (AAC Stereo)",
+                  "extendedDisplayTitle": "Unknown (AAC Stereo)",
+                  "location": "direct",
+                  "channels": 2,
+                  "selected": true
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "sessionKey": "stream-4",
@@ -263,6 +428,34 @@
         "location": "wan"
       },
       "mediaDecision": "direct play",
+      "media": [
+        {
+          "bitrate": 256,
+          "audioCodec": "aac",
+          "container": "m4b",
+          "audioChannels": 2,
+          "part": [
+            {
+              "decision": "directplay",
+              "container": "m4b",
+              "stream": [
+                {
+                  "id": 3103001,
+                  "streamType": 2,
+                  "codec": "aac",
+                  "bitrate": 256,
+                  "displayTitle": "English (AAC Stereo)",
+                  "extendedDisplayTitle": "English (AAC Stereo)",
+                  "location": "direct",
+                  "channels": 2,
+                  "language": "English",
+                  "selected": true
+                }
+              ]
+            }
+          ]
+        }
+      ],
       "audioStream": {
         "id": 3103001,
         "streamType": 2,

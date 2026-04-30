@@ -323,7 +323,7 @@ import Testing
     )
 
     #expect(session.isPaused)
-    #expect(session.playbackLine == "Directplay • LAN")
+    #expect(session.playbackLine == "Direct Play • LAN")
 }
 
 @Test func playbackLineRetainsNonDefaultStateText() async throws {
@@ -353,6 +353,78 @@ import Testing
 
     #expect(!session.isPaused)
     #expect(session.playbackLine == "Buffering • Transcode • WAN")
+}
+
+@Test func streamDiagnosticsSummarizeConnectionAndMediaDetails() async throws {
+    let json = #"""
+    {
+      "sessionKey": "77",
+      "ratingKey": "42",
+      "key": "/library/metadata/42",
+      "type": "movie",
+      "title": "Heat",
+      "duration": 1020000,
+      "viewOffset": 255000,
+      "Player": {
+        "title": "Apple TV",
+        "state": "playing",
+        "local": false,
+        "relayed": true,
+        "secure": false,
+        "remotePublicAddress": "203.0.113.7"
+      },
+      "Session": {
+        "id": "session-77",
+        "bandwidth": 12000,
+        "location": "wan"
+      },
+      "Media": [
+        {
+          "bitrate": "8800",
+          "videoCodec": "h264",
+          "audioCodec": "aac",
+          "container": "mkv",
+          "width": 1920,
+          "height": 1080,
+          "Part": [
+            {
+              "decision": "directstream",
+              "Stream": [
+                {
+                  "id": 1,
+                  "streamType": 1,
+                  "codec": "h265",
+                  "bitrate": 8700,
+                  "width": 1920,
+                  "height": 1080,
+                  "selected": 1
+                },
+                {
+                  "id": 2,
+                  "streamType": 2,
+                  "codec": "ac3",
+                  "selected": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    """#
+
+    let data = try #require(json.data(using: .utf8))
+    let session = try JSONDecoder().decode(PlexSession.self, from: data)
+    let diagnostics = session.streamDiagnostics
+
+    #expect(diagnostics.playbackItems.map(\.value).contains("Direct Stream"))
+    #expect(diagnostics.mediaRows.map(\.value).contains("1920x1080 H265, 8.7 Mbps"))
+    #expect(diagnostics.mediaRows.map(\.value).contains("AC3"))
+    #expect(diagnostics.connectionItems.map(\.value).contains("WAN"))
+    #expect(diagnostics.connectionItems.map(\.value).contains("12 Mbps"))
+    #expect(diagnostics.connectionItems.map(\.value).contains("Relay"))
+    #expect(diagnostics.connectionItems.map(\.value).contains("Insecure"))
+    #expect(!diagnostics.connectionItems.map(\.label).contains("Public IP"))
 }
 
 @Test func playbackTimingSummaryFormatsRemainingMinutesAndEndTime() async throws {

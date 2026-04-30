@@ -71,6 +71,7 @@ private struct PlexDebugMockFixture {
     let server: PlexServerResource
     let activeConnection: PlexResolvedConnection
     let sessions: [PlexSession]
+    let activeSessionPayloadsByKey: [String: PlexMockServerPayload.ActiveSession]
     let streamLevelsByID: [Int: [Double]]
     let resolvedLocationsBySessionKey: [String: String]
     let historyItems: [PlexHistoryItem]
@@ -148,6 +149,9 @@ private struct PlexDebugMockFixture {
             server: server,
             activeConnection: activeConnection,
             sessions: sessions,
+            activeSessionPayloadsByKey: Dictionary(
+                uniqueKeysWithValues: payload.activeSessions.map { ($0.sessionKey, $0) }
+            ),
             streamLevelsByID: Dictionary(
                 payload.activeSessions.compactMap { session in
                     session.audioStream.map { ($0.id, $0.levels) }
@@ -276,7 +280,9 @@ private struct PlexDebugMockFixture {
                 url: url,
                 object: [
                     "MediaContainer": [
-                        "Metadata": filteredSessions.map { sessionObject(from: $0) }
+                        "Metadata": filteredSessions.map { session in
+                            sessionObject(from: session, payload: session.canonicalSessionKey.flatMap { activeSessionPayloadsByKey[$0] })
+                        }
                     ]
                 ]
             )
@@ -584,7 +590,7 @@ private struct PlexDebugMockFixture {
         return PlexDebugMockResponse(response: response, data: data)
     }
 
-    private func sessionObject(from session: PlexSession) -> [String: Any] {
+    private func sessionObject(from session: PlexSession, payload: PlexMockServerPayload.ActiveSession?) -> [String: Any] {
         var object = compactObject([
             "sessionKey": session.sessionKey,
             "ratingKey": session.ratingKey,
@@ -626,34 +632,132 @@ private struct PlexDebugMockFixture {
             ]),
         ])
 
-        if let transcodeSession = session.transcodeSession {
+        if let transcodeSession = payload?.transcodeSession {
+            object["TranscodeSession"] = transcodeSessionObject(from: transcodeSession)
+        } else if let transcodeSession = session.transcodeSession {
             object["TranscodeSession"] = compactObject(["key": transcodeSession.key])
         }
 
-        if let media = session.media {
+        if let media = payload?.media {
+            object["Media"] = media.map(mediaObject(from:))
+        } else if let media = session.media {
             object["Media"] = media.map { media in
-                [
-                    "Part": (media.part ?? []).map { part in
-                        var partObject = compactObject(["decision": part.decision])
-
-                        if let stream = part.stream {
-                            partObject["Stream"] = stream.map { stream in
-                                compactObject([
-                                    "id": stream.id,
-                                    "streamType": stream.streamType,
-                                    "codec": stream.codec,
-                                    "selected": stream.selected,
-                                ])
-                            }
-                        }
-
-                        return partObject
-                    }
-                ]
+                mediaObject(from: media)
             }
         }
 
         return object
+    }
+
+    private func mediaObject(from media: PlexMockServerPayload.Media) -> [String: Any] {
+        var object = compactObject([
+            "bitrate": media.bitrate,
+            "videoCodec": media.videoCodec,
+            "audioCodec": media.audioCodec,
+            "container": media.container,
+            "width": media.width,
+            "height": media.height,
+            "audioChannels": media.audioChannels,
+            "videoResolution": media.videoResolution,
+            "videoFrameRate": media.videoFrameRate,
+            "videoProfile": media.videoProfile,
+        ])
+        object["Part"] = (media.part ?? []).map(partObject(from:))
+        return object
+    }
+
+    private func mediaObject(from media: PlexMedia) -> [String: Any] {
+        var object = compactObject([
+            "bitrate": media.bitrate,
+            "videoCodec": media.videoCodec,
+            "audioCodec": media.audioCodec,
+            "container": media.container,
+            "width": media.width,
+            "height": media.height,
+        ])
+        object["Part"] = (media.part ?? []).map(partObject(from:))
+        return object
+    }
+
+    private func partObject(from part: PlexMockServerPayload.Part) -> [String: Any] {
+        var object = compactObject([
+            "decision": part.decision,
+            "bitrate": part.bitrate,
+            "videoCodec": part.videoCodec,
+            "audioCodec": part.audioCodec,
+            "container": part.container,
+            "width": part.width,
+            "height": part.height,
+            "videoProfile": part.videoProfile,
+        ])
+        object["Stream"] = (part.stream ?? []).map(streamObject(from:))
+        return object
+    }
+
+    private func partObject(from part: PlexPart) -> [String: Any] {
+        var object = compactObject([
+            "decision": part.decision,
+            "bitrate": part.bitrate,
+            "videoCodec": part.videoCodec,
+            "audioCodec": part.audioCodec,
+            "container": part.container,
+            "width": part.width,
+            "height": part.height,
+        ])
+        object["Stream"] = (part.stream ?? []).map(streamObject(from:))
+        return object
+    }
+
+    private func streamObject(from stream: PlexMockServerPayload.Stream) -> [String: Any] {
+        compactObject([
+            "id": stream.id,
+            "streamType": stream.streamType,
+            "codec": stream.codec,
+            "bitrate": stream.bitrate,
+            "width": stream.width,
+            "height": stream.height,
+            "displayTitle": stream.displayTitle,
+            "extendedDisplayTitle": stream.extendedDisplayTitle,
+            "decision": stream.decision,
+            "location": stream.location,
+            "channels": stream.channels,
+            "language": stream.language,
+            "title": stream.title,
+            "selected": stream.selected,
+        ])
+    }
+
+    private func streamObject(from stream: PlexStream) -> [String: Any] {
+        compactObject([
+            "id": stream.id,
+            "streamType": stream.streamType,
+            "codec": stream.codec,
+            "bitrate": stream.bitrate,
+            "width": stream.width,
+            "height": stream.height,
+            "selected": stream.selected,
+        ])
+    }
+
+    private func transcodeSessionObject(from transcodeSession: PlexMockServerPayload.TranscodeSession) -> [String: Any] {
+        compactObject([
+            "key": transcodeSession.key,
+            "videoDecision": transcodeSession.videoDecision,
+            "audioDecision": transcodeSession.audioDecision,
+            "protocol": transcodeSession.protocolName,
+            "container": transcodeSession.container,
+            "videoCodec": transcodeSession.videoCodec,
+            "audioCodec": transcodeSession.audioCodec,
+            "sourceVideoCodec": transcodeSession.sourceVideoCodec,
+            "sourceAudioCodec": transcodeSession.sourceAudioCodec,
+            "width": transcodeSession.width,
+            "height": transcodeSession.height,
+            "progress": transcodeSession.progress,
+            "speed": transcodeSession.speed,
+            "throttled": transcodeSession.throttled,
+            "transcodeHwRequested": transcodeSession.transcodeHwRequested,
+            "transcodeHwFullPipeline": transcodeSession.transcodeHwFullPipeline,
+        ])
     }
 
     private func historyItemObject(from item: PlexHistoryItem) -> [String: Any] {
@@ -752,7 +856,9 @@ private struct PlexDebugMockFixture {
             audiobooksByID: audiobooksByID
         )
         let mediaParts: [PlexMedia]?
-        if session.mediaDecision != nil || session.audioStream != nil {
+        if let mockMedia = session.media {
+            mediaParts = mockMedia.map(materializeMedia(_:))
+        } else if session.mediaDecision != nil || session.audioStream != nil {
             let stream = session.audioStream.map {
                 PlexStream(
                     id: $0.id,
@@ -793,6 +899,48 @@ private struct PlexDebugMockFixture {
             session: session.session?.materialize(),
             transcodeSession: session.transcodeSession?.materialize(),
             media: mediaParts
+        )
+    }
+
+    private static func materializeMedia(_ media: PlexMockServerPayload.Media) -> PlexMedia {
+        PlexMedia(
+            bitrate: media.bitrate,
+            videoCodec: media.videoCodec,
+            audioCodec: media.audioCodec,
+            container: media.container,
+            width: media.width,
+            height: media.height,
+            part: media.part?.map(materializePart(_:))
+        )
+    }
+
+    private static func materializePart(_ part: PlexMockServerPayload.Part) -> PlexPart {
+        PlexPart(
+            decision: part.decision,
+            bitrate: part.bitrate,
+            videoCodec: part.videoCodec,
+            audioCodec: part.audioCodec,
+            container: part.container,
+            width: part.width,
+            height: part.height,
+            stream: part.stream?.map(materializeStream(_:))
+        )
+    }
+
+    private static func materializeStream(_ stream: PlexMockServerPayload.Stream) -> PlexStream {
+        PlexStream(
+            id: stream.id,
+            streamType: stream.streamType,
+            codec: stream.codec,
+            bitrate: stream.bitrate,
+            width: stream.width,
+            height: stream.height,
+            displayTitle: stream.displayTitle,
+            extendedDisplayTitle: stream.extendedDisplayTitle,
+            channels: stream.channels,
+            language: stream.language,
+            title: stream.title,
+            selected: stream.selected
         )
     }
 
