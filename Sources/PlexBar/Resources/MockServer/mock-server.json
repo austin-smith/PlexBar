@@ -430,25 +430,43 @@
       "mediaDecision": "direct play",
       "media": [
         {
-          "bitrate": 256,
+          "id": "3103-media",
+          "bitrate": 65,
           "audioCodec": "aac",
-          "container": "m4b",
-          "audioChannels": 2,
+          "audioProfile": "lc",
+          "container": "mp4",
+          "duration": 1314000,
+          "audioChannels": 1,
+          "has64bitOffsets": false,
+          "hasVoiceActivity": "0",
+          "optimizedForStreaming": false,
+          "selected": true,
           "part": [
             {
+              "id": "3103-part",
               "decision": "directplay",
-              "container": "m4b",
+              "container": "mp4",
+              "duration": 1314000,
+              "file": "\\\\mock-server\\plex\\Audiobooks\\H. G. Wells\\The War of the Worlds\\The War of the Worlds.m4b",
+              "key": "/library/parts/3103/file.m4b",
+              "size": 10984000,
+              "has64bitOffsets": false,
+              "optimizedForStreaming": false,
+              "selected": true,
               "stream": [
                 {
                   "id": 3103001,
                   "streamType": 2,
                   "codec": "aac",
-                  "bitrate": 256,
-                  "displayTitle": "English (AAC Stereo)",
-                  "extendedDisplayTitle": "English (AAC Stereo)",
+                  "profile": "lc",
+                  "bitrate": 65,
+                  "displayTitle": "AAC (Mono)",
+                  "extendedDisplayTitle": "AAC (Mono)",
                   "location": "direct",
-                  "channels": 2,
-                  "language": "English",
+                  "channels": 1,
+                  "audioChannelLayout": "mono",
+                  "samplingRate": 44100,
+                  "default": true,
                   "selected": true
                 }
               ]

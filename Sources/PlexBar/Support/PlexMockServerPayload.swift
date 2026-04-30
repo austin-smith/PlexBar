@@ -153,28 +153,43 @@ extension PlexMockServerPayload {
     }
 
     struct Media: Decodable {
+        let id: String?
         let bitrate: Int?
         let videoCodec: String?
         let audioCodec: String?
+        let audioProfile: String?
         let container: String?
+        let duration: Int?
         let width: Int?
         let height: Int?
         let audioChannels: Int?
         let videoResolution: String?
         let videoFrameRate: String?
         let videoProfile: String?
+        let has64bitOffsets: Bool?
+        let hasVoiceActivity: String?
+        let optimizedForStreaming: Bool?
+        let selected: Bool?
         let part: [Part]?
     }
 
     struct Part: Decodable {
+        let id: String?
         let decision: String?
         let bitrate: Int?
         let videoCodec: String?
         let audioCodec: String?
         let container: String?
+        let duration: Int?
+        let file: String?
+        let key: String?
+        let size: Int?
         let width: Int?
         let height: Int?
         let videoProfile: String?
+        let has64bitOffsets: Bool?
+        let optimizedForStreaming: Bool?
+        let selected: Bool?
         let stream: [Stream]?
     }
 
@@ -182,6 +197,7 @@ extension PlexMockServerPayload {
         let id: Int?
         let streamType: Int?
         let codec: String?
+        let profile: String?
         let bitrate: Int?
         let width: Int?
         let height: Int?
@@ -190,6 +206,9 @@ extension PlexMockServerPayload {
         let decision: String?
         let location: String?
         let channels: Int?
+        let audioChannelLayout: String?
+        let samplingRate: Int?
+        let `default`: Bool?
         let language: String?
         let title: String?
         let selected: Bool?

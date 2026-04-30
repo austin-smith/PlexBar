@@ -142,7 +142,7 @@ struct PlexStreamDiagnostics: Equatable {
     private static func formatVideoSummary(resolution: String?, codec: String?, bitrate: String?) -> String? {
         let base = [resolution, codec].compactMap { $0?.nilIfBlank }.joined(separator: " ")
         guard !base.isEmpty else {
-            return bitrate
+            return nil
         }
 
         guard let bitrate = bitrate?.nilIfBlank else {

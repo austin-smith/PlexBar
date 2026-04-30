@@ -651,16 +651,23 @@ private struct PlexDebugMockFixture {
 
     private func mediaObject(from media: PlexMockServerPayload.Media) -> [String: Any] {
         var object = compactObject([
+            "id": media.id,
             "bitrate": media.bitrate,
             "videoCodec": media.videoCodec,
             "audioCodec": media.audioCodec,
+            "audioProfile": media.audioProfile,
             "container": media.container,
+            "duration": media.duration,
             "width": media.width,
             "height": media.height,
             "audioChannels": media.audioChannels,
             "videoResolution": media.videoResolution,
             "videoFrameRate": media.videoFrameRate,
             "videoProfile": media.videoProfile,
+            "has64bitOffsets": media.has64bitOffsets,
+            "hasVoiceActivity": media.hasVoiceActivity,
+            "optimizedForStreaming": media.optimizedForStreaming,
+            "selected": media.selected,
         ])
         object["Part"] = (media.part ?? []).map(partObject(from:))
         return object
@@ -681,14 +688,22 @@ private struct PlexDebugMockFixture {
 
     private func partObject(from part: PlexMockServerPayload.Part) -> [String: Any] {
         var object = compactObject([
+            "id": part.id,
             "decision": part.decision,
             "bitrate": part.bitrate,
             "videoCodec": part.videoCodec,
             "audioCodec": part.audioCodec,
             "container": part.container,
+            "duration": part.duration,
+            "file": part.file,
+            "key": part.key,
+            "size": part.size,
             "width": part.width,
             "height": part.height,
             "videoProfile": part.videoProfile,
+            "has64bitOffsets": part.has64bitOffsets,
+            "optimizedForStreaming": part.optimizedForStreaming,
+            "selected": part.selected,
         ])
         object["Stream"] = (part.stream ?? []).map(streamObject(from:))
         return object
@@ -713,6 +728,7 @@ private struct PlexDebugMockFixture {
             "id": stream.id,
             "streamType": stream.streamType,
             "codec": stream.codec,
+            "profile": stream.profile,
             "bitrate": stream.bitrate,
             "width": stream.width,
             "height": stream.height,
@@ -721,6 +737,9 @@ private struct PlexDebugMockFixture {
             "decision": stream.decision,
             "location": stream.location,
             "channels": stream.channels,
+            "audioChannelLayout": stream.audioChannelLayout,
+            "samplingRate": stream.samplingRate,
+            "default": stream.default,
             "language": stream.language,
             "title": stream.title,
             "selected": stream.selected,
