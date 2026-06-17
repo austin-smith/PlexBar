@@ -18,6 +18,7 @@ struct PlexBarApp: App {
     @State private var historyStore: PlexHistoryStore
     @State private var libraryStore: PlexLibraryStore
     @State private var serverPreviewStore: PlexServerPreviewStore
+    private let systemLifecycleObserver: PlexSystemLifecycleObserver
     private let updateService: PlexUpdateService
 
     init() {
@@ -52,6 +53,9 @@ struct PlexBarApp: App {
             libraryStore: libraryStore,
             client: runtime.authClient
         ))
+        systemLifecycleObserver = PlexSystemLifecycleObserver {
+            sessionStore.refreshNow()
+        }
         updateService = PlexUpdateService()
     }
 
