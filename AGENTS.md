@@ -39,7 +39,8 @@ This file defines project constraints for coding agents working in this reposito
 - Write commit messages entirely lowercase. Use the imperative mood for the subject, keep each commit focused on one logical change, do not use type or scope prefixes, and do not end the subject with a period. Add a body when the reason or important tradeoffs are not clear from the subject.
 - Keep each pull request focused on one coherent change.
 - Write concise, specific, imperative pull request titles in sentence case. Do not use prefixes or trailing periods, and make the title understandable without the branch name.
-- Pull request descriptions must include `What Changed`, `Why`, and `Validation`. Include `UI Changes` only when the pull request changes the UI. Include `Related Issues` when applicable. Keep descriptions concise, self-contained, complete, and accurate to the final diff.
+- Pull request descriptions must include `What Changed`, `Why`, and `Validation`. Include `UI Changes` only when the pull request changes the UI. Keep descriptions concise, self-contained, complete, and accurate to the final diff.
+- Link any related issues in the pull request description; do not include issue numbers in branch names.
 - Review the complete diff before opening a pull request. Update the title and description whenever the scope changes, and remove unrelated changes.
 
 ## Issues
