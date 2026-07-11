@@ -162,6 +162,34 @@ import Testing
     #expect(tommySession.audioStreamID == 3_103_001)
 }
 
+@Test func mockServerReturnsRealisticStreamDiagnosticsShape() async throws {
+    let client = PlexAPIClient(session: PlexDebugMockServer.makeSession())
+    let configuration = PlexConnectionConfiguration(
+        serverURL: URL(string: "https://demo.plexbar.local:32400")!,
+        token: "plexbar-debug-mock-server-token",
+        clientContext: PlexClientContext(clientIdentifier: "tests")
+    )
+
+    let sessions = try await client.fetchSessions(using: configuration)
+    let directPlaySession = try #require(sessions.first(where: { $0.canonicalSessionKey == "stream-1" }))
+    let transcodeSession = try #require(sessions.first(where: { $0.canonicalSessionKey == "stream-2" }))
+    let audiobookSession = try #require(sessions.first(where: { $0.canonicalSessionKey == "stream-4" }))
+
+    #expect(directPlaySession.streamDiagnostics.playbackItems.map(\.value).contains("Direct Play"))
+    #expect(directPlaySession.streamDiagnostics.mediaRows.map(\.value).contains("1920x1080 H264, 11 Mbps"))
+    #expect(directPlaySession.streamDiagnostics.mediaRows.map(\.value).contains("English AAC Stereo, 320 Kbps"))
+
+    #expect(transcodeSession.streamDiagnostics.playbackItems.map(\.value).contains("Transcode"))
+    #expect(transcodeSession.streamDiagnostics.mediaRows.map(\.value).contains("3840x2160 HEVC, 7.8 Mbps"))
+    #expect(transcodeSession.streamDiagnostics.mediaRows.map(\.value).contains("English AC3 5.1, 640 Kbps"))
+    #expect(transcodeSession.streamDiagnostics.mediaRows.map(\.value).contains("English (SRT)"))
+    #expect(transcodeSession.streamDiagnostics.connectionItems.map(\.value).contains("WAN"))
+
+    #expect(audiobookSession.streamDiagnostics.playbackItems.map(\.value).contains("Direct Play"))
+    #expect(audiobookSession.streamDiagnostics.mediaRows.map(\.value).contains("AAC Mono, 65 Kbps"))
+    #expect(!audiobookSession.streamDiagnostics.mediaRows.map(\.label).contains("Video"))
+}
+
 @Test func mockServerReturnsAudiobookStreamLevels() async throws {
     let client = PlexAPIClient(session: PlexDebugMockServer.makeSession())
     let configuration = PlexConnectionConfiguration(

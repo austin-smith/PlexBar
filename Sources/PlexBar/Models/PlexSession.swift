@@ -346,6 +346,10 @@ struct PlexSession: Decodable, Identifiable {
         [playbackStatusDisplayName, decisionDisplayName, locationDisplayName].compactMap { $0?.nilIfBlank }.joined(separator: " • ")
     }
 
+    var streamDiagnostics: PlexStreamDiagnostics {
+        PlexStreamDiagnostics(session: self)
+    }
+
     var isPaused: Bool {
         player.state?.nilIfBlank?.lowercased() == "paused"
     }
@@ -464,7 +468,7 @@ struct PlexSession: Decodable, Identifiable {
     }
 
     private var decisionDisplayName: String? {
-        media?.first?.part?.first?.decision?.nilIfBlank?.capitalized
+        PlexStreamDiagnostics.formatDecision(media?.first?.part?.first?.decision)
     }
 
     private var locationDisplayName: String? {
@@ -596,29 +600,105 @@ struct PlexTranscodeSession: Decodable {
 }
 
 struct PlexMedia: Decodable {
+    let bitrate: Int?
+    let videoCodec: String?
+    let audioCodec: String?
+    let container: String?
+    let width: Int?
+    let height: Int?
     let part: [PlexPart]?
 
-    init(part: [PlexPart]?) {
+    init(
+        bitrate: Int? = nil,
+        videoCodec: String? = nil,
+        audioCodec: String? = nil,
+        container: String? = nil,
+        width: Int? = nil,
+        height: Int? = nil,
+        part: [PlexPart]?
+    ) {
+        self.bitrate = bitrate
+        self.videoCodec = videoCodec
+        self.audioCodec = audioCodec
+        self.container = container
+        self.width = width
+        self.height = height
         self.part = part
     }
 
     enum CodingKeys: String, CodingKey {
+        case bitrate
+        case videoCodec
+        case audioCodec
+        case container
+        case width
+        case height
         case part = "Part"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        bitrate = try container.decodeFlexibleIntIfPresent(forKey: .bitrate)
+        videoCodec = try container.decodeIfPresent(String.self, forKey: .videoCodec)
+        audioCodec = try container.decodeIfPresent(String.self, forKey: .audioCodec)
+        self.container = try container.decodeIfPresent(String.self, forKey: .container)
+        width = try container.decodeFlexibleIntIfPresent(forKey: .width)
+        height = try container.decodeFlexibleIntIfPresent(forKey: .height)
+        part = try container.decodeIfPresent([PlexPart].self, forKey: .part)
     }
 }
 
 struct PlexPart: Decodable {
     let decision: String?
+    let bitrate: Int?
+    let videoCodec: String?
+    let audioCodec: String?
+    let container: String?
+    let width: Int?
+    let height: Int?
     let stream: [PlexStream]?
 
-    init(decision: String?, stream: [PlexStream]? = nil) {
+    init(
+        decision: String?,
+        bitrate: Int? = nil,
+        videoCodec: String? = nil,
+        audioCodec: String? = nil,
+        container: String? = nil,
+        width: Int? = nil,
+        height: Int? = nil,
+        stream: [PlexStream]? = nil
+    ) {
         self.decision = decision
+        self.bitrate = bitrate
+        self.videoCodec = videoCodec
+        self.audioCodec = audioCodec
+        self.container = container
+        self.width = width
+        self.height = height
         self.stream = stream
     }
 
     enum CodingKeys: String, CodingKey {
         case decision
+        case bitrate
+        case videoCodec
+        case audioCodec
+        case container
+        case width
+        case height
         case stream = "Stream"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        decision = try container.decodeIfPresent(String.self, forKey: .decision)
+        bitrate = try container.decodeFlexibleIntIfPresent(forKey: .bitrate)
+        videoCodec = try container.decodeIfPresent(String.self, forKey: .videoCodec)
+        audioCodec = try container.decodeIfPresent(String.self, forKey: .audioCodec)
+        self.container = try container.decodeIfPresent(String.self, forKey: .container)
+        width = try container.decodeFlexibleIntIfPresent(forKey: .width)
+        height = try container.decodeFlexibleIntIfPresent(forKey: .height)
+        stream = try container.decodeIfPresent([PlexStream].self, forKey: .stream)
     }
 }
 
@@ -626,16 +706,53 @@ struct PlexStream: Decodable {
     let id: Int?
     let streamType: Int?
     let codec: String?
+    let bitrate: Int?
+    let width: Int?
+    let height: Int?
+    let displayTitle: String?
+    let extendedDisplayTitle: String?
+    let channels: Int?
+    let language: String?
+    let title: String?
     let selected: Bool?
+
+    var isVideo: Bool {
+        streamType == 1
+    }
 
     var isAudio: Bool {
         streamType == 2
     }
 
-    init(id: Int?, streamType: Int?, codec: String? = nil, selected: Bool? = nil) {
+    var isSubtitle: Bool {
+        streamType == 3
+    }
+
+    init(
+        id: Int?,
+        streamType: Int?,
+        codec: String? = nil,
+        bitrate: Int? = nil,
+        width: Int? = nil,
+        height: Int? = nil,
+        displayTitle: String? = nil,
+        extendedDisplayTitle: String? = nil,
+        channels: Int? = nil,
+        language: String? = nil,
+        title: String? = nil,
+        selected: Bool? = nil
+    ) {
         self.id = id
         self.streamType = streamType
         self.codec = codec
+        self.bitrate = bitrate
+        self.width = width
+        self.height = height
+        self.displayTitle = displayTitle
+        self.extendedDisplayTitle = extendedDisplayTitle
+        self.channels = channels
+        self.language = language
+        self.title = title
         self.selected = selected
     }
 
@@ -643,6 +760,14 @@ struct PlexStream: Decodable {
         case id
         case streamType
         case codec
+        case bitrate
+        case width
+        case height
+        case displayTitle
+        case extendedDisplayTitle
+        case channels
+        case language
+        case title
         case selected
     }
 
@@ -651,6 +776,14 @@ struct PlexStream: Decodable {
         id = try container.decodeFlexibleIntIfPresent(forKey: .id)
         streamType = try container.decodeFlexibleIntIfPresent(forKey: .streamType)
         codec = try container.decodeIfPresent(String.self, forKey: .codec)
+        bitrate = try container.decodeFlexibleIntIfPresent(forKey: .bitrate)
+        width = try container.decodeFlexibleIntIfPresent(forKey: .width)
+        height = try container.decodeFlexibleIntIfPresent(forKey: .height)
+        displayTitle = try container.decodeIfPresent(String.self, forKey: .displayTitle)
+        extendedDisplayTitle = try container.decodeIfPresent(String.self, forKey: .extendedDisplayTitle)
+        channels = try container.decodeFlexibleIntIfPresent(forKey: .channels)
+        language = try container.decodeIfPresent(String.self, forKey: .language)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
         selected = try container.decodeFlexibleBoolIfPresent(forKey: .selected)
     }
 }
