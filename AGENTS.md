@@ -9,17 +9,19 @@ This file defines project constraints for coding agents working in this reposito
 
 ## Platform + App Contract
 
-- PlexBar is a macOS-only app built with SwiftPM.
+- PlexBar is a macOS-only app built by the `PlexBar` target in `PlexBar.xcodeproj`.
 - Minimum supported platform is macOS 26+.
-- The app is menu-bar-first and should remain an accessory app without a Dock icon unless otherwise explicitly requested.
+- PlexBar is one regular macOS app with a primary window and a persistent menu-bar extra. The window and menu-bar UI must share the same stores and services.
 - UI work should stay SwiftUI-first.
-- Do not introduce AppKit UI implementations unless a maintainer explicitly asks.
+- Use native Apple media frameworks. `AVPlayerView` may be bridged into SwiftUI where SwiftUI has no equivalent macOS player view; do not replace native controls with a custom imitation.
+- Do not introduce web views, cross-platform UI layers, or third-party playback engines.
 
 ## Project Boundaries
 
-- App sources live in `Sources/PlexBar/`.
-- Tests live in `Tests/PlexBarTests/`.
+- App sources live in `PlexBar/`.
+- Tests live in `PlexBarTests/`.
 - Keep view code in `Views/`, stateful app logic in `Stores/`, API/auth code in `Services/`, and shared helpers in `Support/`.
+- Keep playback orchestration in `Playback/` and decoded Plex media contracts in `Models/`.
 
 ## Code Expectations
 
@@ -60,7 +62,7 @@ This file defines project constraints for coding agents working in this reposito
 From repo root (`/Users/austinsmith/Developer/Repos/PlexBar`), build with:
 
 ```bash
-swift build
+xcodebuild -project PlexBar.xcodeproj -scheme PlexBar -configuration Debug -destination 'platform=macOS' build
 ```
 
 To build and launch the app bundle:
@@ -73,7 +75,7 @@ script/build_and_run.sh
 
 - PlexBar uses Sparkle for auto-updates of Developer ID releases.
 - Sparkle appcast/release workflow is documented in `docs/sparkle-updates.md`.
-- Sparkle update metadata is injected by `script/build_and_run.sh` at bundle generation time; keep it out of checked-in source plist files.
+- Sparkle update metadata is injected by Xcode from build settings supplied by `script/build_and_run.sh`.
 - `script/build_and_run.sh` loads `.env.local` when present for local Sparkle build metadata.
 
 ## Testing
@@ -81,7 +83,7 @@ script/build_and_run.sh
 From repo root (`/Users/austinsmith/Developer/Repos/PlexBar`), run:
 
 ```bash
-swift test
+xcodebuild -project PlexBar.xcodeproj -scheme PlexBar -configuration Debug -destination 'platform=macOS' test
 ```
 
 Add tests when they protect meaningful behavior, parsing logic, or regressions. Avoid low-value tests for simple refactors or trivial helpers.

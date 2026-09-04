@@ -1,0 +1,12 @@
+{
+  "MediaContainer": {
+    "size": 0,
+    "generalDecisionCode": 2000,
+    "generalDecisionText": "Playback is not possible for this item.",
+    "directPlayDecisionCode": 3000,
+    "directPlayDecisionText": "Direct play is unavailable.",
+    "transcodeDecisionCode": 4000,
+    "transcodeDecisionText": "Conversion is unavailable.",
+    "Metadata": []
+  }
+}

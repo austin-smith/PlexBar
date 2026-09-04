@@ -1,0 +1,50 @@
+{
+  "MediaContainer": {
+    "generalDecisionCode": 1001,
+    "generalDecisionText": "Direct play not available; Conversion OK.",
+    "directPlayDecisionCode": 3004,
+    "directPlayDecisionText": "App cannot direct play this item. No direct play profile exists for flac.",
+    "transcodeDecisionCode": 1001,
+    "transcodeDecisionText": "Direct play not available; Conversion OK.",
+    "Metadata": [
+      {
+        "ratingKey": "91001",
+        "key": "/library/metadata/91001",
+        "type": "track",
+        "title": "Chapter 3",
+        "parentTitle": "Kitchen Confidential",
+        "grandparentTitle": "Anthony Bourdain",
+        "duration": 1800000,
+        "Media": [
+          {
+            "id": "92001",
+            "selected": true,
+            "container": "flac",
+            "audioCodec": "flac",
+            "bitrate": 921,
+            "duration": 1800000,
+            "Part": [
+              {
+                "id": "93001",
+                "selected": true,
+                "decision": "transcode",
+                "protocol": "hls",
+                "duration": 1800000,
+                "Stream": [
+                  {
+                    "id": "94001",
+                    "selected": true,
+                    "streamType": 2,
+                    "codec": "aac",
+                    "decision": "transcode",
+                    "channels": 2
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

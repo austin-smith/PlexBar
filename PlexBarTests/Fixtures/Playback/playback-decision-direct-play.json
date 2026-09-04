@@ -1,0 +1,62 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "generalDecisionCode": 1000,
+    "generalDecisionText": "Direct play OK.",
+    "directPlayDecisionCode": 1000,
+    "directPlayDecisionText": "Direct play OK.",
+    "identifier": "com.plexapp.plugins.library",
+    "Metadata": [
+      {
+        "ratingKey": "42001",
+        "key": "/library/metadata/42001",
+        "type": "movie",
+        "title": "Direct Play Fixture",
+        "duration": 634533,
+        "viewOffset": 12000,
+        "Media": [
+          {
+            "id": 61001,
+            "selected": true,
+            "container": "mp4",
+            "videoCodec": "h264",
+            "audioCodec": "aac",
+            "width": 1920,
+            "height": 1080,
+            "bitrate": 8000,
+            "duration": 634533,
+            "Part": [
+              {
+                "id": 71001,
+                "selected": true,
+                "decision": "directplay",
+                "key": "/library/parts/71001/fixture.mp4",
+                "container": "mp4",
+                "duration": 634533,
+                "Stream": [
+                  {
+                    "id": 81001,
+                    "streamType": 1,
+                    "codec": "h264",
+                    "decision": "copy",
+                    "location": "direct",
+                    "selected": true
+                  },
+                  {
+                    "id": 81002,
+                    "streamType": 2,
+                    "codec": "aac",
+                    "channels": 2,
+                    "decision": "copy",
+                    "location": "direct",
+                    "selected": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

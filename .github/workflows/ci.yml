@@ -25,13 +25,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Swift 6.3.1
-        uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: "6.3.1"
-
       - name: Build
-        run: swift build
+        run: |
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBar \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
       - name: Test
-        run: swift test
+        run: |
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBar \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            test

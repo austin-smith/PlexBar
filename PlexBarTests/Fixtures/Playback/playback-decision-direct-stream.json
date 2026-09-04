@@ -1,0 +1,61 @@
+{
+  "MediaContainer": {
+    "size": 1,
+    "generalDecisionCode": 1001,
+    "generalDecisionText": "Direct play not available; Conversion OK.",
+    "directPlayDecisionCode": 3000,
+    "directPlayDecisionText": "Direct play is disabled.",
+    "transcodeDecisionCode": 1001,
+    "transcodeDecisionText": "Direct play not available; Conversion OK.",
+    "identifier": "com.plexapp.plugins.library",
+    "Metadata": [
+      {
+        "ratingKey": "42002",
+        "key": "/library/metadata/42002",
+        "type": "movie",
+        "title": "Direct Stream Fixture",
+        "duration": 634533,
+        "Media": [
+          {
+            "id": 61002,
+            "selected": true,
+            "protocol": "hls",
+            "container": "mpegts",
+            "videoCodec": "h264",
+            "audioCodec": "aac",
+            "width": 1920,
+            "height": 1080,
+            "bitrate": 8000,
+            "Part": [
+              {
+                "id": 71002,
+                "selected": true,
+                "decision": "transcode",
+                "protocol": "hls",
+                "Stream": [
+                  {
+                    "id": 82001,
+                    "streamType": 1,
+                    "codec": "h264",
+                    "decision": "copy",
+                    "location": "segments-video",
+                    "selected": true
+                  },
+                  {
+                    "id": 82002,
+                    "streamType": 2,
+                    "codec": "aac",
+                    "channels": 2,
+                    "decision": "copy",
+                    "location": "segments-audio",
+                    "selected": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

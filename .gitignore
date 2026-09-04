@@ -5,6 +5,7 @@
 /Packages
 xcuserdata/
 DerivedData/
+*.xcresult
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc

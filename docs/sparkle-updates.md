@@ -45,7 +45,7 @@ Do not rely on setting these values only when launching an already-built app. Th
 Print the existing public key:
 
 ```bash
-.build/artifacts/sparkle/Sparkle/bin/generate_keys
+.build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys
 ```
 
 Sparkle may report that a pre-existing signing key was found. That is expected if a Sparkle key already exists in the local Keychain.
@@ -53,7 +53,7 @@ Sparkle may report that a pre-existing signing key was found. That is expected i
 Export the matching private key to a temporary file:
 
 ```bash
-.build/artifacts/sparkle/Sparkle/bin/generate_keys -x /tmp/sparkle-private-key
+.build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -x /tmp/sparkle-private-key
 ```
 
 Base64-encode it for GitHub Actions:
@@ -93,7 +93,8 @@ Prereleases create GitHub prereleases but do not update the stable Sparkle appca
 
 ## Build-Time Plist Values
 
-`script/build_and_run.sh` generates the app bundle `Info.plist`.
+Xcode processes `Config/PlexBar-Info.plist` and substitutes the values supplied
+by `script/build_and_run.sh` into the built app bundle.
 
 When `SPARKLE_APPCAST_URL` and `SPARKLE_PUBLIC_KEY` are set, the script writes:
 

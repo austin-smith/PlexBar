@@ -1,0 +1,499 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		21776749D52636039276396B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 02F89628F9045FAD68D161C4 /* Sparkle */; };
+		82B6635D2C318F88250A909A /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 7CDC00102320A7D463E2E701 /* AppIcon.icon */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		34A9BCBEE81F75550B5DEC3A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 99D12365F8058E74529B496C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 04D69605D17997F2671F5859;
+			remoteInfo = PlexBar;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		285B312F1F94E0B792064D1B /* PlexBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PlexBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		55582C8CE850F9EB45BFD8EF /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		61A2A1FA3B9E45FEAA010001 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		61A2A1FA3B9E45FEAA010002 /* PlexBar-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PlexBar-Info.plist"; sourceTree = "<group>"; };
+		7CDC00102320A7D463E2E701 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		AC67D9C1228E77749C552642 /* PlexBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PlexBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC0A13F0916C323FADBD3D6A /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		03ED93ACE00F5908CC02E1A0 /* PlexBarTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PlexBarTests;
+			sourceTree = "<group>";
+		};
+		0DCFEF7F4F154A9050FD8944 /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = App;
+			sourceTree = "<group>";
+		};
+		26F20AD55CF3A593CDB96BF7 /* Support */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Support;
+			sourceTree = "<group>";
+		};
+		4C720AFCEB5F3C6543BA76AE /* Playback */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Playback;
+			sourceTree = "<group>";
+		};
+		6985C422E58A088B3C3CA4E6 /* MenuBarIcon */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MenuBarIcon;
+			sourceTree = "<group>";
+		};
+		8A7FD63E6AB58FC5F129B7BA /* Views */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A03BF67138E06E878C1B8961 /* Models */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		B520D56C55BEA750908D98F7 /* Stores */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Stores;
+			sourceTree = "<group>";
+		};
+		E74C05AC8D13F749E011FC13 /* Services */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Services;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4C2504C9A514499A22B11DC1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				21776749D52636039276396B /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		114C8CB3B607B12646F0A6DA /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				7CDC00102320A7D463E2E701 /* AppIcon.icon */,
+				6985C422E58A088B3C3CA4E6 /* MenuBarIcon */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		7A97BF8BBC5CBA40A384FF4D = {
+			isa = PBXGroup;
+			children = (
+				9E099BCA65079B9FBC2E7CB4 /* Config */,
+				800DB8D882F265AC68298805 /* PlexBar */,
+				03ED93ACE00F5908CC02E1A0 /* PlexBarTests */,
+				F5232B90F32853C03738C047 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		800DB8D882F265AC68298805 /* PlexBar */ = {
+			isa = PBXGroup;
+			children = (
+				0DCFEF7F4F154A9050FD8944 /* App */,
+				A03BF67138E06E878C1B8961 /* Models */,
+				4C720AFCEB5F3C6543BA76AE /* Playback */,
+				114C8CB3B607B12646F0A6DA /* Resources */,
+				E74C05AC8D13F749E011FC13 /* Services */,
+				B520D56C55BEA750908D98F7 /* Stores */,
+				26F20AD55CF3A593CDB96BF7 /* Support */,
+				8A7FD63E6AB58FC5F129B7BA /* Views */,
+			);
+			path = PlexBar;
+			sourceTree = "<group>";
+		};
+		9E099BCA65079B9FBC2E7CB4 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				61A2A1FA3B9E45FEAA010002 /* PlexBar-Info.plist */,
+				61A2A1FA3B9E45FEAA010001 /* Shared.xcconfig */,
+				55582C8CE850F9EB45BFD8EF /* Debug.xcconfig */,
+				CC0A13F0916C323FADBD3D6A /* Release.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		F5232B90F32853C03738C047 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				285B312F1F94E0B792064D1B /* PlexBar.app */,
+				AC67D9C1228E77749C552642 /* PlexBarTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		04D69605D17997F2671F5859 /* PlexBar */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3713CB05E0E2A52573054DE0 /* Build configuration list for PBXNativeTarget "PlexBar" */;
+			buildPhases = (
+				DED0D4FA87F9A7FC16F3F216 /* Sources */,
+				9CBAE774AA5967A3D87EA836 /* Resources */,
+				4C2504C9A514499A22B11DC1 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0DCFEF7F4F154A9050FD8944 /* App */,
+				26F20AD55CF3A593CDB96BF7 /* Support */,
+				4C720AFCEB5F3C6543BA76AE /* Playback */,
+				6985C422E58A088B3C3CA4E6 /* MenuBarIcon */,
+				8A7FD63E6AB58FC5F129B7BA /* Views */,
+				A03BF67138E06E878C1B8961 /* Models */,
+				B520D56C55BEA750908D98F7 /* Stores */,
+				E74C05AC8D13F749E011FC13 /* Services */,
+			);
+			name = PlexBar;
+			packageProductDependencies = (
+				02F89628F9045FAD68D161C4 /* Sparkle */,
+			);
+			productName = PlexBar;
+			productReference = 285B312F1F94E0B792064D1B /* PlexBar.app */;
+			productType = "com.apple.product-type.application";
+		};
+		9D84969CABB037494AEFBCB7 /* PlexBarTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8CF747782D1AEE7DBD7683E2 /* Build configuration list for PBXNativeTarget "PlexBarTests" */;
+			buildPhases = (
+				55BD447D6F8C229A4C70FBB9 /* Sources */,
+				F71E088AD1F6D70F5178CFE2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B3E0B3D15C7A70CBB2AFB066 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				03ED93ACE00F5908CC02E1A0 /* PlexBarTests */,
+			);
+			name = PlexBarTests;
+			packageProductDependencies = (
+			);
+			productName = PlexBarTests;
+			productReference = AC67D9C1228E77749C552642 /* PlexBarTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		99D12365F8058E74529B496C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					04D69605D17997F2671F5859 = {
+						ProvisioningStyle = Automatic;
+					};
+					9D84969CABB037494AEFBCB7 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 00142C26111F8B0B5754534D /* Build configuration list for PBXProject "PlexBar" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7A97BF8BBC5CBA40A384FF4D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				7F550155B4988B4FB8D4CE93 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = F5232B90F32853C03738C047 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				04D69605D17997F2671F5859 /* PlexBar */,
+				9D84969CABB037494AEFBCB7 /* PlexBarTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		9CBAE774AA5967A3D87EA836 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				82B6635D2C318F88250A909A /* AppIcon.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F71E088AD1F6D70F5178CFE2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		55BD447D6F8C229A4C70FBB9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DED0D4FA87F9A7FC16F3F216 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B3E0B3D15C7A70CBB2AFB066 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 04D69605D17997F2671F5859 /* PlexBar */;
+			targetProxy = 34A9BCBEE81F75550B5DEC3A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0197C65E32738B635F535D97 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBarTests;
+				PRODUCT_NAME = PlexBarTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PlexBar.app/Contents/MacOS/PlexBar";
+			};
+			name = Debug;
+		};
+		33F0DF2CB98550AD274E8064 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_NAME = PlexBar;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		4CDEF4B7DA4A50B05F1AEBF8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CC0A13F0916C323FADBD3D6A /* Release.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		98E9CD57E7762B32012F1B11 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_NAME = PlexBar;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		C842FD5E7808F39B6A55D99C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBarTests;
+				PRODUCT_NAME = PlexBarTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PlexBar.app/Contents/MacOS/PlexBar";
+			};
+			name = Release;
+		};
+		F1B72FE58B78E9783744C883 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 55582C8CE850F9EB45BFD8EF /* Debug.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		00142C26111F8B0B5754534D /* Build configuration list for PBXProject "PlexBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F1B72FE58B78E9783744C883 /* Debug */,
+				4CDEF4B7DA4A50B05F1AEBF8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3713CB05E0E2A52573054DE0 /* Build configuration list for PBXNativeTarget "PlexBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				33F0DF2CB98550AD274E8064 /* Debug */,
+				98E9CD57E7762B32012F1B11 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8CF747782D1AEE7DBD7683E2 /* Build configuration list for PBXNativeTarget "PlexBarTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0197C65E32738B635F535D97 /* Debug */,
+				C842FD5E7808F39B6A55D99C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7F550155B4988B4FB8D4CE93 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		02F89628F9045FAD68D161C4 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7F550155B4988B4FB8D4CE93 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 99D12365F8058E74529B496C /* Project object */;
+}

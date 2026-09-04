@@ -43,7 +43,7 @@ jobs:
           echo "RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> "$GITHUB_ENV"
           echo "IS_PRERELEASE=$IS_PRERELEASE" >> "$GITHUB_ENV"
-          echo "DMG_PATH=$RUNNER_TEMP/PlexBar-${TAG}-arm64.dmg" >> "$GITHUB_ENV"
+          echo "DMG_PATH=$RUNNER_TEMP/PlexBar-${TAG}-universal.dmg" >> "$GITHUB_ENV"
           echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "release_version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "build_number=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
@@ -90,11 +90,6 @@ jobs:
 
           echo "RELEASE_NOTES_PATH=$RELEASE_NOTES_PATH" >> "$GITHUB_ENV"
 
-      - name: Setup Swift 6.3.1
-        uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: "6.3.1"
-
       - name: Install create-dmg
         env:
           HOMEBREW_NO_AUTO_UPDATE: 1
@@ -131,11 +126,32 @@ jobs:
             "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
 
-      - name: Build release app bundle
+          SIGNING_IDENTITY="$(
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" |
+              sed -nE 's/^[[:space:]]*[0-9]+\) [0-9A-F]+ "(Developer ID Application:.*)"$/\1/p' |
+              head -n 1
+          )"
+
+          if [[ -z "$SIGNING_IDENTITY" ]]; then
+            echo "No Developer ID Application identity was imported"
+            exit 1
+          fi
+
+          if [[ ! "$SIGNING_IDENTITY" =~ \(([A-Z0-9]{10})\)$ ]]; then
+            echo "Could not derive the Apple team identifier from the signing identity"
+            exit 1
+          fi
+
+          echo "CODE_SIGN_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
+          echo "CODE_SIGN_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "APPLE_TEAM_ID=${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
+
+      - name: Build and verify release app bundle
         env:
           BUILD_CONFIGURATION: release
+          APP_MARKETING_VERSION: ${{ env.RELEASE_VERSION }}
           APP_BUILD_VERSION: ${{ env.BUILD_NUMBER }}
-        run: script/build_and_run.sh build
+        run: script/build_and_run.sh verify
 
       - name: Validate Sparkle release configuration
         run: |
@@ -172,67 +188,6 @@ jobs:
 
           /usr/libexec/PlistBuddy -c "Print :SUVerifyUpdateBeforeExtraction" dist/PlexBar.app/Contents/Info.plist
           /usr/libexec/PlistBuddy -c "Print :SUEnableAutomaticChecks" dist/PlexBar.app/Contents/Info.plist
-
-      - name: Sign app bundle
-        run: |
-          APP_PATH="dist/PlexBar.app"
-          SPARKLE_FRAMEWORK="$APP_PATH/Contents/Frameworks/Sparkle.framework"
-          CODE_SIGN_IDENTITY="Developer ID Application"
-
-          if [[ ! -d "$APP_PATH" ]]; then
-            echo "App bundle not found at $APP_PATH"
-            exit 1
-          fi
-
-          if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then
-            echo "Sparkle framework not found at $SPARKLE_FRAMEWORK"
-            exit 1
-          fi
-
-          codesign --force \
-            --options runtime \
-            --sign "$CODE_SIGN_IDENTITY" \
-            --keychain "$KEYCHAIN_PATH" \
-            --timestamp \
-            "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Installer.xpc"
-
-          if [[ -d "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Downloader.xpc" ]]; then
-            codesign --force \
-              --options runtime \
-              --preserve-metadata=entitlements \
-              --sign "$CODE_SIGN_IDENTITY" \
-              --keychain "$KEYCHAIN_PATH" \
-              --timestamp \
-              "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Downloader.xpc"
-          fi
-
-          codesign --force \
-            --options runtime \
-            --sign "$CODE_SIGN_IDENTITY" \
-            --keychain "$KEYCHAIN_PATH" \
-            --timestamp \
-            "$SPARKLE_FRAMEWORK/Versions/B/Autoupdate"
-
-          codesign --force \
-            --options runtime \
-            --sign "$CODE_SIGN_IDENTITY" \
-            --keychain "$KEYCHAIN_PATH" \
-            --timestamp \
-            "$SPARKLE_FRAMEWORK/Versions/B/Updater.app"
-
-          codesign --force \
-            --options runtime \
-            --sign "$CODE_SIGN_IDENTITY" \
-            --keychain "$KEYCHAIN_PATH" \
-            --timestamp \
-            "$SPARKLE_FRAMEWORK"
-
-          codesign --force \
-            --options runtime \
-            --sign "$CODE_SIGN_IDENTITY" \
-            --keychain "$KEYCHAIN_PATH" \
-            --timestamp \
-            "$APP_PATH"
 
       - name: Create signed DMG
         run: |
@@ -276,7 +231,7 @@ jobs:
       - name: Sign DMG
         run: |
           codesign --force \
-            --sign "Developer ID Application" \
+            --sign "$CODE_SIGN_IDENTITY" \
             --keychain "$KEYCHAIN_PATH" \
             --timestamp \
             "$DMG_PATH"
@@ -368,7 +323,7 @@ jobs:
         env:
           SPARKLE_PRIVATE_KEY_BASE64: ${{ secrets.SPARKLE_PRIVATE_KEY_BASE64 }}
         run: |
-          SPARKLE_BIN=".build/artifacts/sparkle/Sparkle/bin/generate_appcast"
+          SPARKLE_BIN=".build/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast"
           APPCAST_WORK_DIR="appcast-work"
           PAGES_DIR="pages"
           SPARKLE_KEY_PATH="$RUNNER_TEMP/sparkle-ed25519-private-key"
