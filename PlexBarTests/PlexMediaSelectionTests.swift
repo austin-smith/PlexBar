@@ -4,6 +4,75 @@ import Testing
 
 @Suite
 struct PlexMediaSelectionTests {
+    @Test func streamSelectionRequestUsesTheSharedDocumentedPartContract() {
+        let parameters = PlexMediaSelectionRequestParameters(
+            partID: 700,
+            audioStreamID: 21,
+            subtitleStreamID: 0,
+            allParts: true
+        )
+
+        #expect(parameters.hasSelection)
+        #expect(parameters.path == "/library/parts/700")
+        #expect(parameters.queryItems == [
+            URLQueryItem(name: "audioStreamID", value: "21"),
+            URLQueryItem(name: "subtitleStreamID", value: "0"),
+            URLQueryItem(name: "allParts", value: "1"),
+        ])
+
+        let empty = PlexMediaSelectionRequestParameters(
+            partID: 700,
+            audioStreamID: nil,
+            subtitleStreamID: nil,
+            allParts: false
+        )
+        #expect(!empty.hasSelection)
+        #expect(empty.queryItems == [URLQueryItem(name: "allParts", value: "0")])
+    }
+
+    @Test func subtitleOffsetRequestUsesTheDocumentedStreamContract() {
+        let parameters = PlexSubtitleOffsetRequestParameters(
+            streamID: 31,
+            milliseconds: -200
+        )
+
+        #expect(parameters.path == "/library/streams/31")
+        #expect(parameters.queryItems == [
+            URLQueryItem(name: "offset", value: "-200"),
+        ])
+    }
+
+    @Test func exposesOffsetOnlyForTheSelectedExternalTextSubtitle() throws {
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Movie",
+          "Media": [{
+            "Part": [{
+              "id": "700",
+              "Stream": [
+                {"id":"31","streamType":"3","codec":"srt","selected":"1","location":"external","offset":"-150"},
+                {"id":"32","streamType":"3","codec":"srt","location":"embedded"},
+                {"id":"33","streamType":"3","codec":"pgs","location":"external"}
+              ]
+            }]
+          }]
+        }
+        """#)
+
+        let selection = PlexPlaybackMediaSelection(
+            item: item,
+            source: PlexPlaybackSource(mediaIndex: 0, partIndex: 0)
+        )
+
+        #expect(selection.subtitleOffsetSelection == PlexSubtitleOffsetSelection(
+            streamID: 31,
+            milliseconds: -150
+        ))
+        #expect(selection.subtitleOffsetSelection?.displayValue == "−150 ms")
+        #expect(selection.subtitleOffsetSelection?.adjusted(by: 100) == -50)
+    }
+
     @Test func derivesNativeMenuOptionsFromTheSelectedPlexPart() throws {
         let item = try decodeItem(#"""
         {
@@ -84,8 +153,8 @@ struct PlexMediaSelectionTests {
         var state = PlexNativeMediaSelectionState()
         let firstGeneration = state.generation
         let firstAvailability = PlexNativeMediaSelectionAvailability(
-            hasAudio: true,
-            hasSubtitles: false
+            audioOptionCount: 2,
+            subtitleOptionCount: 0
         )
 
         let acceptedFirst = state.accept(firstAvailability, generation: firstGeneration)
@@ -101,8 +170,8 @@ struct PlexMediaSelectionTests {
         #expect(!acceptedStale)
 
         let successorAvailability = PlexNativeMediaSelectionAvailability(
-            hasAudio: false,
-            hasSubtitles: true
+            audioOptionCount: 0,
+            subtitleOptionCount: 1
         )
         let acceptedSuccessor = state.accept(
             successorAvailability,
@@ -112,7 +181,7 @@ struct PlexMediaSelectionTests {
         #expect(state.availability == successorAvailability)
     }
 
-    @Test func serverManagedMenusWaitForInspectionAndNeverDuplicateAVKitGroups() throws {
+    @Test func serverManagedMenusWaitForInspectionAndExposeOnlyIncompleteAVKitGroups() throws {
         let item = try decodeItem(#"""
         {
           "ratingKey": "42",
@@ -144,8 +213,8 @@ struct PlexMediaSelectionTests {
         let allNative = PlexServerManagedMediaSelection(
             selection: selection,
             nativeAvailability: PlexNativeMediaSelectionAvailability(
-                hasAudio: true,
-                hasSubtitles: true
+                audioOptionCount: 2,
+                subtitleOptionCount: 2
             )
         )
         #expect(!allNative.hasChoices)
@@ -153,8 +222,8 @@ struct PlexMediaSelectionTests {
         let subtitlesRequirePlex = PlexServerManagedMediaSelection(
             selection: selection,
             nativeAvailability: PlexNativeMediaSelectionAvailability(
-                hasAudio: true,
-                hasSubtitles: false
+                audioOptionCount: 2,
+                subtitleOptionCount: 0
             )
         )
         #expect(subtitlesRequirePlex.audioOptions.isEmpty)
@@ -166,14 +235,24 @@ struct PlexMediaSelectionTests {
         let audioRequiresPlex = PlexServerManagedMediaSelection(
             selection: selection,
             nativeAvailability: PlexNativeMediaSelectionAvailability(
-                hasAudio: false,
-                hasSubtitles: true
+                audioOptionCount: 0,
+                subtitleOptionCount: 2
             )
         )
         #expect(audioRequiresPlex.audioOptions.map(\.id) == [21, 22])
         #expect(audioRequiresPlex.subtitleOptions.isEmpty)
         #expect(audioRequiresPlex.canSelectAudioStream(22))
         #expect(!audioRequiresPlex.canSelectAudioStream(21))
+
+        let partiallyNative = PlexServerManagedMediaSelection(
+            selection: selection,
+            nativeAvailability: PlexNativeMediaSelectionAvailability(
+                audioOptionCount: 1,
+                subtitleOptionCount: 1
+            )
+        )
+        #expect(partiallyNative.audioOptions.map(\.id) == [21, 22])
+        #expect(partiallyNative.subtitleOptions.map(\.id) == [31, 32])
     }
 
     @Test func multipartSelectionUsesTheSelectedPartForServerStreamChanges() throws {

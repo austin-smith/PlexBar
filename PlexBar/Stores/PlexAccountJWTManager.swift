@@ -7,11 +7,21 @@ struct PlexPreparedAccountToken: Equatable, Sendable {
 }
 
 @MainActor
+protocol PlexAccountJWTStorage: AnyObject {
+    var clientIdentifier: String { get }
+    var storedAccountToken: String { get }
+    var registeredJWTKeyID: String? { get }
+
+    func persistAccountToken(_ token: String) async throws
+    func markJWTKeyRegistered(keyID: String)
+}
+
+@MainActor
 final class PlexAccountJWTManager {
     nonisolated static let requestedScope = "username,email,friendly_name"
     nonisolated static let defaultRefreshLeadTime: TimeInterval = 24 * 60 * 60
 
-    private let settings: PlexSettingsStore
+    private let storage: any PlexAccountJWTStorage
     private let client: any PlexAccountJWTClient
     private let deviceIdentityStore: any PlexDeviceIdentityProviding
     private let refreshLeadTime: TimeInterval
@@ -19,13 +29,13 @@ final class PlexAccountJWTManager {
     private var preparationTask: Task<PlexPreparedAccountToken, Error>?
 
     init(
-        settings: PlexSettingsStore,
+        storage: any PlexAccountJWTStorage,
         client: any PlexAccountJWTClient,
         deviceIdentityStore: any PlexDeviceIdentityProviding,
         refreshLeadTime: TimeInterval = PlexAccountJWTManager.defaultRefreshLeadTime,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
-        self.settings = settings
+        self.storage = storage
         self.client = client
         self.deviceIdentityStore = deviceIdentityStore
         self.refreshLeadTime = refreshLeadTime
@@ -52,13 +62,13 @@ final class PlexAccountJWTManager {
         preparationTask?.cancel()
         preparationTask = nil
         let preparedToken = try validateIssuedJWT(token, issuedAt: now())
-        settings.markJWTKeyRegistered(keyID: registeredKeyID)
-        try await settings.saveAuthenticatedUserToken(preparedToken.token)
+        storage.markJWTKeyRegistered(keyID: registeredKeyID)
+        try await storage.persistAccountToken(preparedToken.token)
         return preparedToken
     }
 
     func recoverRejectedAccountToken(_ rejectedToken: String) async throws -> PlexPreparedAccountToken {
-        if settings.trimmedUserToken != rejectedToken {
+        if storage.storedAccountToken != rejectedToken {
             return try await prepareAccountToken()
         }
 
@@ -66,7 +76,7 @@ final class PlexAccountJWTManager {
     }
 
     private func prepareAccountTokenNow(forceRefresh: Bool) async throws -> PlexPreparedAccountToken {
-        let storedToken = settings.trimmedUserToken
+        let storedToken = storage.storedAccountToken
         guard !storedToken.isEmpty else {
             throw PlexJWTError.missingAccountToken
         }
@@ -75,13 +85,13 @@ final class PlexAccountJWTManager {
         switch try PlexAccountToken(token: storedToken) {
         case .legacy:
             let identity = try await deviceIdentityStore.loadOrCreateIdentity()
-            if settings.registeredJWTKeyID != identity.keyID {
+            if storage.registeredJWTKeyID != identity.keyID {
                 try await client.registerJWK(
                     identity.publicJWK(includeUse: true),
                     legacyToken: storedToken,
                     clientContext: clientContext
                 )
-                settings.markJWTKeyRegistered(keyID: identity.keyID)
+                storage.markJWTKeyRegistered(keyID: identity.keyID)
             }
             return try await issueAccountToken(identity: identity, issuedAt: currentDate)
 
@@ -102,7 +112,7 @@ final class PlexAccountJWTManager {
     ) async throws -> PlexPreparedAccountToken {
         let nonce = try await client.fetchJWTNonce(clientContext: clientContext)
         let deviceJWT = try identity.signedDeviceJWT(
-            clientIdentifier: settings.clientIdentifier,
+            clientIdentifier: storage.clientIdentifier,
             nonce: nonce,
             scope: Self.requestedScope,
             issuedAt: issuedAt
@@ -112,8 +122,8 @@ final class PlexAccountJWTManager {
             clientContext: clientContext
         )
         let preparedToken = try validateIssuedJWT(accountToken, issuedAt: issuedAt)
-        settings.markJWTKeyRegistered(keyID: identity.keyID)
-        try await settings.saveAuthenticatedUserToken(preparedToken.token)
+        storage.markJWTKeyRegistered(keyID: identity.keyID)
+        try await storage.persistAccountToken(preparedToken.token)
         return preparedToken
     }
 
@@ -139,6 +149,6 @@ final class PlexAccountJWTManager {
     }
 
     private var clientContext: PlexClientContext {
-        PlexClientContext(clientIdentifier: settings.clientIdentifier)
+        PlexClientContext(clientIdentifier: storage.clientIdentifier)
     }
 }

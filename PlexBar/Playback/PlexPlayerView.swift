@@ -74,8 +74,10 @@ enum PlexPlayerNavigationTitle {
 }
 
 @MainActor
+@Observable
 final class PlexPlayerPresentationLifecycle {
     private(set) var isFullScreenActive = false
+    private(set) var isFullScreenTransitioning = false
     private(set) var isPictureInPictureActive = false
 
     var keepsPlaybackAliveWhenViewDisappears: Bool {
@@ -84,10 +86,20 @@ final class PlexPlayerPresentationLifecycle {
 
     func willEnterFullScreen() {
         isFullScreenActive = true
+        isFullScreenTransitioning = true
+    }
+
+    func didEnterFullScreen() {
+        isFullScreenTransitioning = false
+    }
+
+    func willExitFullScreen() {
+        isFullScreenTransitioning = true
     }
 
     func didExitFullScreen() {
         isFullScreenActive = false
+        isFullScreenTransitioning = false
     }
 
     func willStartPictureInPicture() {
@@ -257,7 +269,7 @@ struct PlexPlayerView: View {
             ToolbarItem(placement: .navigation) {
                 Button("Back to Library", systemImage: "chevron.backward", action: closePlayer)
                     .help("Stop Playback and Return to Library")
-                    .keyboardShortcut(.cancelAction)
+                    .keyboardShortcut(presentationLifecycle.isFullScreenActive ? nil : .cancelAction)
             }
 
             ToolbarItem(placement: .automatic) {
@@ -731,6 +743,7 @@ private struct PlexAVPlayerView: NSViewRepresentable {
         playerView.preferredDisplayDynamicRange = videoDynamicRange.avDisplayDynamicRange
         playerView.updatesNowPlayingInfoCenter = false
         playerView.delegate = context.coordinator
+        context.coordinator.installFullScreenKeyboardHandler(on: playerView)
         playerView.pictureInPictureDelegate = context.coordinator
         context.coordinator.updateAudioStage(in: playerView, overlay: audioOverlay)
         context.coordinator.installMarkerOverlay(in: playerView)
@@ -794,6 +807,10 @@ private struct PlexAVPlayerView: NSViewRepresentable {
         )
     }
 
+    static func dismantleNSView(_ playerView: AVPlayerView, coordinator: Coordinator) {
+        coordinator.stopFullScreenKeyboardHandler()
+    }
+
     func sizeThatFits(
         _ proposal: ProposedViewSize,
         nsView: AVPlayerView,
@@ -815,6 +832,7 @@ private struct PlexAVPlayerView: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, @MainActor AVPlayerViewDelegate, @MainActor AVPlayerViewPictureInPictureDelegate {
         private let presentationLifecycle: PlexPlayerPresentationLifecycle
+        private var fullScreenKeyboardHandler: PlexVideoFullScreenKeyboardHandler?
         private var restorePlayerInterface: (@escaping (Bool) -> Void) -> Void
         private var onSelectPlaybackRate: (PlexPlaybackRate) -> Void
         private var mediaSelection: PlexPlaybackMediaSelection?
@@ -1039,8 +1057,29 @@ private struct PlexAVPlayerView: NSViewRepresentable {
             }
         }
 
+        func installFullScreenKeyboardHandler(on playerView: AVPlayerView) {
+            fullScreenKeyboardHandler = PlexVideoFullScreenKeyboardHandler(
+                playerView: playerView,
+                lifecycle: presentationLifecycle
+            )
+            fullScreenKeyboardHandler?.start()
+        }
+
+        func stopFullScreenKeyboardHandler() {
+            fullScreenKeyboardHandler?.stop()
+            fullScreenKeyboardHandler = nil
+        }
+
         func playerViewWillEnterFullScreen(_ playerView: AVPlayerView) {
             presentationLifecycle.willEnterFullScreen()
+        }
+
+        func playerViewDidEnterFullScreen(_ playerView: AVPlayerView) {
+            presentationLifecycle.didEnterFullScreen()
+        }
+
+        func playerViewWillExitFullScreen(_ playerView: AVPlayerView) {
+            presentationLifecycle.willExitFullScreen()
         }
 
         func playerViewDidExitFullScreen(_ playerView: AVPlayerView) {
@@ -1083,15 +1122,10 @@ private struct PlexAVPlayerView: NSViewRepresentable {
                     return
                 }
 
-                let asset = item.asset
-                let characteristics = try? await asset.load(
-                    .availableMediaCharacteristicsWithMediaSelectionOptions
-                )
-                let availableCharacteristics = characteristics ?? []
-                let availability = PlexNativeMediaSelectionAvailability(
-                    hasAudio: availableCharacteristics.contains(.audible),
-                    hasSubtitles: availableCharacteristics.contains(.legible)
-                )
+                guard let availability = try? await PlexNativeMediaInspector
+                    .mediaSelectionAvailability(asset: item.asset) else {
+                    return
+                }
 
                 guard !Task.isCancelled,
                       inspectedItemIdentifier == ObjectIdentifier(item),
@@ -1124,8 +1158,12 @@ private struct PlexAVPlayerView: NSViewRepresentable {
             markerAction: PlexPlaybackMarkerAction?
         ) -> NSMenu? {
             let includesVideoQuality = videoQualitySelection.isVideo
-            let includesAudio = selection.audioOptions.count > 1 && !nativeAvailability.hasAudio
-            let includesSubtitles = !selection.subtitleOptions.isEmpty && !nativeAvailability.hasSubtitles
+            let serverManagedSelection = PlexServerManagedMediaSelection(
+                selection: selection,
+                nativeAvailability: nativeAvailability
+            )
+            let includesAudio = !serverManagedSelection.audioOptions.isEmpty
+            let includesSubtitles = !serverManagedSelection.subtitleOptions.isEmpty
             guard markerAction != nil || includesVideoQuality || includesAudio || includesSubtitles else {
                 return nil
             }
@@ -1167,12 +1205,12 @@ private struct PlexAVPlayerView: NSViewRepresentable {
             }
             if includesAudio {
                 let item = NSMenuItem(title: "Audio", action: nil, keyEquivalent: "")
-                item.submenu = audioMenu(options: selection.audioOptions)
+                item.submenu = audioMenu(options: serverManagedSelection.audioOptions)
                 menu.addItem(item)
             }
             if includesSubtitles {
                 let item = NSMenuItem(title: "Subtitles", action: nil, keyEquivalent: "")
-                item.submenu = subtitleMenu(options: selection.subtitleOptions)
+                item.submenu = subtitleMenu(options: serverManagedSelection.subtitleOptions)
                 menu.addItem(item)
             }
             return menu
@@ -1315,67 +1353,6 @@ private struct PlexAVPlayerView: NSViewRepresentable {
             onSkipMarker()
         }
 
-    }
-}
-
-@MainActor
-enum PlexNativeVideoScalingConfiguration {
-    static func apply(
-        to playerView: AVPlayerView,
-        scalingMode: PlexVideoScalingMode
-    ) {
-        let videoGravity = scalingMode.avVideoGravity
-        guard playerView.videoGravity != videoGravity else {
-            return
-        }
-        playerView.videoGravity = videoGravity
-    }
-}
-
-extension PlexVideoScalingMode {
-    var avVideoGravity: AVLayerVideoGravity {
-        switch self {
-        case .fit: .resizeAspect
-        case .fill: .resizeAspectFill
-        }
-    }
-}
-
-@MainActor
-enum PlexNativePlaybackSpeedConfiguration {
-    static let speeds = PlexPlaybackRate.allCases.map { playbackRate in
-        AVPlaybackSpeed(
-            rate: playbackRate.rawValue,
-            localizedName: playbackRate.label
-        )
-    }
-
-    static func apply(
-        to playerView: AVPlayerView,
-        playbackRate: PlexPlaybackRate
-    ) {
-        if playerView.speeds.map(\.rate) != speeds.map(\.rate) {
-            playerView.speeds = speeds
-        }
-
-        guard let speed = speed(for: playbackRate),
-              playerView.selectedSpeed?.rate != speed.rate else {
-            return
-        }
-        playerView.selectSpeed(speed)
-    }
-
-    static func speed(for playbackRate: PlexPlaybackRate) -> AVPlaybackSpeed? {
-        speeds.first { speed in
-            abs(speed.rate - playbackRate.rawValue) < 0.001
-        }
-    }
-
-    static func playbackRate(for speed: AVPlaybackSpeed?) -> PlexPlaybackRate? {
-        guard let speed else {
-            return nil
-        }
-        return PlexPlaybackRate(remoteCommandValue: speed.rate)
     }
 }
 
@@ -1545,10 +1522,6 @@ final class PlexPlayerSessionModel {
 
     var playbackWaitingReasonLabel: String? {
         engine.waitingReason?.diagnosticLabel
-    }
-
-    var deliveredMediaDiagnosticFacts: [PlexNativeMediaDiagnosticFact] {
-        engine.mediaFacts?.diagnosticFacts ?? []
     }
 
     var playbackMetricDiagnosticFacts: [PlexPlaybackMetricDiagnosticFact] {
@@ -2165,6 +2138,7 @@ final class PlexPlayerSessionModel {
             selection: videoQualitySelection,
             sourceBitrate: selectedSourceVideoBitrate,
             maximumQuality: settingsStore.videoQuality(for: connectionKind),
+            isTranscoding: presentation.plan.method == .transcode,
             metrics: engine.metricFacts,
             excludedQualities: qualitySuggestionState.acceptedQualities
         )
@@ -3663,7 +3637,9 @@ final class PlexPlayerSessionModel {
                 to: queuedItem,
                 queue: updatedQueue,
                 completedCurrentItem: completedCurrentItem,
-                startTimeOverride: direction == .previous ? 0 : nil,
+                startTimeOverride: (
+                    updatedQueue.isCinemaPreplayQueue || direction == .previous
+                ) ? 0 : nil,
                 ticket: ticket
             )
         } catch is CancellationError {
@@ -3704,7 +3680,7 @@ final class PlexPlayerSessionModel {
                 to: queuedItem,
                 queue: updatedQueue,
                 completedCurrentItem: false,
-                startTimeOverride: nil,
+                startTimeOverride: updatedQueue.isCinemaPreplayQueue ? 0 : nil,
                 ticket: ticket
             )
         } catch is CancellationError {
@@ -3796,16 +3772,6 @@ final class PlexPlayerSessionModel {
 
     private var canChangeLanguageOptions: Bool {
         canChangeMediaSelection
-    }
-}
-
-private extension PlexPlaybackPlan.Method {
-    var label: String {
-        switch self {
-        case .directPlay: "Direct Play"
-        case .directStream: "Direct Stream"
-        case .transcode: "Transcode"
-        }
     }
 }
 

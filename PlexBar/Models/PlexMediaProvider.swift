@@ -4,6 +4,7 @@ struct PlexLibraryProviderEndpoints: Equatable, Sendable {
     let providerIdentifier: String
     let browseRoutesByLibraryID: [String: PlexLibraryBrowseRoute]
     let promotedPath: String?
+    let continueWatchingPath: String?
     let searchPath: String?
     let timelinePath: String?
     let scrobblePath: String?
@@ -23,6 +24,7 @@ struct PlexLibraryProviderEndpoints: Equatable, Sendable {
         providerIdentifier: String,
         browseRoutesByLibraryID: [String: PlexLibraryBrowseRoute] = [:],
         promotedPath: String? = nil,
+        continueWatchingPath: String? = nil,
         searchPath: String? = nil,
         timelinePath: String?,
         scrobblePath: String?,
@@ -41,6 +43,7 @@ struct PlexLibraryProviderEndpoints: Equatable, Sendable {
         self.providerIdentifier = providerIdentifier
         self.browseRoutesByLibraryID = browseRoutesByLibraryID
         self.promotedPath = promotedPath
+        self.continueWatchingPath = continueWatchingPath
         self.searchPath = searchPath
         self.timelinePath = timelinePath
         self.scrobblePath = scrobblePath
@@ -161,6 +164,9 @@ struct PlexMediaProvidersContainer: Decodable, Sendable {
         let promotedPath = provider.features.first(where: {
             $0.type.caseInsensitiveCompare("promoted") == .orderedSame
         })?.key?.nilIfBlank
+        let continueWatchingPath = provider.features.first(where: {
+            $0.type.caseInsensitiveCompare("continuewatching") == .orderedSame
+        })?.key?.nilIfBlank
         let searchPath = provider.features.first(where: {
             $0.type.caseInsensitiveCompare("search") == .orderedSame
         })?.key?.nilIfBlank
@@ -201,6 +207,7 @@ struct PlexMediaProvidersContainer: Decodable, Sendable {
             providerIdentifier: provider.identifier,
             browseRoutesByLibraryID: browseRoutesByLibraryID,
             promotedPath: promotedPath,
+            continueWatchingPath: continueWatchingPath,
             searchPath: searchPath,
             timelinePath: timelinePath,
             scrobblePath: scrobblePath,

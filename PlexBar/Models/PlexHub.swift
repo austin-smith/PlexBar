@@ -40,7 +40,7 @@ struct PlexHub: Decodable, Equatable, Identifiable, Sendable {
 
     var prefersPosterArtwork: Bool {
         switch hubIdentifier.lowercased() {
-        case "home.continue", "home.ondeck":
+        case "continuewatching", "home.continue", "home.ondeck":
             true
         default:
             false
@@ -48,7 +48,24 @@ struct PlexHub: Decodable, Equatable, Identifiable, Sendable {
     }
 
     var isContinueWatching: Bool {
-        hubIdentifier.caseInsensitiveCompare("home.continue") == .orderedSame
+        hubIdentifier.caseInsensitiveCompare("continueWatching") == .orderedSame
+            || hubIdentifier.caseInsensitiveCompare("home.continue") == .orderedSame
+    }
+
+    /// The dedicated feed owns continuation eligibility and item order. Never merge
+    /// the legacy promoted rows into it, even when the unified feed is empty.
+    static func homeHubs(promoted: [PlexHub], continueWatching: [PlexHub]) throws -> [PlexHub] {
+        guard continueWatching.count <= 1,
+              continueWatching.allSatisfy({
+                  $0.hubIdentifier.caseInsensitiveCompare("continueWatching") == .orderedSame
+              }) else {
+            throw PlexAPIError.invalidResponse
+        }
+        return continueWatching.filter { !$0.metadata.isEmpty }
+            + promoted.filter {
+                !$0.metadata.isEmpty && !$0.isContinueWatching
+                    && $0.hubIdentifier.caseInsensitiveCompare("home.ondeck") != .orderedSame
+            }
     }
 
     enum CodingKeys: String, CodingKey {

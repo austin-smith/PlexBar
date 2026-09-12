@@ -20,6 +20,42 @@ enum PlexPlaybackMediaKind: String, Equatable, Sendable {
     }
 }
 
+enum PlexNativeSkippingMode: Equatable, Sendable {
+    case time
+    case item
+}
+
+struct PlexNativeSkippingConfiguration: Equatable, Sendable {
+    let mode: PlexNativeSkippingMode
+    let isBackwardEnabled: Bool
+    let isForwardEnabled: Bool
+
+    init(
+        mediaKind: PlexPlaybackMediaKind,
+        canMovePrevious: Bool,
+        canMoveNext: Bool,
+        controlsEnabled: Bool
+    ) {
+        let usesItemSkipping = mediaKind == .music
+            && (canMovePrevious || canMoveNext)
+        mode = usesItemSkipping ? .item : .time
+
+        guard controlsEnabled else {
+            isBackwardEnabled = false
+            isForwardEnabled = false
+            return
+        }
+
+        if usesItemSkipping {
+            isBackwardEnabled = canMovePrevious
+            isForwardEnabled = canMoveNext
+        } else {
+            isBackwardEnabled = true
+            isForwardEnabled = true
+        }
+    }
+}
+
 enum PlexVideoDisplayDynamicRange: String, CaseIterable, Identifiable, Sendable {
     case automatic
     case standard
@@ -84,17 +120,20 @@ struct PlexPlaybackCapabilities: Equatable, Sendable {
     let directPlayVideoCodecs: Set<String>
     let directPlayAudioCodecs: Set<String>
     let directPlayMusicProfiles: Set<PlexMusicDirectPlayProfile>
+    let hlsStreamingAudioCodecs: Set<String>
 
     init(
         directPlayContainers: Set<String>,
         directPlayVideoCodecs: Set<String>,
         directPlayAudioCodecs: Set<String>,
-        directPlayMusicProfiles: Set<PlexMusicDirectPlayProfile> = []
+        directPlayMusicProfiles: Set<PlexMusicDirectPlayProfile> = [],
+        hlsStreamingAudioCodecs: Set<String> = []
     ) {
         self.directPlayContainers = directPlayContainers
         self.directPlayVideoCodecs = directPlayVideoCodecs
         self.directPlayAudioCodecs = directPlayAudioCodecs
         self.directPlayMusicProfiles = directPlayMusicProfiles
+        self.hlsStreamingAudioCodecs = hlsStreamingAudioCodecs
     }
 
     func clientProfileExtra(for mediaKind: PlexPlaybackMediaKind) -> String {
@@ -128,7 +167,7 @@ struct PlexPlaybackCapabilities: Equatable, Sendable {
 
     /// Returns an exact PMS media-part path only when the selected source is a
     /// single file whose declared container and codecs independently satisfy
-    /// this Mac's native AVFoundation and VideoToolbox capability contract.
+    /// this device's native AVFoundation and VideoToolbox capability contract.
     /// Missing facts, multipart media, and selected subtitle streams are not
     /// guessed; those sources remain owned by PMS's universal decision path.
     func directPlayPath(
@@ -204,10 +243,13 @@ struct PlexPlaybackCapabilities: Equatable, Sendable {
     }
 
     private var videoClientProfileExtra: String {
+        // H.264 remains the conversion target. Copy HEVC only when the native
+        // decoder supports it; Apple HLS requires fragmented MP4 for HEVC.
+        let videoCodecs = directPlayVideoCodecs.contains("hevc") ? "h264,hevc" : "h264"
         let transcodeTarget =
             "add-transcode-target(type=videoProfile&context=streaming&protocol=hls" +
-            "&container=mpegts&videoCodec=h264&audioCodec=aac)"
-        return [videoDirectPlayProfile, transcodeTarget]
+            "&container=mp4&videoCodec=\(videoCodecs)&audioCodec=aac&replace=true)"
+        return [videoDirectPlayProfile, transcodeTarget, hlsStreamingAudioProfile]
             .compactMap { $0 }
             .joined(separator: "+")
     }
@@ -230,6 +272,13 @@ struct PlexPlaybackCapabilities: Equatable, Sendable {
         }
         return "add-direct-play-profile(type=videoProfile&container=\(containers)" +
             "&videoCodec=\(videoCodecs)&audioCodec=\(audioCodecs)&subtitleCodec=*)"
+    }
+
+    private var hlsStreamingAudioProfile: String? {
+        let audioCodecs = hlsStreamingAudioCodecs.sorted().joined(separator: ",")
+        guard !audioCodecs.isEmpty else { return nil }
+        return "add-transcode-target-codec(type=videoProfile&context=streaming" +
+            "&protocol=hls&audioCodec=\(audioCodecs))"
     }
 
     private var musicDirectPlayProfiles: [String] {
@@ -266,11 +315,120 @@ struct PlexPlaybackPlan: Equatable, Sendable {
     let startTime: TimeInterval
     let source: PlexPlaybackSource
     let usesServerMediaSelection: Bool
+    let supportsAudioBoost: Bool
+    let supportsSubtitleAutoSync: Bool
+
+    init(
+        url: URL,
+        method: Method,
+        mediaKind: PlexPlaybackMediaKind,
+        sessionIdentifier: String,
+        ratingKey: String,
+        duration: TimeInterval?,
+        startTime: TimeInterval,
+        source: PlexPlaybackSource,
+        usesServerMediaSelection: Bool,
+        supportsAudioBoost: Bool = false,
+        supportsSubtitleAutoSync: Bool = false
+    ) {
+        self.url = url
+        self.method = method
+        self.mediaKind = mediaKind
+        self.sessionIdentifier = sessionIdentifier
+        self.ratingKey = ratingKey
+        self.duration = duration
+        self.startTime = startTime
+        self.source = source
+        self.usesServerMediaSelection = usesServerMediaSelection
+        self.supportsAudioBoost = supportsAudioBoost
+        self.supportsSubtitleAutoSync = supportsSubtitleAutoSync
+    }
+}
+
+extension PlexPlaybackPlan.Method {
+    var label: String {
+        switch self {
+        case .directPlay: "Direct Play"
+        case .directStream: "Direct Stream"
+        case .transcode: "Transcode"
+        }
+    }
+}
+
+struct PlexPlayerPlaybackInfoPresentation: Equatable, Sendable {
+    let title: String
+    let hierarchyLine: String?
+    let summary: String?
+    let contentRating: String?
+    let genre: String?
+
+    init(item: PlexMediaItem) {
+        title = item.title
+        hierarchyLine = Self.hierarchyLine(for: item)
+        summary = item.summary?.nilIfBlank
+        contentRating = item.contentRating?.nilIfBlank
+        genre = Self.genreLine(for: item)
+    }
+
+    private static func hierarchyLine(for item: PlexMediaItem) -> String? {
+        let values: [String?] = switch item.type?.lowercased() {
+        case "episode", "track": [item.grandparentTitle, item.parentTitle]
+        default: [item.parentTitle, item.grandparentTitle]
+        }
+
+        var seen: Set<String> = []
+        let hierarchy = values
+            .compactMap { $0?.nilIfBlank }
+            .filter { seen.insert($0).inserted }
+        return hierarchy.isEmpty ? nil : hierarchy.joined(separator: " · ")
+    }
+
+    private static func genreLine(for item: PlexMediaItem) -> String? {
+        var seen: Set<String> = []
+        let genres = item.genres
+            .compactMap(\.tag.nilIfBlank)
+            .filter { seen.insert($0).inserted }
+        return genres.isEmpty ? nil : genres.joined(separator: ", ")
+    }
 }
 
 struct PlexPlaybackSource: Codable, Equatable, Sendable {
     let mediaIndex: Int
     let partIndex: Int
+}
+
+struct PlexPlaybackVersionOption: Equatable, Identifiable, Sendable {
+    let id: Int
+    let source: PlexPlaybackSource
+    let label: String
+}
+
+struct PlexPlaybackVersionSelection: Equatable, Sendable {
+    let options: [PlexPlaybackVersionOption]
+    let selectedID: Int
+
+    init?(item: PlexMediaItem, selectedSource: PlexPlaybackSource) {
+        let options = item.playbackVersionOptions
+        guard options.count > 1,
+              options.contains(where: { $0.source == selectedSource }) else {
+            return nil
+        }
+        self.options = options
+        selectedID = selectedSource.mediaIndex
+    }
+
+    func canSelect(_ id: Int) -> Bool {
+        id != selectedID && options.contains(where: { $0.id == id })
+    }
+
+    var selectedOption: PlexPlaybackVersionOption? {
+        options.first(where: { $0.id == selectedID })
+    }
+
+    func source(for id: Int) -> PlexPlaybackSource? {
+        guard canSelect(id) else { return nil }
+        return options.first(where: { $0.id == id })?.source
+    }
 }
 
 struct PlexAudioPlaybackPresentation: Equatable, Sendable {
@@ -574,7 +732,7 @@ enum PlexPlaybackRate: Float, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum PlexPlaybackRepeatMode: CaseIterable, Identifiable, Sendable {
+enum PlexPlaybackRepeatMode: CaseIterable, Equatable, Identifiable, Sendable {
     case off
     case one
     case all
@@ -665,6 +823,26 @@ enum PlexPlaybackCompletionAction: Equatable, Sendable {
         return countdownSeconds == 0
             ? .advanceNext
             : .presentPostPlay(autoAdvanceAfterSeconds: countdownSeconds)
+    }
+}
+
+enum PlexPostPlayPresentationMode: Equatable, Sendable {
+    case none
+    case manual
+    case automatic(afterSeconds: Int)
+    case inactivityConfirmation
+
+    static func resolve(
+        action: PlexPlaybackCompletionAction,
+        autoplayPreferences: PlexAutoplayPreferences
+    ) -> Self {
+        guard case .presentPostPlay(let autoAdvanceAfterSeconds) = action else {
+            return .none
+        }
+        if let autoAdvanceAfterSeconds {
+            return .automatic(afterSeconds: autoAdvanceAfterSeconds)
+        }
+        return autoplayPreferences.isEnabled ? .inactivityConfirmation : .manual
     }
 }
 
@@ -772,10 +950,91 @@ enum PlexVideoQuality: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+struct PlexVideoQualityPreferences: Equatable, Sendable {
+    let local: PlexVideoQuality
+    let remote: PlexVideoQuality
+
+    func quality(for connectionKind: PlexConnectionKind?) -> PlexVideoQuality {
+        connectionKind == .local ? local : remote
+    }
+}
+
 struct PlexVideoQualityConstraints: Equatable, Sendable {
     let width: Int
     let height: Int
     let bitrate: Int
+}
+
+enum PlexMusicQuality: String, CaseIterable, Identifiable, Sendable {
+    case original
+    case kbps320
+    case kbps256
+    case kbps192
+    case kbps128
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .original: "Original"
+        case .kbps320: "320 kbps"
+        case .kbps256: "256 kbps"
+        case .kbps192: "192 kbps"
+        case .kbps128: "128 kbps"
+        }
+    }
+
+    var bitrate: Int? {
+        switch self {
+        case .original: nil
+        case .kbps320: 320
+        case .kbps256: 256
+        case .kbps192: 192
+        case .kbps128: 128
+        }
+    }
+
+    func limits(media: PlexMediaVersion) -> Bool {
+        guard media.videoCodec?.nilIfBlank == nil,
+              media.audioCodec?.nilIfBlank != nil else {
+            return false
+        }
+        guard let bitrate else { return false }
+        guard let sourceBitrate = media.bitrate, sourceBitrate > 0 else {
+            return true
+        }
+        return sourceBitrate > bitrate
+    }
+}
+
+enum PlexAudioBoost: Int, CaseIterable, Identifiable, Sendable {
+    case none = 100
+    case small = 175
+    case large = 225
+    case huge = 300
+
+    var id: Self { self }
+
+    var label: String {
+        switch self {
+        case .none: "None"
+        case .small: "Small"
+        case .large: "Large"
+        case .huge: "Huge"
+        }
+    }
+
+    var percentageLabel: String {
+        "\(rawValue)%"
+    }
+}
+
+struct PlexMusicQualityPreferences: Equatable, Sendable {
+    let remote: PlexMusicQuality
+
+    func quality(for connectionKind: PlexConnectionKind?) -> PlexMusicQuality {
+        connectionKind == .local ? .original : remote
+    }
 }
 
 extension PlexMediaItem {
@@ -818,6 +1077,60 @@ extension PlexMediaItem {
         }
 
         return PlexPlaybackSource(mediaIndex: mediaIndex, partIndex: partIndex)
+    }
+
+    var playbackVersionOptions: [PlexPlaybackVersionOption] {
+        media.indices.compactMap { mediaIndex in
+            guard let source = playbackSource(mediaIndex: mediaIndex) else {
+                return nil
+            }
+            return PlexPlaybackVersionOption(
+                id: mediaIndex,
+                source: source,
+                label: Self.playbackVersionLabel(
+                    media[mediaIndex],
+                    number: mediaIndex + 1
+                )
+            )
+        }
+    }
+
+    private static func playbackVersionLabel(
+        _ version: PlexMediaVersion,
+        number: Int
+    ) -> String {
+        var facts: [String] = []
+
+        if let width = version.width, let height = version.height,
+           width > 0, height > 0 {
+            facts.append("\(width) × \(height)")
+        } else if let resolution = version.videoResolution?.nilIfBlank {
+            facts.append(resolution.uppercased())
+        }
+        if let videoCodec = version.videoCodec?.nilIfBlank {
+            facts.append(videoCodec.uppercased())
+        } else if let audioCodec = version.audioCodec?.nilIfBlank {
+            facts.append(audioCodec.uppercased())
+        }
+        if let bitrate = version.bitrate, bitrate > 0 {
+            facts.append(Self.playbackVersionBitrateLabel(bitrate))
+        }
+        if let container = version.container?.nilIfBlank {
+            facts.append(container.uppercased())
+        }
+
+        let prefix = "Version \(number)"
+        return facts.isEmpty ? prefix : "\(prefix) · \(facts.joined(separator: " · "))"
+    }
+
+    private static func playbackVersionBitrateLabel(_ kilobitsPerSecond: Int) -> String {
+        guard kilobitsPerSecond >= 1_000 else {
+            return "\(kilobitsPerSecond) kbps"
+        }
+        let megabitsPerSecond = Double(kilobitsPerSecond) / 1_000
+        return megabitsPerSecond.formatted(
+            .number.precision(.fractionLength(0...1))
+        ) + " Mbps"
     }
 }
 

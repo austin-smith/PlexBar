@@ -50,21 +50,6 @@ extension PlexMediaItem {
         return usesSquareArtwork ? 260 : 390
     }
 
-    var formattedDuration: String? {
-        guard let duration, duration > 0 else {
-            return nil
-        }
-
-        let roundedMinutes = max((Int64(duration) + 30_000) / 60_000, 1)
-        return Duration.seconds(roundedMinutes * 60)
-            .formatted(.units(width: .abbreviated))
-            .replacingOccurrences(of: ", ", with: " ")
-    }
-
-    var preferredArtworkPath: String? {
-        thumb?.nilIfBlank ?? composite?.nilIfBlank
-    }
-
     var itemCountLabel: String? {
         leafCount.map { "\($0.formatted()) \($0 == 1 ? "item" : "items")" }
     }
@@ -79,19 +64,4 @@ extension PlexMediaItem {
         return supportsWatchedStateMutation ? "Unwatched" : nil
     }
 
-    var episodeIdentifier: String? {
-        guard type?.lowercased() == "episode", let index else {
-            return nil
-        }
-        if let parentIndex {
-            return "S\(parentIndex), E\(index)"
-        }
-        return "Episode \(index)"
-    }
-
-    var factsLine: String? {
-        let values = [episodeIdentifier, year.map(String.init), formattedDuration, contentRating?.nilIfBlank]
-            .compactMap { $0 }
-        return values.isEmpty ? nil : values.joined(separator: " · ")
-    }
 }

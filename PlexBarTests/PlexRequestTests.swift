@@ -47,41 +47,7 @@ struct PlexRequestTests {
         #expect(request.value(forHTTPHeaderField: "X-Plex-Pms-Api-Version") == "1.0.0")
     }
 
-    @Test func fetchSessionUsesSessionKeyQueryParameter() async throws {
-        let capture = RequestCapture()
-        let session = makeMockSession { request in
-            capture.record(request)
-
-            let response = try #require(HTTPURLResponse(
-                url: request.url!,
-                statusCode: 200,
-                httpVersion: nil,
-                headerFields: nil
-            ))
-            let data = try #require(#"{"MediaContainer":{"Metadata":[]}}"#.data(using: .utf8))
-            return (response, data)
-        }
-
-        let client = PlexAPIClient(session: session)
-        let serverURL = try #require(PlexURLBuilder.normalizeServerURL("http://plex.local:32400"))
-        let clientContext = PlexClientContext(clientIdentifier: "client-123")
-
-        let fetchedSession = try await client.fetchSession(using: PlexConnectionConfiguration(
-            serverURL: serverURL,
-            token: "server-token",
-            clientContext: clientContext
-        ), sessionKey: "77")
-
-        #expect(fetchedSession == nil)
-
-        let request = try #require(capture.request)
-        let requestURL = try #require(request.url)
-        let components = try #require(URLComponents(url: requestURL, resolvingAgainstBaseURL: false))
-        #expect(components.path == "/status/sessions")
-        #expect(components.queryItems?.contains(where: { $0.name == "sessionKey" && $0.value == "77" }) == true)
-    }
-
-    @Test func fetchSessionReturnsOnlyTheMatchingSessionKey() async throws {
+    @Test func fetchSessionsReturnsTheCompleteActiveSessionList() async throws {
         let session = makeMockSession { request in
             let response = try #require(HTTPURLResponse(
                 url: request.url!,
@@ -126,14 +92,14 @@ struct PlexRequestTests {
         let serverURL = try #require(PlexURLBuilder.normalizeServerURL("http://plex.local:32400"))
         let clientContext = PlexClientContext(clientIdentifier: "client-123")
 
-        let fetchedSession = try await client.fetchSession(using: PlexConnectionConfiguration(
+        let fetchedSessions = try await client.fetchSessions(using: PlexConnectionConfiguration(
             serverURL: serverURL,
             token: "server-token",
             clientContext: clientContext
-        ), sessionKey: "77")
+        ))
 
-        #expect(fetchedSession?.canonicalSessionKey == "77")
-        #expect(fetchedSession?.title == "Right Session")
+        #expect(fetchedSessions.map(\.canonicalSessionKey) == ["44", "77"])
+        #expect(fetchedSessions.map(\.title) == ["Wrong Session", "Right Session"])
     }
 
     @Test func fetchStreamLevelsUsesStreamEndpointAndSubsample() async throws {
@@ -261,6 +227,34 @@ struct PlexRequestTests {
         #expect(encodedJWK["kid"] as? String == "key-123")
         #expect(encodedJWK["x"] as? String == jwk.x)
         #expect(encodedJWK["use"] == nil)
+    }
+
+    @Test func createPinCanRequestTelevisionLinkCode() async throws {
+        let capture = RequestCapture()
+        let session = makeMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            let data = try #require(#"{"id":8,"code":"ABCD","authToken":null}"#.data(using: .utf8))
+            return (response, data)
+        }
+        let identity = try PlexDeviceSigningIdentity.generate(keyID: "key-tv")
+
+        _ = try await PlexAuthClient(session: session).createPin(
+            jwk: identity.publicJWK(includeUse: false),
+            strong: false,
+            clientContext: PlexClientContext(clientIdentifier: "tv-client")
+        )
+
+        let request = try #require(capture.request)
+        let body = try requestBodyData(request)
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(object["strong"] as? Bool == false)
+        #expect((object["jwk"] as? [String: Any])?["kid"] as? String == "key-tv")
     }
 
     @Test func fetchPinSendsDeviceJWTAsQueryParameter() async throws {

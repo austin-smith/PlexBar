@@ -456,6 +456,7 @@ struct PlexMediaProviderTests {
                 )
             ],
             promotedPath: "/provider/promoted?includeTypeFirst=1",
+            continueWatchingPath: "/provider/continue?source=library",
             searchPath: "/provider/search?includeCollections=1",
             timelinePath: "/provider/timeline?source=library",
             scrobblePath: "/provider/played?source=library",
@@ -502,6 +503,9 @@ struct PlexMediaProviderTests {
               }, {
                 "type": "promoted",
                 "key": "/provider/promoted?includeTypeFirst=1"
+              }, {
+                "type": "continuewatching",
+                "key": "/provider/continue?source=library"
               }, {
                 "type": "search",
                 "key": "/provider/search?includeCollections=1"
@@ -591,6 +595,8 @@ struct PlexMediaProviderTests {
             switch url.path {
             case "/provider/promoted":
                 data = Data(#"{"MediaContainer":{"Hub":[{"hubIdentifier":"home.continue","key":"/hubs/continue-expanded","title":"Continue Watching","more":true,"totalSize":2,"Metadata":[{"ratingKey":"42","type":"movie","title":"Movie","viewCount":0}]},{"hubIdentifier":"movie.recentlyadded.1","title":"Recently Added in Movies","Metadata":[{"ratingKey":"42","type":"movie","title":"Movie","viewCount":0}]}]}}"#.utf8)
+            case "/provider/continue":
+                data = Data(#"{"MediaContainer":{"Hub":[{"hubIdentifier":"continueWatching","key":"/hubs/continue-expanded","title":"Continue Watching","more":true,"totalSize":2,"Metadata":[{"ratingKey":"42","type":"movie","title":"Movie","viewCount":0}]}]}}"#.utf8)
             case "/hubs/continue-expanded":
                 data = Data(#"{"MediaContainer":{"size":2,"totalSize":2,"Metadata":[{"ratingKey":"42","type":"movie","title":"Movie","viewCount":0},{"ratingKey":"43","type":"movie","title":"Another Movie","viewCount":0}]}}"#.utf8)
             case "/media/providers":

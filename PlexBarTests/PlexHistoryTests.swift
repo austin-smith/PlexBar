@@ -25,7 +25,7 @@ import Testing
     #expect(item.posterPath == "/library/metadata/show-thumb")
     #expect(item.posterPath(spoilerPolicy: .allEpisodes) == "/library/metadata/show-thumb")
     #expect(item.headline == "The X-Files")
-    #expect(item.detailLine == "S3E13 • Syzygy")
+    #expect(item.detailLine == "S3 • E13 - Syzygy")
 }
 
 @Test func allEpisodeSpoilerPolicyDoesNotFallBackToHistoryScreenshots() async throws {
@@ -679,7 +679,7 @@ import Testing
     )
 
     #expect(presentation.title == "Severance")
-    #expect(presentation.subtitle == "S1E01 • Good News About Hell")
+    #expect(presentation.subtitle == "S1 • E1 - Good News About Hell")
     #expect(presentation.viewerLine == "Watched by Taylor")
     #expect(presentation.deviceLine == "Living Room · tvOS")
     #expect(presentation.contextLine == "Watched by Taylor • Living Room · tvOS")

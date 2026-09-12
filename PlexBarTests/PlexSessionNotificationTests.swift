@@ -14,9 +14,7 @@ import Testing
             "viewOffset": 1234,
             "ratingKey": "900",
             "key": "/library/metadata/900",
-            "transcodeSession": {
-              "key": "/transcode/sessions/abc"
-            }
+            "transcodeSession": "abc"
           }
         ]
       }
@@ -35,6 +33,60 @@ import Testing
             transcodeSessionKey: "/transcode/sessions/abc"
         ))
     ])
+}
+
+@Test(arguments: ["null", "\"\"", "\"   \""])
+func emptyTranscodeReferenceClearsThePreviousTranscode(value: String) throws {
+    let data = Data("""
+    {"NotificationContainer":{"type":"playing","PlaySessionStateNotification":[
+      {"sessionKey":"44","state":"playing","transcodeSession":\(value)}
+    ]}}
+    """.utf8)
+
+    let event = try #require(PlexSessionEventsClient.decodeEvents(from: data).first)
+    guard case .playing(let notification) = event else {
+        Issue.record("Expected a playback notification")
+        return
+    }
+    #expect(notification.hasTranscodeSession)
+    #expect(notification.transcodeSessionKey == nil)
+}
+
+@Test func missingTranscodeReferenceDoesNotClearThePreviousTranscode() throws {
+    let data = Data(#"{"NotificationContainer":{"type":"playing","PlaySessionStateNotification":[{"sessionKey":"44","state":"playing"}]}}"#.utf8)
+    let event = try #require(PlexSessionEventsClient.decodeEvents(from: data).first)
+    guard case .playing(let notification) = event else {
+        Issue.record("Expected a playback notification")
+        return
+    }
+    #expect(notification.hasTranscodeSession == false)
+    #expect(notification.transcodeSessionKey == nil)
+}
+
+@Test func objectValuedTranscodeReferenceReportsTheFailingField() throws {
+    let data = Data(#"{"NotificationContainer":{"type":"playing","PlaySessionStateNotification":[{"sessionKey":"44","state":"stopped","transcodeSession":{"key":"private-value"}}]}}"#.utf8)
+    do {
+        _ = try PlexSessionEventsClient.decodeEvents(from: data)
+        Issue.record("Expected the invalid transcode field to fail decoding")
+    } catch let error as DecodingError {
+        let summary = PlexSessionEventsClient.decodingFailureSummary(error)
+        #expect(summary.contains("type mismatch"))
+        #expect(summary.contains("transcodeSession"))
+        #expect(summary.contains("private-value") == false)
+    }
+}
+
+@Test func decodingFailureSummaryExcludesPrivateErrorDetails() {
+    let error = DecodingError.dataCorrupted(.init(
+        codingPath: [],
+        debugDescription: "Invalid credential: private-value"
+    ))
+    #expect(PlexSessionEventsClient.decodingFailureSummary(error) == "invalid data at root")
+}
+
+@Test func unrelatedServerNotificationsProduceNoSessionEvents() throws {
+    let data = Data(#"{"NotificationContainer":{"type":"timeline","TimelineEntry":[{"state":5,"itemID":123}]}}"#.utf8)
+    #expect(try PlexSessionEventsClient.decodeEvents(from: data).isEmpty)
 }
 
 @Test func decodesTranscodeSessionUpdateEvent() async throws {

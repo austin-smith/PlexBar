@@ -122,7 +122,7 @@ final class PlexSettingsStore {
         }
     }
 
-    var downloadMusicQuality: PlexDownloadMusicQuality {
+    var downloadMusicQuality: PlexMusicQuality {
         didSet {
             defaults.set(downloadMusicQuality.rawValue, forKey: DefaultsKeys.downloadMusicQuality)
         }
@@ -293,7 +293,7 @@ final class PlexSettingsStore {
         downloadVideoQuality = defaults.string(forKey: DefaultsKeys.downloadVideoQuality)
             .flatMap(PlexDownloadVideoQuality.init(rawValue:)) ?? .original
         downloadMusicQuality = defaults.string(forKey: DefaultsKeys.downloadMusicQuality)
-            .flatMap(PlexDownloadMusicQuality.init(rawValue:)) ?? .original
+            .flatMap(PlexMusicQuality.init(rawValue:)) ?? .original
         downloadSubtitlePreference = defaults.string(
             forKey: DefaultsKeys.downloadSubtitlePreference
         ).flatMap(PlexDownloadSubtitlePreference.init(rawValue:)) ?? .selectable
@@ -533,6 +533,16 @@ final class PlexSettingsStore {
     }
 }
 
+extension PlexSettingsStore: PlexAccountJWTStorage {
+    var storedAccountToken: String {
+        trimmedUserToken
+    }
+
+    func persistAccountToken(_ token: String) async throws {
+        try await saveAuthenticatedUserToken(token)
+    }
+}
+
 private extension PlexSettingsStore {
     func persistUserToken() {
         guard !isApplyingLoadedCredentials else {
@@ -659,7 +669,10 @@ extension PlexSettingsStore {
     }
 
     func videoQuality(for connectionKind: PlexConnectionKind?) -> PlexVideoQuality {
-        connectionKind == .local ? localVideoQuality : remoteVideoQuality
+        PlexVideoQualityPreferences(
+            local: localVideoQuality,
+            remote: remoteVideoQuality
+        ).quality(for: connectionKind)
     }
 
     func setVideoQuality(_ quality: PlexVideoQuality, for connectionKind: PlexConnectionKind?) {

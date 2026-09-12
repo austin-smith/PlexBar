@@ -7,15 +7,14 @@ extension PlexAPIClient {
         endpointPath: String,
         using configuration: PlexConnectionConfiguration
     ) async throws -> PlexPlaybackQueue {
-        guard item.type?.lowercased() == "movie",
-              (0...5).contains(extrasPrefixCount),
-              let itemKey = item.key?.nilIfBlank,
-              itemKey.hasPrefix("/") else {
-            throw PlexAPIError.invalidPlayQueue
-        }
         guard let serverIdentifier = configuration.serverIdentifier else {
             throw PlexAPIError.missingServerIdentity
         }
+        let queueRequest = try PlexCinemaPlayQueueRequest(
+            item: item,
+            extrasPrefixCount: extrasPrefixCount,
+            serverIdentifier: serverIdentifier
+        )
         guard let endpoint = PlexURLBuilder.endpointURL(
             serverURL: configuration.serverURL,
             path: endpointPath
@@ -23,19 +22,7 @@ extension PlexAPIClient {
             throw PlexAPIError.invalidServerURL
         }
 
-        let sourceURI = try PlexMediaSourceURI.item(
-            item,
-            serverIdentifier: serverIdentifier
-        )
-        components.queryItems = (components.queryItems ?? []) + [
-            URLQueryItem(name: "uri", value: sourceURI),
-            URLQueryItem(name: "type", value: PlexContinuousPlayQueueType.video.rawValue),
-            URLQueryItem(name: "key", value: itemKey),
-            URLQueryItem(name: "shuffle", value: "0"),
-            URLQueryItem(name: "repeat", value: "0"),
-            URLQueryItem(name: "continuous", value: "0"),
-            URLQueryItem(name: "extrasPrefixCount", value: String(extrasPrefixCount)),
-        ]
+        components.queryItems = (components.queryItems ?? []) + queueRequest.queryItems
 
         guard let url = components.url else {
             throw PlexAPIError.invalidServerURL
@@ -62,14 +49,13 @@ extension PlexAPIClient {
         endpointPath: String,
         using configuration: PlexConnectionConfiguration
     ) async throws -> PlexPlaybackQueue {
-        guard let queueType = item.continuousPlayQueueType,
-              let itemKey = item.key?.nilIfBlank,
-              itemKey.hasPrefix("/") else {
-            throw PlexAPIError.invalidPlayQueue
-        }
         guard let serverIdentifier = configuration.serverIdentifier else {
             throw PlexAPIError.missingServerIdentity
         }
+        let queueRequest = try PlexContinuousPlayQueueRequest(
+            item: item,
+            serverIdentifier: serverIdentifier
+        )
         guard let endpoint = PlexURLBuilder.endpointURL(
             serverURL: configuration.serverURL,
             path: endpointPath
@@ -77,23 +63,7 @@ extension PlexAPIClient {
             throw PlexAPIError.invalidServerURL
         }
 
-        let sourceURI = try PlexMediaSourceURI.item(
-            item,
-            serverIdentifier: serverIdentifier
-        )
-        var queueQueryItems = [
-            URLQueryItem(name: "uri", value: sourceURI),
-            URLQueryItem(name: "type", value: queueType.rawValue),
-            URLQueryItem(name: "shuffle", value: "0"),
-            URLQueryItem(name: "repeat", value: "0"),
-            URLQueryItem(name: "continuous", value: "1"),
-        ]
-        if item.continuousPlayQueueUsesOnDeck {
-            queueQueryItems.append(URLQueryItem(name: "onDeck", value: "1"))
-        } else {
-            queueQueryItems.append(URLQueryItem(name: "key", value: itemKey))
-        }
-        components.queryItems = (components.queryItems ?? []) + queueQueryItems
+        components.queryItems = (components.queryItems ?? []) + queueRequest.queryItems
 
         guard let url = components.url else {
             throw PlexAPIError.invalidServerURL
@@ -184,13 +154,14 @@ extension PlexAPIClient {
         endpointPath: String,
         using configuration: PlexConnectionConfiguration
     ) async throws -> PlexPlayQueuePage {
+        let mutation = try PlexPlayQueueMutationRequest(
+            queueID: queueID,
+            mutation: .shuffled(shuffled)
+        )
         guard let endpoint = PlexURLBuilder.endpointURL(
             serverURL: configuration.serverURL,
             path: endpointPath,
-            appendingPathComponents: [
-                String(queueID),
-                shuffled ? "shuffle" : "unshuffle",
-            ]
+            appendingPathComponents: mutation.endpointPathComponents
         ) else {
             throw PlexAPIError.invalidServerURL
         }
@@ -209,22 +180,20 @@ extension PlexAPIClient {
         endpointPath: String,
         using configuration: PlexConnectionConfiguration
     ) async throws -> PlexPlayQueuePage {
-        guard queueID > 0,
-              isValidPlayQueueIdentifier(playQueueItemID),
-              let endpoint = PlexURLBuilder.endpointURL(
-                  serverURL: configuration.serverURL,
-                  path: endpointPath,
-                  appendingPathComponents: [
-                      String(queueID),
-                      "items",
-                      playQueueItemID,
-                  ]
-              ) else {
-            throw PlexAPIError.invalidPlayQueue
+        let mutation = try PlexPlayQueueItemMutationRequest(
+            queueID: queueID,
+            mutation: .remove(playQueueItemID: playQueueItemID)
+        )
+        guard let endpoint = PlexURLBuilder.endpointURL(
+            serverURL: configuration.serverURL,
+            path: endpointPath,
+            appendingPathComponents: mutation.endpointPathComponents
+        ) else {
+            throw PlexAPIError.invalidServerURL
         }
         let request = PlexRequestBuilder(clientContext: configuration.clientContext).request(
             url: endpoint,
-            method: "DELETE",
+            method: mutation.method,
             accept: "application/json",
             token: configuration.token
         )
@@ -237,35 +206,28 @@ extension PlexAPIClient {
         endpointPath: String,
         using configuration: PlexConnectionConfiguration
     ) async throws -> PlexPlayQueuePage {
-        guard queueID > 0,
-              isValidPlayQueueIdentifier(move.playQueueItemID),
-              isValidPlayQueueIdentifier(move.afterPlayQueueItemID),
-              move.playQueueItemID != move.afterPlayQueueItemID,
-              let endpoint = PlexURLBuilder.endpointURL(
+        let mutation = try PlexPlayQueueItemMutationRequest(
+            queueID: queueID,
+            mutation: .move(move)
+        )
+        guard let endpoint = PlexURLBuilder.endpointURL(
                   serverURL: configuration.serverURL,
                   path: endpointPath,
-                  appendingPathComponents: [
-                      String(queueID),
-                      "items",
-                      move.playQueueItemID,
-                      "move",
-                  ]
+                  appendingPathComponents: mutation.endpointPathComponents
               ),
               var components = URLComponents(
                   url: endpoint,
                   resolvingAgainstBaseURL: false
               ) else {
-            throw PlexAPIError.invalidPlayQueue
+            throw PlexAPIError.invalidServerURL
         }
-        components.queryItems = (components.queryItems ?? []) + [
-            URLQueryItem(name: "after", value: move.afterPlayQueueItemID),
-        ]
+        components.queryItems = (components.queryItems ?? []) + mutation.queryItems
         guard let url = components.url else {
             throw PlexAPIError.invalidServerURL
         }
         let request = PlexRequestBuilder(clientContext: configuration.clientContext).request(
             url: url,
-            method: "PUT",
+            method: mutation.method,
             accept: "application/json",
             token: configuration.token
         )
@@ -277,10 +239,14 @@ extension PlexAPIClient {
         endpointPath: String,
         using configuration: PlexConnectionConfiguration
     ) async throws -> PlexPlayQueuePage {
+        let mutation = try PlexPlayQueueMutationRequest(
+            queueID: queueID,
+            mutation: .reset
+        )
         guard let endpoint = PlexURLBuilder.endpointURL(
             serverURL: configuration.serverURL,
             path: endpointPath,
-            appendingPathComponents: [String(queueID), "reset"]
+            appendingPathComponents: mutation.endpointPathComponents
         ) else {
             throw PlexAPIError.invalidServerURL
         }
@@ -299,19 +265,18 @@ extension PlexAPIClient {
         endpoints: PlexLibraryProviderEndpoints,
         using configuration: PlexConnectionConfiguration
     ) async throws {
-        guard let endpointPath = watched ? endpoints.scrobblePath : endpoints.unscrobblePath else {
-            throw PlexAPIError.missingLibraryTimelineFeature
-        }
+        let parameters = try PlexWatchedStateRequestParameters(
+            watched: watched,
+            ratingKey: ratingKey,
+            endpoints: endpoints
+        )
         guard let endpoint = PlexURLBuilder.endpointURL(
             serverURL: configuration.serverURL,
-            path: endpointPath
+            path: parameters.endpointPath
         ), var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
             throw PlexAPIError.invalidServerURL
         }
-        components.queryItems = (components.queryItems ?? []) + [
-            URLQueryItem(name: "identifier", value: endpoints.providerIdentifier),
-            URLQueryItem(name: "key", value: ratingKey),
-        ]
+        components.queryItems = (components.queryItems ?? []) + parameters.queryItems
 
         guard let url = components.url else {
             throw PlexAPIError.invalidServerURL
@@ -337,10 +302,4 @@ extension PlexAPIClient {
         }
     }
 
-    private func isValidPlayQueueIdentifier(_ identifier: String) -> Bool {
-        guard let identifier = identifier.nilIfBlank else {
-            return false
-        }
-        return identifier.utf8.allSatisfy { (48...57).contains($0) }
-    }
 }

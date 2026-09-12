@@ -348,10 +348,7 @@ struct PlexMediaPosterCard: View {
         GridItem(.adaptive(minimum: artworkWidth, maximum: 205), spacing: 20)
     ]
 
-    enum ArtworkLayout: Equatable {
-        case automatic
-        case poster
-    }
+    typealias ArtworkLayout = PlexMediaArtworkLayout
 
     let item: PlexMediaItem
     let settingsStore: PlexSettingsStore
@@ -381,11 +378,13 @@ struct PlexMediaPosterCard: View {
                 }
             }
 
-            Text(item.title)
-                .font(.headline)
-                .lineLimit(2)
+            if let title = cardTitle {
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(2)
+            }
 
-            if let subtitle = item.subtitle {
+            if let subtitle = cardSubtitle {
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -395,6 +394,27 @@ struct PlexMediaPosterCard: View {
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
         .accessibilityValue(item.watchStateAccessibilityValue ?? "")
+    }
+
+    private var cardTitle: String? {
+        switch item.type?.lowercased() {
+        case "episode": item.grandparentTitle
+        case "season": item.parentTitle
+        default: item.title
+        }
+    }
+
+    private var cardSubtitle: String? {
+        switch item.type?.lowercased() {
+        case "episode":
+            return PlexEpisodeText.subtitle(season: item.parentIndex, episode: item.index, title: item.title)
+        case "season":
+            return item.title
+        case "show":
+            return nil
+        default:
+            return item.subtitle
+        }
     }
 
     private var artworkURL: URL? {
@@ -465,12 +485,8 @@ struct PlexMediaPosterCard: View {
         artworkLayout: ArtworkLayout,
         spoilerPolicy: PlexEpisodeSpoilerPolicy
     ) -> String? {
-        switch artworkLayout {
-        case .automatic:
-            PlexEpisodeSpoilerPresentation(item: item, policy: spoilerPolicy).thumbnailPath
-        case .poster:
-            item.posterArtworkPath
-        }
+        guard artworkLayout != .automatic || !spoilerPolicy.hidesSpoilers(for: item) else { return nil }
+        return PlexMediaArtworkPresentation(item: item, layout: artworkLayout).path
     }
 
     private var spoilerPresentation: PlexEpisodeSpoilerPresentation {
@@ -484,14 +500,10 @@ struct PlexMediaPosterCard: View {
         for item: PlexMediaItem,
         artworkLayout: ArtworkLayout
     ) -> CGFloat {
-        if artworkLayout == .poster {
-            return 270
-        }
-
-        return switch item.type?.lowercased() {
-        case "artist", "album", "track", "photo", "photoalbum", "collection", "playlist": 180
-        case "episode", "clip": 101
-        default: 270
+        switch PlexMediaArtworkPresentation(item: item, layout: artworkLayout).shape {
+        case .poster: 270
+        case .landscape: 101
+        case .square: 180
         }
     }
 }

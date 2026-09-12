@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 struct PlexSessionEventsClient {
     typealias MonitorHandler = @Sendable (PlexSessionEvent) async throws -> Void
@@ -6,6 +7,7 @@ struct PlexSessionEventsClient {
     private static let handshakeTimeout: Duration = .seconds(5)
     private static let heartbeatInterval: Duration = .seconds(30)
     private static let heartbeatTimeout: Duration = .seconds(10)
+    private static let logger = Logger(subsystem: "com.crapshack.PlexBar", category: "SessionEvents")
 
     private let monitorImplementation: MonitorImplementation
 
@@ -77,11 +79,38 @@ struct PlexSessionEventsClient {
     static func decodeEventsIfPossible(from data: Data) -> [PlexSessionEvent] {
         do {
             return try decodeEvents(from: data)
-        } catch is DecodingError {
+        } catch let error as DecodingError {
+            logger.error("Unable to decode Plex notification: \(decodingFailureSummary(error), privacy: .public)")
             return []
         } catch {
+            logger.error("Unable to decode Plex notification: \(error.localizedDescription, privacy: .private)")
             return []
         }
+    }
+
+    static func decodingFailureSummary(_ error: DecodingError) -> String {
+        let reason: String
+        let path: [any CodingKey]
+        switch error {
+        case .typeMismatch(_, let context):
+            reason = "type mismatch"
+            path = context.codingPath
+        case .valueNotFound(_, let context):
+            reason = "missing value"
+            path = context.codingPath
+        case .keyNotFound(let key, let context):
+            reason = "missing key"
+            path = context.codingPath + [key]
+        case .dataCorrupted(let context):
+            reason = "invalid data"
+            path = context.codingPath
+        @unknown default:
+            return "unknown decoding error"
+        }
+
+        // Do not log the payload or debugDescription, which may contain private values.
+        let field = path.map(\.stringValue).joined(separator: ".")
+        return "\(reason) at \(field.isEmpty ? "root" : field)"
     }
 
     static func confirmHandshake(

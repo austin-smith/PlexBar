@@ -4,6 +4,43 @@ import Testing
 
 @Suite(.serialized)
 struct PlexConnectionResolverTests {
+    @Test func unreachableConnectionsPreserveUnderlyingTransportCauses() async throws {
+        let session = makeResolverSession { request in
+            throw URLError(request.url?.host == "plex.local" ? .timedOut : .cannotConnectToHost)
+        }
+        defer { session.invalidateAndCancel() }
+        let resolver = PlexConnectionResolver(client: PlexAPIClient(session: session))
+        do {
+            _ = try await resolver.resolve(
+                server: makeServer(id: "server-id", connections: [
+                    .init(uri: URL(string: "https://plex.local:32400")!, local: true, relay: false),
+                    .init(uri: URL(string: "https://plex.remote:32400")!, local: false, relay: false)
+                ]),
+                clientContext: PlexClientContext(clientIdentifier: "client-123"),
+                cachedURL: nil
+            )
+            Issue.record("Expected unreachable connections")
+        } catch let failure as PlexServerConnectionFailure {
+            #expect(failure.failureCodes == [.timedOut, .cannotConnectToHost])
+            #expect(failure.localizedDescription.contains(URLError(.timedOut).localizedDescription))
+            #expect(failure.localizedDescription.contains(URLError(.cannotConnectToHost).localizedDescription))
+        }
+    }
+
+    @Test func preferredConnectionUsesSharedDeterministicRanking() throws {
+        let server = makeServer(
+            id: "server-id",
+            connections: [
+                .init(uri: try #require(URL(string: "https://plex.relay:8443")), local: false, relay: true),
+                .init(uri: try #require(URL(string: "http://plex.local:32400")), local: true, relay: false),
+                .init(uri: try #require(URL(string: "https://plex.local:32400")), local: true, relay: false),
+                .init(uri: try #require(URL(string: "https://plex.remote:32400")), local: false, relay: false),
+            ]
+        )
+
+        #expect(server.preferredConnection?.uri.absoluteString == "https://plex.local:32400")
+    }
+
     @Test func prefersReachableLocalConnection() async throws {
         let session = makeResolverSession { request in
             let url = try #require(request.url)
@@ -449,7 +486,7 @@ struct PlexConnectionResolverTests {
         )
         connectionStore.updateAvailableServers([server])
 
-        await #expect(throws: PlexConnectionResolutionError.self) {
+        await #expect(throws: PlexServerConnectionFailure.self) {
             try await connectionStore.currentConfiguration()
         }
         #expect(connectionStore.errorMessage != nil)

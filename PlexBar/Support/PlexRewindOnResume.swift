@@ -55,4 +55,16 @@ enum PlexRewindOnResumePolicy {
     ) -> PlexPlaybackTransportAction? {
         hasPendingRewind ? .pause : PlexPlaybackTransportAction(status: status)
     }
+
+    static func shouldInterceptNativePlayPausePress(
+        status: PlexPlaybackStatus,
+        hasPendingRewind: Bool,
+        isPlaybackControlBusy: Bool,
+        preference: PlexRewindOnResume
+    ) -> Bool {
+        if hasPendingRewind || isPlaybackControlBusy {
+            return true
+        }
+        return status == .paused && preference.seconds > 0
+    }
 }

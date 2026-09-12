@@ -684,12 +684,43 @@ private struct PlexActivityView: View {
     @Bindable var sessionStore: PlexSessionStore
 
     var body: some View {
-        Group {
-            if sessionStore.sessions.isEmpty {
-                ContentUnavailableView("No Active Streams", systemImage: "play.slash")
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 16) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                if sessionStore.lastHydratedAt != nil {
+                    HStack(alignment: .top) {
+                        PlexActivitySummaryView(
+                            summary: sessionStore.activitySummary,
+                            isStale: sessionStore.activityErrorMessage != nil
+                        )
+                        if sessionStore.isLoading {
+                            ProgressView().controlSize(.small)
+                        }
+                    }
+                }
+
+                if let message = sessionStore.activityErrorMessage {
+                    InlineWarningBanner(message: message)
+                }
+
+                if sessionStore.lastHydratedAt == nil {
+                    if sessionStore.activityErrorMessage != nil {
+                        ContentUnavailableView {
+                            Label("Activity Unavailable", systemImage: "exclamationmark.triangle")
+                        } actions: {
+                            Button("Refresh") { sessionStore.refreshNow() }
+                        }
+                    } else {
+                        ProgressView("Loading activity…")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                } else if sessionStore.sessions.isEmpty {
+                    ContentUnavailableView("No Active Streams", systemImage: "play.slash")
+                } else {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 360), spacing: 16, alignment: .top)],
+                        alignment: .leading,
+                        spacing: 16
+                    ) {
                         ForEach(sessionStore.sessions) { session in
                             StreamCardView(
                                 session: session,
@@ -706,11 +737,13 @@ private struct PlexActivityView: View {
                             )
                         }
                     }
-                    .scenePadding()
-                    .frame(maxWidth: 860)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+            .scenePadding()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .navigationTitle("Activity")
+        .modifier(PlexActivityVisibility(store: sessionStore))
     }
 }

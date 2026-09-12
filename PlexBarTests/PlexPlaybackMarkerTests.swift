@@ -221,6 +221,47 @@ struct PlexPlaybackMarkerTests {
         }
     }
 
+    @Test func validActionsAndAvailableKindsUseStablePlaybackOrder() throws {
+        let markers = try decodeMarkers(#"""
+        [
+          { "id": 4, "type": "credits", "startTimeOffset": 90000, "endTimeOffset": 110000 },
+          { "id": 2, "type": "commercial", "startTimeOffset": 30000, "endTimeOffset": 40000 },
+          { "id": 1, "type": "intro", "startTimeOffset": 10000, "endTimeOffset": 20000 },
+          { "id": 3, "type": "commercial", "startTimeOffset": 30000, "endTimeOffset": 50000 },
+          { "id": 5, "type": "preview", "startTimeOffset": 60000, "endTimeOffset": 70000 },
+          { "id": 6, "type": "credits", "startTimeOffset": 120000, "endTimeOffset": 130000 }
+        ]
+        """#)
+
+        let actions = PlexPlaybackMarkerAction.actions(in: markers, duration: 120)
+
+        #expect(actions.map(\.id) == ["1", "2", "3", "4"])
+        #expect(actions.last?.targetTime == 110)
+        #expect(PlexPlaybackMarkerAction.availableKinds(in: markers, duration: 120) == [
+            .intro,
+            .commercial,
+            .credits,
+        ])
+    }
+
+    @Test func commercialInterstitialsUseAllValidPlexAdsAndMergeOverlaps() throws {
+        let markers = try decodeMarkers(#"""
+        [
+          { "id": 1, "type": "commercial", "startTimeOffset": 30000, "endTimeOffset": 45000 },
+          { "id": 2, "type": "intro", "startTimeOffset": 10000, "endTimeOffset": 20000 },
+          { "id": 3, "type": "commercial", "startTimeOffset": 40000, "endTimeOffset": 60000 },
+          { "id": 4, "type": "commercial", "startTimeOffset": 60000, "endTimeOffset": 70000 },
+          { "id": 5, "type": "commercial", "startTimeOffset": 90000, "endTimeOffset": 130000 },
+          { "id": 6, "type": "commercial", "startTimeOffset": 140000, "endTimeOffset": 150000 }
+        ]
+        """#)
+
+        #expect(PlexPlaybackInterstitial.commercials(in: markers, duration: 120) == [
+            PlexPlaybackInterstitial(startTime: 30, duration: 40),
+            PlexPlaybackInterstitial(startTime: 90, duration: 30),
+        ])
+    }
+
     private func decodeItem(_ json: String) throws -> PlexMediaItem {
         try JSONDecoder().decode(PlexMediaItem.self, from: Data(json.utf8))
     }

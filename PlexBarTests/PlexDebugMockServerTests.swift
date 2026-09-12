@@ -201,7 +201,7 @@ import Testing
     )
     let endpoints = try await client.fetchLibraryProviderEndpoints(using: configuration)
     let promotedPath = try #require(endpoints.promotedPath)
-    let hubs = try await client.fetchPromotedHubs(
+    let hubs = try await client.fetchHubs(
         endpointPath: promotedPath,
         using: configuration,
         count: 2

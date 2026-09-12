@@ -32,14 +32,18 @@ struct PlexAuthClient: PlexAccountJWTClient, Sendable {
         return try JSONDecoder().decode(PlexAuthenticatedUser.self, from: data)
     }
 
-    func createPin(jwk: PlexJSONWebKey, clientContext: PlexClientContext) async throws -> PlexPin {
+    func createPin(
+        jwk: PlexJSONWebKey,
+        strong: Bool = true,
+        clientContext: PlexClientContext
+    ) async throws -> PlexPin {
         var request = PlexRequestBuilder(clientContext: clientContext).request(
             url: PlexRemoteService.clientsURL(path: "/api/v2/pins"),
             method: "POST",
             accept: "application/json"
         )
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(PlexPinRequest(jwk: jwk, strong: true))
+        request.httpBody = try JSONEncoder().encode(PlexPinRequest(jwk: jwk, strong: strong))
 
         let (data, response) = try await session.data(for: request)
         try validate(response: response)
@@ -161,6 +165,15 @@ struct PlexAuthClient: PlexAccountJWTClient, Sendable {
         }
     }
 
+}
+
+extension PlexAuthError {
+    var requiresTokenRefresh: Bool {
+        guard case .badStatusCode(let statusCode) = self else {
+            return false
+        }
+        return statusCode == 401 || statusCode == 498
+    }
 }
 
 private struct PlexServerResourceResponse: Decodable {

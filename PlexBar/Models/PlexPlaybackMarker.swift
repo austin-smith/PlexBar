@@ -25,10 +25,12 @@ struct PlexMediaMarker: Decodable, Equatable, Hashable, Sendable {
     }
 }
 
-enum PlexPlaybackMarkerKind: String, Equatable, Hashable, Sendable {
+enum PlexPlaybackMarkerKind: String, CaseIterable, Equatable, Hashable, Identifiable, Sendable {
     case intro
     case commercial
     case credits
+
+    var id: Self { self }
 
     var label: String {
         switch self {
@@ -38,6 +40,17 @@ enum PlexPlaybackMarkerKind: String, Equatable, Hashable, Sendable {
             "Skip Ads"
         case .credits:
             "Skip Credits"
+        }
+    }
+
+    var settingsLabel: String {
+        switch self {
+        case .intro:
+            "Intros"
+        case .commercial:
+            "Ads"
+        case .credits:
+            "Credits"
         }
     }
 }
@@ -120,6 +133,29 @@ struct PlexPlaybackMarkerAction: Equatable, Identifiable, Sendable {
         }
     }
 
+    static func actions(
+        in markers: [PlexMediaMarker],
+        duration: TimeInterval?
+    ) -> [Self] {
+        markers.compactMap { marker in
+            action(for: marker, duration: duration)
+        }
+        .sorted { lhs, rhs in
+            if lhs.startTime != rhs.startTime {
+                return lhs.startTime < rhs.startTime
+            }
+            return lhs.id < rhs.id
+        }
+    }
+
+    static func availableKinds(
+        in markers: [PlexMediaMarker],
+        duration: TimeInterval?
+    ) -> [PlexPlaybackMarkerKind] {
+        let availableKinds = Set(actions(in: markers, duration: duration).map(\.kind))
+        return PlexPlaybackMarkerKind.allCases.filter(availableKinds.contains)
+    }
+
     static func manual(
         in markers: [PlexMediaMarker],
         at position: TimeInterval,
@@ -137,12 +173,8 @@ struct PlexPlaybackMarkerAction: Equatable, Identifiable, Sendable {
         in markers: [PlexMediaMarker],
         duration: TimeInterval?
     ) -> TimeInterval? {
-        markers.compactMap { marker in
-            guard let action = action(for: marker, duration: duration),
-                  action.kind == .credits else {
-                return nil
-            }
-            return action.startTime
+        actions(in: markers, duration: duration).compactMap { action in
+            action.kind == .credits ? action.startTime : nil
         }
         .min()
     }
@@ -185,6 +217,46 @@ struct PlexPlaybackMarkerAction: Equatable, Identifiable, Sendable {
             startTime: startTime,
             targetTime: targetTime
         )
+    }
+}
+
+struct PlexPlaybackInterstitial: Equatable, Sendable {
+    let startTime: TimeInterval
+    let duration: TimeInterval
+
+    static func commercials(
+        in markers: [PlexMediaMarker],
+        duration mediaDuration: TimeInterval?
+    ) -> [Self] {
+        let commercialActions = PlexPlaybackMarkerAction.actions(
+            in: markers,
+            duration: mediaDuration
+        ).filter { $0.kind == .commercial }
+
+        return commercialActions.reduce(into: [Self]()) { ranges, action in
+            guard let previous = ranges.last else {
+                ranges.append(Self(
+                    startTime: action.startTime,
+                    duration: action.targetTime - action.startTime
+                ))
+                return
+            }
+
+            let previousEnd = previous.startTime + previous.duration
+            guard action.startTime <= previousEnd else {
+                ranges.append(Self(
+                    startTime: action.startTime,
+                    duration: action.targetTime - action.startTime
+                ))
+                return
+            }
+
+            let mergedEnd = max(previousEnd, action.targetTime)
+            ranges[ranges.count - 1] = Self(
+                startTime: previous.startTime,
+                duration: mergedEnd - previous.startTime
+            )
+        }
     }
 }
 

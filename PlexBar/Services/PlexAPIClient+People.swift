@@ -5,10 +5,7 @@ extension PlexAPIClient {
         for item: PlexMediaItem,
         using configuration: PlexConnectionConfiguration
     ) async throws -> [PlexTag] {
-        guard item.type?.caseInsensitiveCompare("episode") == .orderedSame,
-              item.roles.isEmpty,
-              let seriesRatingKey = item.grandparentRatingKey?.nilIfBlank,
-              seriesRatingKey != item.ratingKey else {
+        guard let seriesRatingKey = item.episodeSeriesCastRatingKey else {
             return []
         }
 

@@ -181,6 +181,7 @@ struct PlexPlaybackMetricFacts: Equatable, Sendable {
     private(set) var successfulVariantSwitchCount = 0
     private(set) var failedVariantSwitchCount = 0
     private(set) var currentVariant: PlexPlaybackVariantFacts?
+    private(set) var previousMeasuredBandwidth: PlexPlaybackBandwidthSample?
     private(set) var lastMeasuredBandwidth: PlexPlaybackBandwidthSample?
 
     mutating func recordInitialLikelyToKeepUp(
@@ -215,6 +216,7 @@ struct PlexPlaybackMetricFacts: Equatable, Sendable {
             return
         }
         receivedEvent = true
+        previousMeasuredBandwidth = lastMeasuredBandwidth
         lastMeasuredBandwidth = sample
     }
 

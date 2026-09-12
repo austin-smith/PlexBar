@@ -120,7 +120,7 @@ struct PlexPeopleTests {
 
         #expect(capture.requests.count == 1)
         #expect(capture.request?.url?.path == "/library/metadata/show-90")
-        #expect(capture.request?.url?.query == "includeOptionalElements=Image,Marker,Rating&includeGuids=1")
+        #expect(capture.request?.url?.query == "includeOptionalElements=Chapter,Image,Marker,Rating&includeGuids=1")
         #expect(capture.request?.value(forHTTPHeaderField: "X-Plex-Token") == "server-token")
         #expect(presentation.cast.map(\.name) == ["Series Lead", "Series Regular"])
         #expect(presentation.crew.map(\.name) == ["Episode Producer"])

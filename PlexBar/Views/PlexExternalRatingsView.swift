@@ -2,9 +2,11 @@ import SwiftUI
 
 struct PlexExternalRatingsView: View {
     let ratings: [PlexExternalRatingPresentation]
+    var valueFont: Font
 
-    init(item: PlexMediaItem) {
+    init(item: PlexMediaItem, valueFont: Font = .headline.weight(.semibold)) {
         ratings = PlexExternalRatingsPresentation(item: item).ratings
+        self.valueFont = valueFont
     }
 
     var body: some View {
@@ -25,7 +27,7 @@ struct PlexExternalRatingsView: View {
     @ViewBuilder
     private var ratingViews: some View {
         ForEach(ratings) { rating in
-            PlexExternalRatingView(rating: rating)
+            PlexExternalRatingView(rating: rating, valueFont: valueFont)
         }
     }
 }
@@ -33,8 +35,13 @@ struct PlexExternalRatingsView: View {
 private struct PlexExternalRatingView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     let rating: PlexExternalRatingPresentation
+    let valueFont: Font
 
     var body: some View {
+        #if os(tvOS)
+        ratingContent
+            .accessibilityLabel(rating.accessibilityLabel)
+        #else
         if let destinationURL = rating.destinationURL {
             Link(destination: destinationURL) {
                 ratingContent
@@ -47,6 +54,7 @@ private struct PlexExternalRatingView: View {
             ratingContent
                 .accessibilityLabel(rating.accessibilityLabel)
         }
+        #endif
     }
 
     private var ratingContent: some View {
@@ -55,7 +63,7 @@ private struct PlexExternalRatingView: View {
                 .accessibilityHidden(true)
 
             Text(rating.displayValue)
-                .font(.headline.weight(.semibold).monospacedDigit())
+                .font(valueFont.monospacedDigit())
                 .foregroundStyle(.white.opacity(0.92))
                 .contentTransition(.numericText())
                 .animation(

@@ -100,3 +100,14 @@ import Testing
     #expect(absoluteString.contains("context%5Bdevice%5D%5BdeviceName%5D=Mac%20(PlexBar)"))
     #expect(!absoluteString.contains("forwardUrl="))
 }
+
+@Test func buildsDirectPlexLinkURLForDeviceAuthorization() throws {
+    let url = try #require(PlexRemoteService.linkURL(pinCode: " AB12 \n"))
+    let components = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+
+    #expect(components.scheme == "https")
+    #expect(components.host == "plex.tv")
+    #expect(components.path == "/link/")
+    #expect(components.queryItems == [URLQueryItem(name: "pin", value: "AB12")])
+    #expect(PlexRemoteService.linkURL(pinCode: "   ") == nil)
+}

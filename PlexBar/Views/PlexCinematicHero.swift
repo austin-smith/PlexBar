@@ -9,7 +9,6 @@ struct PlexCinematicHero<Content: View>: View {
     private let content: Content
     private let pageBackground = Color(nsColor: .windowBackgroundColor)
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @State private var artwork: PlexArtworkPresentationState
 
     init(
@@ -37,75 +36,11 @@ struct PlexCinematicHero<Content: View>: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            pageBackground
+            PlexCinematicBackdrop(image: artwork.image, pageBackground: pageBackground)
 
-            if let image = artwork.image {
-                GeometryReader { geometry in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
-                }
-                .transition(.opacity)
-            } else {
+            if artwork.image == nil {
                 placeholder
             }
-
-            if let image = artwork.image {
-                GeometryReader { geometry in
-                    ZStack {
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                            .clipped()
-                            .blur(radius: 18, opaque: true)
-                            .saturation(style.blurSaturation)
-
-                        Color.black.opacity(style.blurDarkeningOpacity)
-                    }
-                }
-                .mask {
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0.34),
-                            .init(color: .white.opacity(0.18), location: 0.44),
-                            .init(color: .white.opacity(0.72), location: 0.58),
-                            .init(color: .white, location: 0.70),
-                            .init(color: .white, location: 1.00),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                }
-                .allowsHitTesting(false)
-            }
-
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0.20),
-                    .init(color: .black.opacity(style.upperScrimOpacity), location: 0.40),
-                    .init(color: .black.opacity(style.contentScrimOpacity), location: 0.62),
-                    .init(color: .black.opacity(style.lowerScrimOpacity), location: 0.78),
-                    .init(color: .black.opacity(style.lowerScrimOpacity), location: 1.00),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0.36),
-                    .init(color: pageBackground.opacity(0.08), location: 0.50),
-                    .init(color: pageBackground.opacity(0.34), location: 0.66),
-                    .init(color: pageBackground.opacity(0.74), location: 0.82),
-                    .init(color: pageBackground, location: 0.96),
-                    .init(color: pageBackground, location: 1.00),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
 
             content
                 .padding(.horizontal, 32)
@@ -175,26 +110,6 @@ struct PlexCinematicHero<Content: View>: View {
         .joined(separator: "|")
     }
 
-    private var style: PlexCinematicHeroStyle {
-        PlexCinematicHeroStyle(contrast: colorSchemeContrast)
-    }
-}
-
-struct PlexCinematicHeroStyle: Equatable {
-    let blurSaturation: Double
-    let blurDarkeningOpacity: Double
-    let upperScrimOpacity: Double
-    let contentScrimOpacity: Double
-    let lowerScrimOpacity: Double
-
-    init(contrast: ColorSchemeContrast) {
-        let usesIncreasedContrast = contrast == .increased
-        blurSaturation = usesIncreasedContrast ? 0.56 : 0.78
-        blurDarkeningOpacity = usesIncreasedContrast ? 0.64 : 0.48
-        upperScrimOpacity = usesIncreasedContrast ? 0.28 : 0.16
-        contentScrimOpacity = usesIncreasedContrast ? 0.72 : 0.56
-        lowerScrimOpacity = usesIncreasedContrast ? 0.56 : 0.40
-    }
 }
 
 private struct PlexCinematicPrimaryButtonStyle: ButtonStyle {

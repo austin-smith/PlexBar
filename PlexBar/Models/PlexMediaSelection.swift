@@ -10,9 +10,67 @@ struct PlexMediaSelectionOption: Equatable, Identifiable, Sendable {
     let isVisualImpaired: Bool
 }
 
+struct PlexMediaSelectionRequestParameters: Equatable, Sendable {
+    let partID: Int
+    let audioStreamID: Int?
+    let subtitleStreamID: Int?
+    let allParts: Bool
+
+    var hasSelection: Bool {
+        audioStreamID != nil || subtitleStreamID != nil
+    }
+
+    var path: String {
+        "/library/parts/\(partID)"
+    }
+
+    var queryItems: [URLQueryItem] {
+        var items: [URLQueryItem] = []
+        if let audioStreamID {
+            items.append(URLQueryItem(name: "audioStreamID", value: String(audioStreamID)))
+        }
+        if let subtitleStreamID {
+            items.append(URLQueryItem(name: "subtitleStreamID", value: String(subtitleStreamID)))
+        }
+        items.append(URLQueryItem(name: "allParts", value: allParts ? "1" : "0"))
+        return items
+    }
+}
+
+struct PlexSubtitleOffsetRequestParameters: Equatable, Sendable {
+    let streamID: Int
+    let milliseconds: Int
+
+    var path: String {
+        "/library/streams/\(streamID)"
+    }
+
+    var queryItems: [URLQueryItem] {
+        [URLQueryItem(name: "offset", value: String(milliseconds))]
+    }
+}
+
+struct PlexSubtitleOffsetSelection: Equatable, Sendable {
+    static let adjustmentStepMilliseconds = 100
+
+    let streamID: Int
+    let milliseconds: Int
+
+    var displayValue: String {
+        guard milliseconds != 0 else { return "0 ms" }
+        let sign = milliseconds > 0 ? "+" : "−"
+        return "\(sign)\(milliseconds.magnitude) ms"
+    }
+
+    func adjusted(by delta: Int) -> Int? {
+        let result = milliseconds.addingReportingOverflow(delta)
+        return result.overflow ? nil : result.partialValue
+    }
+}
+
 struct PlexNativeMediaSelectionAvailability: Equatable, Sendable {
-    let hasAudio: Bool
-    let hasSubtitles: Bool
+    let audioOptionCount: Int
+    let subtitleOptionCount: Int
 }
 
 struct PlexNativeMediaSelectionState: Equatable, Sendable {
@@ -41,12 +99,14 @@ struct PlexPlaybackMediaSelection: Equatable, Sendable {
     let partID: Int?
     let audioOptions: [PlexMediaSelectionOption]
     let subtitleOptions: [PlexMediaSelectionOption]
+    let subtitleOffsetSelection: PlexSubtitleOffsetSelection?
 
     init(item: PlexMediaItem, source: PlexPlaybackSource) {
         guard item.media.indices.contains(source.mediaIndex) else {
             partID = nil
             audioOptions = []
             subtitleOptions = []
+            subtitleOffsetSelection = nil
             return
         }
 
@@ -62,10 +122,15 @@ struct PlexPlaybackMediaSelection: Equatable, Sendable {
         partID = part?.id
         audioOptions = Self.options(from: part?.streams ?? [], streamType: 2)
         subtitleOptions = Self.options(from: part?.streams ?? [], streamType: 3)
+        subtitleOffsetSelection = Self.subtitleOffsetSelection(from: part?.streams ?? [])
     }
 
     var hasActionMenuItems: Bool {
         audioOptions.count > 1 || !subtitleOptions.isEmpty
+    }
+
+    var hasSelectedSubtitle: Bool {
+        subtitleOptions.contains(where: \.isSelected)
     }
 
     func canSelectAudioStream(_ streamID: Int) -> Bool {
@@ -104,6 +169,24 @@ struct PlexPlaybackMediaSelection: Equatable, Sendable {
             )
         }
     }
+
+    private static func subtitleOffsetSelection(
+        from streams: [PlexMediaStream]
+    ) -> PlexSubtitleOffsetSelection? {
+        let textSubtitleCodecs = Set(["ass", "srt", "ssa", "subrip", "vtt", "webvtt"])
+        guard let stream = streams.first(where: { stream in
+            stream.streamType == 3
+                && stream.selected == true
+                && stream.location?.lowercased() == "external"
+                && stream.codec.map { textSubtitleCodecs.contains($0.lowercased()) } == true
+        }), let streamID = stream.id else {
+            return nil
+        }
+        return PlexSubtitleOffsetSelection(
+            streamID: streamID,
+            milliseconds: stream.offset ?? 0
+        )
+    }
 }
 
 struct PlexServerManagedMediaSelection: Equatable, Sendable {
@@ -120,10 +203,11 @@ struct PlexServerManagedMediaSelection: Equatable, Sendable {
             return
         }
 
-        audioOptions = nativeAvailability.hasAudio || selection.audioOptions.count < 2
+        audioOptions = nativeAvailability.audioOptionCount >= selection.audioOptions.count
+            || selection.audioOptions.count < 2
             ? []
             : selection.audioOptions
-        subtitleOptions = nativeAvailability.hasSubtitles
+        subtitleOptions = nativeAvailability.subtitleOptionCount >= selection.subtitleOptions.count
             ? []
             : selection.subtitleOptions
     }

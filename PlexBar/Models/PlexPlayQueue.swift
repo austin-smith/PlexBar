@@ -126,6 +126,16 @@ struct PlexPlaybackQueue: Equatable, Sendable {
         items[currentIndex]
     }
 
+    var previousItem: PlexMediaItem? {
+        let index = currentIndex - 1
+        return items.indices.contains(index) ? items[index] : nil
+    }
+
+    var nextItem: PlexMediaItem? {
+        let index = currentIndex + 1
+        return items.indices.contains(index) ? items[index] : nil
+    }
+
     var currentAbsoluteIndex: Int {
         windowOffset + currentIndex
     }
@@ -143,7 +153,9 @@ struct PlexPlaybackQueue: Equatable, Sendable {
             upcomingItems: upcomingItems,
             currentPosition: currentAbsoluteIndex + 1,
             totalCount: totalCount,
-            isShuffled: isShuffled
+            isShuffled: isShuffled,
+            canRemoveUpcomingItems: purpose == .standard,
+            canReorderUpcomingItems: canReorderLoadedUpcomingItems
         )
     }
 
@@ -172,6 +184,13 @@ struct PlexPlaybackQueue: Equatable, Sendable {
             return false
         }
         return currentItem.ratingKey != primaryRatingKey
+    }
+
+    var isCinemaPreplayQueue: Bool {
+        if case .cinemaPreplay = purpose {
+            return true
+        }
+        return false
     }
 
     func canAdd(_ item: PlexMediaItem) -> Bool {
@@ -505,6 +524,8 @@ struct PlexPlaybackQueuePresentation: Equatable, Sendable {
     let currentPosition: Int
     let totalCount: Int
     let isShuffled: Bool
+    let canRemoveUpcomingItems: Bool
+    let canReorderUpcomingItems: Bool
 
     var remainingCount: Int {
         max(totalCount - currentPosition, 0)
@@ -512,6 +533,19 @@ struct PlexPlaybackQueuePresentation: Equatable, Sendable {
 
     var unloadedRemainingCount: Int {
         max(remainingCount - upcomingItems.count, 0)
+    }
+
+    func canMoveUpcomingItem(
+        playQueueItemID: String,
+        direction: PlexPlayQueueItemMoveDirection
+    ) -> Bool {
+        guard canReorderUpcomingItems,
+              let index = upcomingItems.firstIndex(where: {
+                  $0.playQueueItemID == playQueueItemID
+              }) else {
+            return false
+        }
+        return upcomingItems.indices.contains(index + direction.indexDelta)
     }
 }
 

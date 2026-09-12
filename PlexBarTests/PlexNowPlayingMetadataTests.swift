@@ -287,7 +287,7 @@ struct PlexNowPlayingMetadataTests {
         #expect(metadata.nowPlayingInfo[MPMediaItemPropertyDiscNumber] == nil)
     }
 
-    @Test func publicationFingerprintIgnoresClockDriftButDetectsQueueChanges() throws {
+    @Test func publicationFingerprintIgnoresClockDriftButDetectsControlChanges() throws {
         let item = try decodeItem(#"""
         {
           "ratingKey": "episode-42",
@@ -324,10 +324,21 @@ struct PlexNowPlayingMetadataTests {
             queuePosition: 4,
             queueCount: 12
         )
+        let changedSelectedSpeed = PlexNowPlayingMetadata(
+            item: item,
+            duration: 2_400,
+            elapsedTime: 101,
+            playbackRate: 0,
+            defaultPlaybackRate: 1.5,
+            serverIdentifier: "server-a",
+            queuePosition: 3,
+            queueCount: 10
+        )
 
         #expect(original != ordinaryClockDrift)
         #expect(original.publicationFingerprint == ordinaryClockDrift.publicationFingerprint)
         #expect(original.publicationFingerprint != changedQueue.publicationFingerprint)
+        #expect(original.publicationFingerprint != changedSelectedSpeed.publicationFingerprint)
     }
 
     @Test func serverFallbackTracksPublishNativeNowPlayingLanguageGroups() throws {
@@ -356,8 +367,8 @@ struct PlexNowPlayingMetadataTests {
         let languageOptions = PlexNowPlayingLanguageOptions(
             selection: selection,
             nativeAvailability: PlexNativeMediaSelectionAvailability(
-                hasAudio: false,
-                hasSubtitles: false
+                audioOptionCount: 0,
+                subtitleOptionCount: 0
             )
         )
 
@@ -440,8 +451,8 @@ struct PlexNowPlayingMetadataTests {
         let allNative = PlexNowPlayingLanguageOptions(
             selection: selection,
             nativeAvailability: PlexNativeMediaSelectionAvailability(
-                hasAudio: true,
-                hasSubtitles: true
+                audioOptionCount: 2,
+                subtitleOptionCount: 1
             )
         )
         #expect(!allNative.hasAvailableOptions)
@@ -450,13 +461,25 @@ struct PlexNowPlayingMetadataTests {
         let audioNative = PlexNowPlayingLanguageOptions(
             selection: selection,
             nativeAvailability: PlexNativeMediaSelectionAvailability(
-                hasAudio: true,
-                hasSubtitles: false
+                audioOptionCount: 2,
+                subtitleOptionCount: 0
             )
         )
         #expect(audioNative.groups.count == 1)
         #expect(audioNative.groups[0].languageOptions.allSatisfy {
             $0.languageOptionType == .legible
+        })
+
+        let partiallyNative = PlexNowPlayingLanguageOptions(
+            selection: selection,
+            nativeAvailability: PlexNativeMediaSelectionAvailability(
+                audioOptionCount: 1,
+                subtitleOptionCount: 0
+            )
+        )
+        #expect(partiallyNative.groups.count == 2)
+        #expect(partiallyNative.groups[0].languageOptions.allSatisfy {
+            $0.languageOptionType == .audible
         })
 
         let inspectionPending = PlexNowPlayingLanguageOptions(

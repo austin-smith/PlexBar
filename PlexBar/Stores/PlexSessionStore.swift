@@ -24,6 +24,16 @@ final class PlexSessionStore {
     private let geoIPClient: PlexGeoIPClient
     private let eventsClient: PlexSessionEventsClient
     private let connectionRecheckSleep: ConnectionRecheckSleep
+    private let activityClock: PlexActivityRefreshClock
+    private static let activityRefreshInterval: Duration = .seconds(10)
+    private var activityConsumers: Set<UUID> = []
+    private var activityRefreshTask: Task<Void, Never>?
+    private var activityRefreshID = UUID()
+    private var lastHydratedInstant: ContinuousClock.Instant?
+    private var isSystemAsleep = false
+    private var hydration: (id: UUID, scope: String, url: URL, task: Task<Void, Error>)?
+    private var hydrationNotifications: [PlexPlaySessionStateNotification] = []
+    private var hydrationNeedsFollowup = false
     private var monitorTask: Task<Void, Never>?
     private var connectionRecheckTask: Task<Void, Never>?
     private var geoLookupTasksByIP: [String: Task<Void, Never>] = [:]
@@ -36,6 +46,7 @@ final class PlexSessionStore {
     private var waveformUnavailableStreamIDs: Set<Int> = []
     private var waveformLevelTasksByStreamID: [Int: Task<Void, Never>] = [:]
     private var activeServerIdentifier: String?
+    private var activeAccountScope: String?
     private var activeMonitorURL: URL?
 
     var sessions: [PlexSession] {
@@ -45,6 +56,12 @@ final class PlexSessionStore {
     var isLoading = false
     var errorMessage: String?
     var lastUpdated: Date?
+    private(set) var lastHydratedAt: Date?
+    private(set) var activityErrorMessage: String?
+
+    var activitySummary: PlexActivitySummary {
+        PlexActivitySummary(sessions: sessions)
+    }
 
     init(
         connectionStore: PlexConnectionStore,
@@ -53,13 +70,15 @@ final class PlexSessionStore {
         eventsClient: PlexSessionEventsClient = PlexSessionEventsClient(),
         connectionRecheckSleep: @escaping ConnectionRecheckSleep = { duration in
             try await Task.sleep(for: duration)
-        }
+        },
+        activityClock: PlexActivityRefreshClock = .continuous
     ) {
         self.connectionStore = connectionStore
         self.client = client
         self.geoIPClient = geoIPClient
         self.eventsClient = eventsClient
         self.connectionRecheckSleep = connectionRecheckSleep
+        self.activityClock = activityClock
     }
 
     var activeStreamCount: Int {
@@ -74,10 +93,44 @@ final class PlexSessionStore {
         return terminatingSessionKeys.contains(sessionKey)
     }
 
-    func refreshNow() {
+    @discardableResult
+    func refreshNow() -> Task<Void, Never> {
         Task {
             await performFullHydrate()
         }
+    }
+
+    func setActivityVisible(_ isVisible: Bool, consumer: UUID) {
+        let wasVisible = !activityConsumers.isEmpty
+        if isVisible {
+            activityConsumers.insert(consumer)
+        } else {
+            activityConsumers.remove(consumer)
+        }
+        if activityConsumers.isEmpty {
+            cancelActivityRefresh()
+        } else if !wasVisible {
+            let deadline = lastHydratedInstant.map { $0 + Self.activityRefreshInterval } ?? activityClock.now()
+            scheduleActivityRefresh(at: max(deadline, activityClock.now()))
+        }
+    }
+
+    func systemWillSleep() {
+        isSystemAsleep = true
+        cancelActivityRefresh()
+        cancelHydration()
+        monitorTask?.cancel()
+        monitorTask = nil
+        connectionRecheckTask?.cancel()
+        connectionRecheckTask = nil
+    }
+
+    func systemDidWake() {
+        isSystemAsleep = false
+        guard connectionStore.settings.hasValidConfiguration else { return }
+        startMonitorTask()
+        restartConnectionRecheckTask()
+        scheduleActivityRefresh(at: activityClock.now())
     }
 
     func terminate(_ session: PlexSession, reason: String? = nil) async {
@@ -109,7 +162,7 @@ final class PlexSessionStore {
 
             do {
                 try await connectionStore.perform { configuration in
-                    try await hydrateAll(using: configuration, showLoading: false)
+                    try await hydrateAll(using: configuration, showLoading: false, afterPlaybackChange: true)
                 }
             } catch {
                 errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -182,6 +235,11 @@ final class PlexSessionStore {
         clearGeoLookups()
         clearWaveformCache()
 
+        if activeAccountScope != connectionStore.accountCacheScope {
+            clearSessions(resetTimestamp: true)
+            errorMessage = nil
+        }
+
         guard connectionStore.settings.hasValidConfiguration else {
             activeServerIdentifier = nil
             activeMonitorURL = nil
@@ -192,8 +250,11 @@ final class PlexSessionStore {
         }
 
         activeServerIdentifier = connectionStore.settings.selectedServerIdentifier
+        activeAccountScope = connectionStore.accountCacheScope
+        guard !isSystemAsleep else { return }
         startMonitorTask()
         startConnectionRecheckTask()
+        scheduleActivityRefresh(at: activityClock.now())
     }
 
     func restartConnectionRecheckTask() {
@@ -221,6 +282,7 @@ final class PlexSessionStore {
 
             do {
                 let configuration = try await connectionStore.currentConfiguration(forceRefresh: forceRefresh)
+                try Task.checkCancellation()
                 activeMonitorURL = configuration.serverURL
 
                 try await eventsClient.monitor(using: configuration) { [weak self] event in
@@ -234,11 +296,12 @@ final class PlexSessionStore {
                 reconnectAttempt = 0
                 forceRefresh = true
             } catch is CancellationError {
-                activeMonitorURL = nil
                 return
             } catch {
+                guard !Task.isCancelled else { return }
                 activeMonitorURL = nil
                 errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                activityErrorMessage = errorMessage
                 reconnectAttempt += 1
                 forceRefresh = true
 
@@ -292,6 +355,10 @@ final class PlexSessionStore {
         _ event: PlexSessionEvent,
         using configuration: PlexConnectionConfiguration
     ) async throws {
+        try Task.checkCancellation()
+        guard configuration.accountCacheScope == connectionStore.accountCacheScope else {
+            throw CancellationError()
+        }
         switch event {
         case .connected:
             try await hydrateAll(using: configuration, showLoading: true)
@@ -310,18 +377,22 @@ final class PlexSessionStore {
             return
         }
 
+        if hydration != nil {
+            hydrationNotifications.append(notification)
+        }
+
         if notification.state?.lowercased() == "stopped" {
             removeSession(for: sessionKey)
             return
         }
 
         guard let existingSession = sessionsByKey[sessionKey] else {
-            try await rehydrateSession(using: configuration, sessionKey: sessionKey)
+            try await hydrateAll(using: configuration, showLoading: false, afterPlaybackChange: true)
             return
         }
 
         if notification.requiresHydrate(comparedTo: existingSession) {
-            try await rehydrateSession(using: configuration, sessionKey: sessionKey)
+            try await hydrateAll(using: configuration, showLoading: false, afterPlaybackChange: true)
             return
         }
 
@@ -331,22 +402,8 @@ final class PlexSessionStore {
         lastUpdated = Date()
     }
 
-    private func rehydrateSession(
-        using configuration: PlexConnectionConfiguration,
-        sessionKey: String
-    ) async throws {
-        if let session = try await client.fetchSession(using: configuration, sessionKey: sessionKey),
-           let canonicalSessionKey = session.canonicalSessionKey {
-            upsertSession(session, sessionKey: canonicalSessionKey)
-        } else {
-            removeSession(for: sessionKey)
-        }
-
-        errorMessage = nil
-        lastUpdated = Date()
-    }
-
-    private func performFullHydrate() async {
+    private func performFullHydrate(showLoading: Bool = true) async {
+        guard !Task.isCancelled, !isSystemAsleep else { return }
         guard connectionStore.settings.hasValidConfiguration else {
             clearSessions(resetTimestamp: true)
             errorMessage = nil
@@ -358,34 +415,87 @@ final class PlexSessionStore {
             didChangeConfiguration()
         }
 
-        isLoading = true
-
+        let scope = connectionStore.accountCacheScope
         do {
             try await connectionStore.perform { configuration in
-                try await hydrateAll(using: configuration, showLoading: false)
+                try Task.checkCancellation()
+                try await hydrateAll(using: configuration, showLoading: showLoading)
             }
+        } catch is CancellationError {
+            return
+        } catch let error as URLError where error.code == .cancelled {
+            return
         } catch {
+            guard !Task.isCancelled, scope == connectionStore.accountCacheScope else { return }
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            activityErrorMessage = errorMessage
         }
-
-        isLoading = false
     }
 
     private func hydrateAll(
         using configuration: PlexConnectionConfiguration,
-        showLoading: Bool
+        showLoading: Bool,
+        afterPlaybackChange: Bool = false
     ) async throws {
-        if showLoading {
-            isLoading = true
+        try Task.checkCancellation()
+        guard !isSystemAsleep, configuration.accountCacheScope == connectionStore.accountCacheScope else {
+            throw CancellationError()
         }
-        defer {
-            if showLoading {
-                isLoading = false
-            }
+        if let current = hydration,
+           current.scope != configuration.accountCacheScope || current.url != configuration.serverURL {
+            cancelHydration()
+        }
+        if let current = hydration {
+            // An event received after a request began requires a snapshot taken
+            // after that event. All waiters share the same reconciliation pass.
+            if afterPlaybackChange { hydrationNeedsFollowup = true }
+            if showLoading { isLoading = true }
+            try await current.task.value
+            return
         }
 
-        let fetchedSessions = try await client.fetchSessions(using: configuration)
-        applyHydratedSessions(fetchedSessions)
+        let id = UUID()
+        let task = Task { [weak self] in
+            guard let self else { throw CancellationError() }
+            defer {
+                if self.hydration?.id == id {
+                    self.hydration = nil
+                    self.hydrationNotifications = []
+                    self.hydrationNeedsFollowup = false
+                    self.isLoading = false
+                }
+            }
+            do {
+                while true {
+                    let fetched = try await self.client.fetchSessions(using: configuration)
+                    try Task.checkCancellation()
+                    guard self.hydration?.id == id,
+                          configuration.accountCacheScope == self.connectionStore.accountCacheScope else {
+                        throw CancellationError()
+                    }
+                    if self.hydrationNeedsFollowup {
+                        self.hydrationNeedsFollowup = false
+                        self.hydrationNotifications = []
+                        continue
+                    }
+                    self.applyHydratedSessions(fetched)
+                    return
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch let error as URLError where error.code == .cancelled {
+                throw CancellationError()
+            } catch {
+                if self.hydration?.id == id,
+                   configuration.accountCacheScope == self.connectionStore.accountCacheScope {
+                    self.activityErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                }
+                throw error
+            }
+        }
+        hydration = (id, configuration.accountCacheScope, configuration.serverURL, task)
+        isLoading = showLoading
+        try await task.value
     }
 
     private func applyHydratedSessions(_ fetchedSessions: [PlexSession]) {
@@ -405,23 +515,28 @@ final class PlexSessionStore {
             nextSessionOrder.append(storageKey)
         }
 
+        // Preserve events newer than the HTTP request, including stops. A
+        // completed fetch must not restore an old position or resurrect a session.
+        for notification in hydrationNotifications {
+            guard let key = notification.sessionKey?.nilIfBlank else { continue }
+            if notification.state?.lowercased() == "stopped" {
+                nextSessionsByKey.removeValue(forKey: key)
+                nextSessionOrder.removeAll { $0 == key }
+            } else if let session = nextSessionsByKey[key],
+                      !notification.requiresHydrate(comparedTo: session) {
+                nextSessionsByKey[key] = session.applying(playNotification: notification)
+            }
+        }
         sessionsByKey = nextSessionsByKey
         sessionOrder = nextSessionOrder
         pruneWaveformCache()
         refreshResolvedLocationsIfNeeded()
         errorMessage = nil
         lastUpdated = Date()
-    }
-
-    private func upsertSession(_ session: PlexSession, sessionKey: String) {
-        sessionsByKey[sessionKey] = session
-
-        if !sessionOrder.contains(sessionKey) {
-            sessionOrder.append(sessionKey)
-        }
-
-        pruneWaveformCache()
-        refreshResolvedLocationsIfNeeded()
+        lastHydratedAt = lastUpdated
+        lastHydratedInstant = activityClock.now()
+        activityErrorMessage = nil
+        scheduleActivityRefresh(at: activityClock.now() + Self.activityRefreshInterval)
     }
 
     private func removeSession(for sessionKey: String) {
@@ -443,6 +558,9 @@ final class PlexSessionStore {
 
         if resetTimestamp {
             lastUpdated = nil
+            lastHydratedAt = nil
+            lastHydratedInstant = nil
+            activityErrorMessage = nil
         }
     }
 
@@ -452,6 +570,8 @@ final class PlexSessionStore {
     }
 
     private func cancelBackgroundTasks() {
+        cancelActivityRefresh()
+        cancelHydration()
         monitorTask?.cancel()
         monitorTask = nil
         connectionRecheckTask?.cancel()
@@ -462,8 +582,44 @@ final class PlexSessionStore {
         waveformLevelTasksByStreamID.removeAll()
     }
 
+    private func cancelHydration() {
+        hydration?.task.cancel()
+        hydration = nil
+        hydrationNotifications = []
+        hydrationNeedsFollowup = false
+        isLoading = false
+    }
+
+    private func cancelActivityRefresh() {
+        activityRefreshID = UUID()
+        activityRefreshTask?.cancel()
+        activityRefreshTask = nil
+    }
+
+    private func scheduleActivityRefresh(at deadline: ContinuousClock.Instant) {
+        cancelActivityRefresh()
+        guard !activityConsumers.isEmpty, !isSystemAsleep,
+              connectionStore.settings.hasValidConfiguration else { return }
+        let id = activityRefreshID
+        let clock = activityClock
+        activityRefreshTask = Task { [weak self] in
+            do {
+                try await clock.sleepUntil(deadline)
+                try Task.checkCancellation()
+            } catch { return }
+            guard let self, self.activityRefreshID == id else { return }
+            await self.performFullHydrate(showLoading: false)
+            // Success schedules from the new snapshot. Failure waits for the
+            // next regular interval; it never stamps old data as fresh.
+            if self.activityRefreshID == id {
+                self.scheduleActivityRefresh(at: clock.now() + Self.activityRefreshInterval)
+            }
+        }
+    }
+
     private func startMonitorTask() {
         monitorTask?.cancel()
+        activeMonitorURL = nil
         monitorTask = Task { [weak self] in
             await self?.runMonitorLoop()
         }

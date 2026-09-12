@@ -4,16 +4,48 @@ struct PlexClientContext: Hashable, Sendable {
     static let pmsAPIVersion = "1.0.0"
 
     let clientIdentifier: String
+    let product: String
+    let productVersion: String
+    let platform: String
+    let device: String
+    let deviceName: String
+
+    init(clientIdentifier: String) {
+        self.init(
+            clientIdentifier: clientIdentifier,
+            product: AppConstants.appName,
+            productVersion: AppConstants.productVersion,
+            platform: Self.currentPlatform,
+            device: Self.currentDevice,
+            deviceName: "\(Self.currentDevice) (\(AppConstants.appName))"
+        )
+    }
+
+    init(
+        clientIdentifier: String,
+        product: String,
+        productVersion: String,
+        platform: String,
+        device: String,
+        deviceName: String
+    ) {
+        self.clientIdentifier = clientIdentifier
+        self.product = product
+        self.productVersion = productVersion
+        self.platform = platform
+        self.device = device
+        self.deviceName = deviceName
+    }
 
     var headers: [String: String] {
         [
             "X-Plex-Client-Identifier": clientIdentifier,
-            "X-Plex-Product": AppConstants.appName,
-            "X-Plex-Version": AppConstants.productVersion,
-            "X-Plex-Platform": "macOS",
+            "X-Plex-Product": product,
+            "X-Plex-Version": productVersion,
+            "X-Plex-Platform": platform,
             "X-Plex-Platform-Version": platformVersion,
-            "X-Plex-Device": "Mac",
-            "X-Plex-Device-Name": "Mac (\(AppConstants.appName))",
+            "X-Plex-Device": device,
+            "X-Plex-Device-Name": deviceName,
             "X-Plex-Language": "en",
         ]
     }
@@ -43,5 +75,21 @@ struct PlexClientContext: Hashable, Sendable {
     private var platformVersion: String {
         let version = ProcessInfo.processInfo.operatingSystemVersion
         return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+    }
+
+    private static var currentPlatform: String {
+        #if os(tvOS)
+        "tvOS"
+        #else
+        "macOS"
+        #endif
+    }
+
+    private static var currentDevice: String {
+        #if os(tvOS)
+        "Apple TV"
+        #else
+        "Mac"
+        #endif
     }
 }

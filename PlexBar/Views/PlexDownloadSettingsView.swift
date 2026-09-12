@@ -18,7 +18,7 @@ struct PlexDownloadSettingsView: View {
 
                 LabeledContent("Music") {
                     Picker("Download Music Quality", selection: $settingsStore.downloadMusicQuality) {
-                        ForEach(PlexDownloadMusicQuality.allCases) { quality in
+                        ForEach(PlexMusicQuality.allCases) { quality in
                             Text(quality.label)
                                 .tag(quality)
                         }

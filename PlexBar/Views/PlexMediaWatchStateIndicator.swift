@@ -4,11 +4,13 @@ struct PlexMediaWatchStateIndicator: View {
     enum Scale {
         case compact
         case standard
+        case large
 
         var badgeSize: CGFloat {
             switch self {
             case .compact: 14
             case .standard: 18
+            case .large: 24
             }
         }
 
@@ -16,6 +18,7 @@ struct PlexMediaWatchStateIndicator: View {
             switch self {
             case .compact: 7
             case .standard: 9
+            case .large: 12
             }
         }
 
@@ -23,6 +26,7 @@ struct PlexMediaWatchStateIndicator: View {
             switch self {
             case .compact: 4
             case .standard: 6
+            case .large: 8
             }
         }
 

@@ -49,11 +49,8 @@ extension PlexBrowserStore {
                 let endpoints = try await self.advertisedLibraryProviderEndpoints(
                     using: configuration
                 )
-                guard let promotedPath = endpoints.promotedPath else {
-                    throw PlexAPIError.missingLibraryPromotedFeature
-                }
-                return try await client.fetchPromotedHubs(
-                    endpointPath: promotedPath,
+                return try await client.fetchHomeHubs(
+                    endpoints: endpoints,
                     using: configuration
                 )
             }

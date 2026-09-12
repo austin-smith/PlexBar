@@ -59,6 +59,7 @@ struct PlexMediaItem: Decodable, Equatable, Hashable, Identifiable, Sendable {
     let producers: [PlexTag]
     let countries: [PlexTag]
     let roles: [PlexTag]
+    let chapters: [PlexMediaChapter]
     let markers: [PlexMediaMarker]
 
     var id: String {
@@ -171,6 +172,21 @@ struct PlexMediaItem: Decodable, Equatable, Hashable, Identifiable, Sendable {
         ].contains(type)
     }
 
+    var preferredArtworkPath: String? {
+        thumb?.nilIfBlank ?? composite?.nilIfBlank
+    }
+
+    var formattedDuration: String? {
+        guard let duration, duration > 0 else {
+            return nil
+        }
+
+        let roundedMinutes = max((Int64(duration) + 30_000) / 60_000, 1)
+        return Duration.seconds(roundedMinutes * 60)
+            .formatted(.units(width: .abbreviated))
+            .replacingOccurrences(of: ", ", with: " ")
+    }
+
     var posterArtworkPath: String? {
         switch type?.lowercased() {
         case "episode":
@@ -197,6 +213,14 @@ struct PlexMediaItem: Decodable, Equatable, Hashable, Identifiable, Sendable {
             [thumb, parentThumb, grandparentThumb, art]
         }
 
+        return uniqueArtworkPaths(candidates)
+    }
+
+    var contentProposalArtworkPaths: [String] {
+        uniqueArtworkPaths([thumb, art, parentThumb, grandparentThumb])
+    }
+
+    private func uniqueArtworkPaths(_ candidates: [String?]) -> [String] {
         var seen: Set<String> = []
         return candidates.compactMap { candidate in
             guard let path = candidate?.nilIfBlank, seen.insert(path).inserted else {
@@ -217,6 +241,10 @@ struct PlexMediaItem: Decodable, Equatable, Hashable, Identifiable, Sendable {
         var seen: Set<String> = []
         let values = candidates.filter { seen.insert($0).inserted }
         return values.isEmpty ? nil : values.joined(separator: " · ")
+    }
+
+    var supportsMediaExtras: Bool {
+        type?.lowercased() != "clip"
     }
 
     var extraSubtypeLabel: String? {
@@ -318,6 +346,7 @@ struct PlexMediaItem: Decodable, Equatable, Hashable, Identifiable, Sendable {
         case producers = "Producer"
         case countries = "Country"
         case roles = "Role"
+        case chapters = "Chapter"
         case markers = "Marker"
     }
 
@@ -381,6 +410,7 @@ struct PlexMediaItem: Decodable, Equatable, Hashable, Identifiable, Sendable {
         producers = try values.decodeIfPresent([PlexTag].self, forKey: .producers) ?? []
         countries = try values.decodeIfPresent([PlexTag].self, forKey: .countries) ?? []
         roles = try values.decodeIfPresent([PlexTag].self, forKey: .roles) ?? []
+        chapters = try values.decodeIfPresent([PlexMediaChapter].self, forKey: .chapters) ?? []
         markers = try values.decodeIfPresent([PlexMediaMarker].self, forKey: .markers) ?? []
     }
 }
@@ -504,6 +534,8 @@ struct PlexMediaStream: Decodable, Equatable, Hashable, Sendable {
     let forced: Bool?
     let hearingImpaired: Bool?
     let visualImpaired: Bool?
+    let canAutoSync: Bool?
+    let offset: Int?
     let decision: String?
     let location: String?
 
@@ -520,6 +552,8 @@ struct PlexMediaStream: Decodable, Equatable, Hashable, Sendable {
         case forced
         case hearingImpaired
         case visualImpaired
+        case canAutoSync
+        case offset
         case decision
         case location
     }
@@ -538,6 +572,8 @@ struct PlexMediaStream: Decodable, Equatable, Hashable, Sendable {
         forced = values.decodePlexBoolIfPresent(forKey: .forced)
         hearingImpaired = values.decodePlexBoolIfPresent(forKey: .hearingImpaired)
         visualImpaired = values.decodePlexBoolIfPresent(forKey: .visualImpaired)
+        canAutoSync = values.decodePlexBoolIfPresent(forKey: .canAutoSync)
+        offset = values.decodePlexIntIfPresent(forKey: .offset)
         decision = try values.decodeIfPresent(String.self, forKey: .decision)
         location = try values.decodeIfPresent(String.self, forKey: .location)
     }

@@ -1,5 +1,16 @@
 import Foundation
 
+extension PlexMediaItem {
+    /// Episodes inherit series credits only when Plex has no episode-specific cast.
+    var episodeSeriesCastRatingKey: String? {
+        guard type?.caseInsensitiveCompare("episode") == .orderedSame,
+              roles.isEmpty,
+              let seriesRatingKey = grandparentRatingKey?.nilIfBlank,
+              seriesRatingKey != ratingKey else { return nil }
+        return seriesRatingKey
+    }
+}
+
 struct PlexCastAndCrewCredit: Equatable, Identifiable, Sendable {
     let id: String
     let name: String

@@ -132,6 +132,28 @@ struct PlexNativeMediaFacts: Equatable, Sendable {
         return facts
     }
 
+    var videoDiagnosticFacts: [PlexNativeMediaDiagnosticFact] {
+        diagnosticFacts.filter { fact in
+            switch fact.kind {
+            case .resolution, .frameRate, .videoCodec, .dynamicRange, .videoBitRate:
+                true
+            case .audioCodec, .channels, .sampleRate, .audioBitRate:
+                false
+            }
+        }
+    }
+
+    var audioDiagnosticFacts: [PlexNativeMediaDiagnosticFact] {
+        diagnosticFacts.filter { fact in
+            switch fact.kind {
+            case .audioCodec, .channels, .sampleRate, .audioBitRate:
+                true
+            case .resolution, .frameRate, .videoCodec, .dynamicRange, .videoBitRate:
+                false
+            }
+        }
+    }
+
     var displayComponents: [String] {
         var components: [String] = []
 
@@ -257,6 +279,18 @@ struct PlexNativeMediaFacts: Equatable, Sendable {
 }
 
 enum PlexNativeMediaInspector {
+    @MainActor
+    static func mediaSelectionAvailability(
+        asset: AVAsset
+    ) async throws -> PlexNativeMediaSelectionAvailability {
+        let audioGroup = try await asset.loadMediaSelectionGroup(for: .audible)
+        let subtitleGroup = try await asset.loadMediaSelectionGroup(for: .legible)
+        return PlexNativeMediaSelectionAvailability(
+            audioOptionCount: audioGroup?.options.count ?? 0,
+            subtitleOptionCount: subtitleGroup?.options.count ?? 0
+        )
+    }
+
     @MainActor
     static func inspect(item: AVPlayerItem) async -> PlexNativeMediaFacts? {
         var videoDescription: CMFormatDescription?

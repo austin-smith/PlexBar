@@ -7,7 +7,7 @@ struct PlexAppRuntime {
         case mock
     }
 
-    private static let mockArgument = "--mock"
+    nonisolated private static let mockArgument = "--mock"
     private static let mockDefaultsSuiteName = "\(AppConstants.bundleIdentifier).mock"
 
     let settingsStore: PlexSettingsStore
@@ -37,7 +37,7 @@ struct PlexAppRuntime {
         }
     }
 
-    static func mode(arguments: [String]) -> Mode {
+    nonisolated static func mode(arguments: [String]) -> Mode {
         #if DEBUG
         if arguments.contains(mockArgument) {
             return .mock
@@ -47,6 +47,15 @@ struct PlexAppRuntime {
         #endif
 
         return .live
+    }
+
+    nonisolated static func makeImageSession(arguments: [String]) -> URLSession {
+        switch mode(arguments: arguments) {
+        case .live:
+            return .shared
+        case .mock:
+            return PlexDebugMockServer.makeSession()
+        }
     }
 
     private static func liveRuntime() -> PlexAppRuntime {

@@ -103,14 +103,14 @@ struct PlexPlaySessionStateNotification: Decodable, Equatable, Sendable {
         hasKey = container.contains(.key)
         key = try container.decodeIfPresent(String.self, forKey: .key)
         hasTranscodeSession = container.contains(.transcodeSession)
-        transcodeSessionKey = try container.decodeIfPresent(PlexTranscodeSessionReference.self, forKey: .transcodeSession)?.key
+        let transcodeID = try container.decodeIfPresent(String.self, forKey: .transcodeSession)
+        // Notifications carry the bare ID; HTTP session snapshots carry this path.
+        transcodeSessionKey = transcodeID
+            .flatMap { $0.nilIfBlank }
+            .map { "/transcode/sessions/\($0)" }
     }
 }
 
 struct PlexTranscodeSessionUpdate: Decodable, Equatable, Sendable {
-    let key: String?
-}
-
-private struct PlexTranscodeSessionReference: Decodable {
     let key: String?
 }

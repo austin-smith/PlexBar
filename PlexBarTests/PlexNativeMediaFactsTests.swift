@@ -66,6 +66,19 @@ struct PlexNativeMediaFactsTests {
             "Audio Data Rate: 640 kbps",
         ])
         #expect(Set(facts.diagnosticFacts.map(\.id)).count == facts.diagnosticFacts.count)
+        #expect(facts.videoDiagnosticFacts.map(\.kind) == [
+            .resolution,
+            .frameRate,
+            .videoCodec,
+            .dynamicRange,
+            .videoBitRate,
+        ])
+        #expect(facts.audioDiagnosticFacts.map(\.kind) == [
+            .audioCodec,
+            .channels,
+            .sampleRate,
+            .audioBitRate,
+        ])
     }
 
     @Test func reportsDeliveredAtmosLayoutWithoutInferringItFromChannelCount() throws {

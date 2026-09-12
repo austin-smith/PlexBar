@@ -24,6 +24,18 @@ enum PlexRemoteService {
         URL(string: authAppBaseURL.absoluteString + "/auth/#!?\(query)")!
     }
 
+    static func linkURL(pinCode: String) -> URL? {
+        guard let pinCode = pinCode
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfBlank else {
+            return nil
+        }
+        return apiURL(
+            path: "/link/",
+            queryItems: [URLQueryItem(name: "pin", value: pinCode)]
+        )
+    }
+
     static func isPlexHosted(_ url: URL) -> Bool {
         guard let host = url.host?.lowercased() else {
             return false

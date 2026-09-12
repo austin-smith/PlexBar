@@ -115,6 +115,28 @@ struct PlexAutoplayPreferencesTests {
         ) == .replayCurrent)
     }
 
+    @Test func postPlayPresentationUsesNativeManualAndAutomaticModes() {
+        #expect(PlexPostPlayPresentationMode.resolve(
+            action: .presentPostPlay(autoAdvanceAfterSeconds: 15),
+            autoplayPreferences: preferences(countdown: .fifteenSeconds)
+        ) == .automatic(afterSeconds: 15))
+        #expect(PlexPostPlayPresentationMode.resolve(
+            action: .presentPostPlay(autoAdvanceAfterSeconds: nil),
+            autoplayPreferences: preferences(isEnabled: false)
+        ) == .manual)
+    }
+
+    @Test func passoutConfirmationRemainsDistinctFromOrdinaryPostPlay() {
+        #expect(PlexPostPlayPresentationMode.resolve(
+            action: .presentPostPlay(autoAdvanceAfterSeconds: nil),
+            autoplayPreferences: preferences(isEnabled: true)
+        ) == .inactivityConfirmation)
+        #expect(PlexPostPlayPresentationMode.resolve(
+            action: .advanceNext,
+            autoplayPreferences: preferences()
+        ) == .none)
+    }
+
     private func resolve(
         repeatMode: PlexPlaybackRepeatMode = .off,
         item: PlexMediaItem,

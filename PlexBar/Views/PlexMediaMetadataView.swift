@@ -11,7 +11,11 @@ struct PlexMediaMetadataView: View {
         if !presentation.facts.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Details")
+                    #if os(tvOS)
+                    .font(TVTypography.sectionTitle)
+                    #else
                     .font(.headline)
+                    #endif
                     .accessibilityAddTraits(.isHeader)
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -21,6 +25,9 @@ struct PlexMediaMetadataView: View {
                 }
             }
             .accessibilityElement(children: .contain)
+            #if os(tvOS)
+            .focusable()
+            #endif
         }
     }
 }
@@ -32,19 +39,37 @@ private struct PlexMediaMetadataFactRow: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 18) {
             Text(fact.label)
-                .font(.callout)
+                .font(valueFont)
                 .foregroundStyle(.secondary)
-                .frame(width: labelWidth, alignment: .trailing)
+                .frame(width: resolvedLabelWidth, alignment: .trailing)
                 .accessibilityHidden(true)
 
             Text(fact.value)
-                .font(.callout)
+                .font(valueFont)
+                #if !os(tvOS)
                 .textSelection(.enabled)
+                #endif
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityHidden(true)
         }
         .accessibilityRepresentation {
             Text("\(fact.label): \(fact.value)")
         }
+    }
+
+    private var valueFont: Font {
+        #if os(tvOS)
+        TVTypography.metadata
+        #else
+        .callout
+        #endif
+    }
+
+    private var resolvedLabelWidth: CGFloat {
+        #if os(tvOS)
+        160
+        #else
+        labelWidth
+        #endif
     }
 }

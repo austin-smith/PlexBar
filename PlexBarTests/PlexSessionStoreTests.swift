@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import PlexBar
@@ -41,6 +42,215 @@ struct PlexSessionStoreTests {
     await waitForSessionStore(store) { $0.activeStreamCount == 1 }
 
     #expect(fullHydrateCounter.value == 1)
+}
+
+@MainActor
+@Test func activityPollingSharesVisibilityAndStopsWhenHidden() async throws {
+    let fixture = try ActivityRefreshFixture()
+    defer { fixture.stop() }
+    await fixture.ready()
+    let first = UUID(), second = UUID()
+    fixture.store.setActivityVisible(true, consumer: first)
+    fixture.store.setActivityVisible(true, consumer: second)
+    await waitUntil { fixture.clock.pendingCount == 1 }
+    #expect(fixture.requests.value == 1)
+    fixture.clock.advance(by: .seconds(9))
+    #expect(fixture.requests.value == 1)
+    fixture.clock.advance(by: .seconds(1))
+    await waitUntil { fixture.requests.value == 2 && fixture.clock.pendingCount == 1 }
+    #expect(fixture.requests.value == 2)
+    fixture.store.setActivityVisible(false, consumer: first)
+    fixture.clock.advance(by: .seconds(10))
+    await waitUntil { fixture.requests.value == 3 && fixture.clock.pendingCount == 1 }
+    #expect(fixture.requests.value == 3)
+    fixture.store.setActivityVisible(false, consumer: second)
+    await waitUntil { fixture.clock.pendingCount == 0 }
+    #expect(fixture.clock.pendingCount == 0)
+    fixture.clock.advance(by: .seconds(100))
+    #expect(fixture.requests.value == 3)
+    fixture.store.setActivityVisible(true, consumer: first)
+    await waitUntil { fixture.requests.value == 4 && fixture.clock.pendingCount == 1 }
+    #expect(fixture.requests.value == 4)
+}
+
+@MainActor
+@Test(arguments: [true, false])
+func activityPollingRefreshesUnchangedPausedAndEmptySnapshots(empty: Bool) async throws {
+    let fixture = try ActivityRefreshFixture(empty: empty)
+    defer { fixture.stop() }
+    await fixture.ready()
+    let original = try #require(fixture.store.lastHydratedAt)
+    fixture.store.setActivityVisible(true, consumer: UUID())
+    await waitUntil { fixture.clock.pendingCount == 1 }
+    fixture.clock.advance(by: .seconds(10))
+    await waitForSessionStore(fixture.store) { $0.lastHydratedAt != original }
+    #expect(try #require(fixture.store.lastHydratedAt) > original)
+    #expect(fixture.store.activeStreamCount == (empty ? 0 : 1))
+    #expect(fixture.store.activitySummary.totalBandwidthKbps == (empty ? 0 : 8000))
+    #expect(!fixture.store.isLoading)
+}
+
+@MainActor
+@Test func activityPollingPreservesFailedSnapshotAndRecovers() async throws {
+    let fixture = try ActivityRefreshFixture()
+    defer { fixture.stop() }
+    await fixture.ready()
+    let original = try #require(fixture.store.lastHydratedAt)
+    fixture.store.setActivityVisible(true, consumer: UUID())
+    await waitUntil { fixture.clock.pendingCount == 1 }
+    fixture.invalidResponse.withValue { $0 = true }
+    fixture.clock.advance(by: .seconds(10))
+    await waitUntil { fixture.store.activityErrorMessage != nil && fixture.clock.pendingCount == 1 }
+    #expect(fixture.store.activityErrorMessage != nil)
+    #expect(fixture.store.lastHydratedAt == original)
+    #expect(fixture.store.activitySummary.totalBandwidthKbps == 8000)
+    #expect(!fixture.store.isLoading)
+    fixture.invalidResponse.withValue { $0 = false }
+    fixture.bandwidth.withValue { $0 = 12000 }
+    fixture.clock.advance(by: .seconds(10))
+    await waitForSessionStore(fixture.store) { $0.activitySummary.totalBandwidthKbps == 12000 }
+    #expect(fixture.store.activitySummary.totalBandwidthKbps == 12000)
+    #expect(fixture.store.activityErrorMessage == nil)
+    #expect(try #require(fixture.store.lastHydratedAt) > original)
+    #expect(fixture.requests.value == 3)
+}
+
+@MainActor
+@Test func manualRefreshJoinsActivityPollInFlight() async throws {
+    let gate = DispatchSemaphore(value: 0)
+    let fixture = try ActivityRefreshFixture(beforeResponse: { count in
+        if count == 2 { #expect(gate.wait(timeout: .now() + 5) == .success) }
+    })
+    defer { gate.signal(); fixture.stop() }
+    await fixture.ready()
+    fixture.store.setActivityVisible(true, consumer: UUID())
+    await waitUntil { fixture.clock.pendingCount == 1 }
+    fixture.clock.advance(by: .seconds(10))
+    await waitUntil { fixture.requests.value == 2 }
+    #expect(!fixture.store.isLoading)
+    let manual = fixture.store.refreshNow()
+    await waitForSessionStore(fixture.store) { $0.isLoading }
+    #expect(fixture.store.isLoading)
+    gate.signal()
+    await manual.value
+    #expect(fixture.requests.value == 2)
+    #expect(!fixture.store.isLoading)
+}
+
+@MainActor
+@Test(arguments: ["stopped", "paused"])
+func activitySnapshotPreservesNewerPlaybackEvents(state: String) async throws {
+    let gate = DispatchSemaphore(value: 0)
+    let fixture = try ActivityRefreshFixture(beforeResponse: { count in
+        if count == 2 { #expect(gate.wait(timeout: .now() + 5) == .success) }
+    })
+    defer { gate.signal(); fixture.stop() }
+    await fixture.ready()
+    let original = try #require(fixture.store.lastHydratedAt)
+    fixture.store.setActivityVisible(true, consumer: UUID())
+    await waitUntil { fixture.clock.pendingCount == 1 }
+    fixture.clock.advance(by: .seconds(10))
+    await waitUntil { fixture.requests.value == 2 }
+    let notification = try JSONDecoder().decode(PlexPlaySessionStateNotification.self, from: Data("""
+        {"sessionKey":"44","state":"\(state)","viewOffset":9000}
+        """.utf8))
+    let handler = try #require(fixture.handler.value)
+    try await handler(.playing(notification))
+    gate.signal()
+    await waitForSessionStore(fixture.store) { $0.lastHydratedAt != original }
+    #expect(fixture.store.lastHydratedAt != original)
+    if state == "stopped" {
+        #expect(fixture.store.sessions.isEmpty)
+        #expect(fixture.store.activitySummary.totalBandwidthKbps == 0)
+    } else {
+        #expect(fixture.store.sessions.first?.isPaused == true)
+        #expect(fixture.store.sessions.first?.viewOffset == 9000)
+    }
+    #expect(fixture.requests.value == 2)
+}
+
+@MainActor
+@Test func activityPollingCancelsOnSleepAndRefreshesOnWake() async throws {
+    let fixture = try ActivityRefreshFixture()
+    defer { fixture.stop() }
+    await fixture.ready()
+    fixture.store.setActivityVisible(true, consumer: UUID())
+    await waitUntil { fixture.clock.pendingCount == 1 }
+    fixture.store.systemWillSleep()
+    await waitUntil { fixture.clock.pendingCount == 0 }
+    #expect(fixture.clock.pendingCount == 0)
+    fixture.clock.advance(by: .seconds(100))
+    #expect(fixture.requests.value == 1)
+    fixture.store.systemDidWake()
+    await waitUntil { fixture.requests.value >= 2 && fixture.clock.pendingCount == 1 }
+    #expect(fixture.requests.value >= 2)
+    #expect(fixture.clock.pendingCount == 1)
+}
+
+@MainActor
+@Test func activityPollingDiscardsResponseAfterSignOut() async throws {
+    let gate = DispatchSemaphore(value: 0)
+    let fixture = try ActivityRefreshFixture(beforeResponse: { count in
+        if count == 2 { #expect(gate.wait(timeout: .now() + 5) == .success) }
+    })
+    defer { gate.signal(); fixture.stop() }
+    await fixture.ready()
+    let manual = fixture.store.refreshNow()
+    await waitUntil { fixture.requests.value == 2 }
+    fixture.stop()
+    gate.signal()
+    await manual.value
+    #expect(fixture.store.sessions.isEmpty)
+    #expect(fixture.store.lastHydratedAt == nil)
+    #expect(fixture.store.activityErrorMessage == nil)
+    #expect(!fixture.store.isLoading)
+    #expect(fixture.clock.pendingCount == 0)
+}
+
+@MainActor
+@Test func activityVisibilityObservesHostingWindowsAndPanelLifetime() async throws {
+    let fixture = try ActivityRefreshFixture()
+    defer { fixture.stop() }
+    await fixture.ready()
+    let first = UUID(), second = UUID()
+    let window = ActivityVisibilityTestWindow()
+    let panel = ActivityVisibilityTestWindow()
+    let firstView = PlexActivityVisibilityView()
+    let secondView = PlexActivityVisibilityView()
+    firstView.isEnabled = true
+    secondView.isEnabled = true
+    firstView.onChange = { fixture.store.setActivityVisible($0, consumer: first) }
+    secondView.onChange = { fixture.store.setActivityVisible($0, consumer: second) }
+    window.contentView = firstView
+    panel.contentView = secondView
+    defer { firstView.stopObserving(); secondView.stopObserving() }
+    window.setVisible(true)
+    await waitUntil { fixture.clock.pendingCount == 1 }
+    #expect(fixture.clock.pendingCount == 1)
+    #expect(!window.isKeyWindow)
+    panel.setVisible(true)
+    // Flush the queued native visibility callbacks before hiding the first window.
+    await Task { @MainActor in }.value
+    window.setVisible(false)
+    await Task { @MainActor in }.value
+    #expect(fixture.clock.pendingCount == 1)
+    panel.setVisible(false)
+    await waitUntil { fixture.clock.pendingCount == 0 }
+    #expect(fixture.clock.pendingCount == 0)
+    fixture.clock.advance(by: .seconds(100))
+    panel.setVisible(true)
+    await waitUntil { fixture.requests.value == 2 && fixture.clock.pendingCount == 1 }
+    #expect(fixture.requests.value == 2)
+    secondView.isEnabled = false
+    secondView.scheduleVisibilityUpdate()
+    await waitUntil { fixture.clock.pendingCount == 0 }
+    #expect(fixture.clock.pendingCount == 0)
+    secondView.isEnabled = true
+    secondView.scheduleVisibilityUpdate()
+    await waitUntil { fixture.clock.pendingCount == 1 }
+    secondView.stopObserving()
+    await waitUntil { fixture.clock.pendingCount == 0 }
+    #expect(fixture.clock.pendingCount == 0)
 }
 
 @MainActor
@@ -350,6 +560,9 @@ struct PlexSessionStoreTests {
         $0.sessions.first?.viewOffset == 2500 && $0.sessions.first?.isPaused == true
     }
 
+    #expect(store.activitySummary.streamCount == 1)
+    #expect(store.lastHydratedAt != nil)
+    #expect(store.lastUpdated != store.lastHydratedAt)
     #expect(fullHydrateCounter.value == 1)
     #expect(targetedHydrateCounter.value == 0)
 }
@@ -605,12 +818,16 @@ struct PlexSessionStoreTests {
     await waitForSessionStore(store) { $0.activeStreamCount == 1 }
     let activeSession = try #require(store.sessions.first)
 
+    let retrievedAt = store.lastHydratedAt
     await store.terminate(activeSession)
 
     #expect(store.activeStreamCount == 1)
     #expect(store.isTerminating(activeSession) == false)
     #expect(store.errorMessage?.isEmpty == false)
     #expect(sessionsCounter.value >= 2)
+    #expect(store.activityErrorMessage != nil)
+    #expect(store.lastHydratedAt == retrievedAt)
+    #expect(store.activitySummary.streamCount == 1)
 }
 
 @MainActor
@@ -666,6 +883,7 @@ struct PlexSessionStoreTests {
     #expect(store.isTerminating(activeSession) == false)
     #expect(store.errorMessage?.isEmpty == false)
     #expect(sessionsCounter.value == 1)
+    #expect(store.activityErrorMessage == nil)
 }
 
 @MainActor
@@ -1177,14 +1395,116 @@ struct PlexSessionStoreTests {
 }
 
 @MainActor
-@Test func unknownPlayingEventTriggersOneTargetedHydrate() async throws {
-    let suiteName = "PlexBarTests.unknownPlayingEventTriggersOneTargetedHydrate"
+@Test(arguments: [true, false], [true, false])
+func capturedEpisodeTransitionReconcilesSessions(
+    receivesStop: Bool,
+    startsWithTranscode: Bool
+) async throws {
+    let suiteName = "PlexBarTests.capturedEpisodeTransition.\(receivesStop).\(startsWithTranscode)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defaults.removePersistentDomain(forName: suiteName)
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+
+    let requestCount = RequestCounter()
+    let handler = Locked<PlexSessionEventsClient.MonitorHandler?>(nil)
+    let pausedSession = sessionJSON(sessionKey: "90", ratingKey: "31475", state: "paused", viewOffset: 1574817)
+    let oldEpisode = sessionJSON(
+        sessionKey: "91", ratingKey: "2832", state: "playing", viewOffset: 1289000,
+        transcodeSessionKey: "/transcode/sessions/transcode-old",
+        type: "episode", title: "Episode 10"
+    )
+    let nextEpisode = sessionJSON(
+        sessionKey: "92", ratingKey: "2833", state: "playing", viewOffset: 0,
+        transcodeSessionKey: "/transcode/sessions/transcode-next",
+        type: "episode", title: "Episode 11"
+    )
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+        if url.path == "/identity" {
+            return try identityResponse(for: url)
+        }
+        if url.path == "/status/sessions" {
+            #expect(url.query == nil)
+            requestCount.increment()
+            let episode = requestCount.value == 1 ? oldEpisode : nextEpisode
+            return try sessionsResponse(for: url, metadata: [pausedSession, episode])
+        }
+        throw URLError(.unsupportedURL)
+    }
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(
+        settings: settings,
+        session: session,
+        eventsClient: PlexSessionEventsClient { _, onEvent in
+            try await onEvent(.connected)
+            handler.withValue { $0 = onEvent }
+            try await Task.sleep(for: .seconds(60))
+        }
+    )
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+    await waitUntil { handler.value != nil }
+    let onEvent = try #require(handler.value)
+    #expect(store.sessions.map(\.canonicalSessionKey) == ["90", "91"])
+
+    // Captured PMS stop/start/progress contracts; opaque transcode IDs are anonymized.
+    if receivesStop {
+        let stopped = Data(#"{"NotificationContainer":{"type":"playing","PlaySessionStateNotification":[{"key":"/library/metadata/2832","ratingKey":"2832","sessionKey":"91","state":"stopped","transcodeSession":"transcode-old","viewOffset":1294000}]}}"#.utf8)
+        let events = PlexSessionEventsClient.decodeEventsIfPossible(from: stopped)
+        #expect(events.count == 1)
+        for event in events {
+            try await onEvent(event)
+        }
+        #expect(store.sessions.map(\.canonicalSessionKey) == ["90"])
+        #expect(requestCount.value == 1)
+    }
+
+    // The observed next-episode start omitted the field. Another real stream included it
+    // from its first notification and never appeared before the decoder was corrected.
+    let transcodeField = startsWithTranscode ? #", "transcodeSession":"transcode-next""# : ""
+    let started = Data("""
+    {"NotificationContainer":{"type":"playing","PlaySessionStateNotification":[
+      {"key":"/library/metadata/2833","ratingKey":"2833","sessionKey":"92","state":"playing","viewOffset":0\(transcodeField)}
+    ]}}
+    """.utf8)
+    let startEvents = PlexSessionEventsClient.decodeEventsIfPossible(from: started)
+    #expect(startEvents.count == 1)
+    for event in startEvents {
+        try await onEvent(event)
+        try await onEvent(event) // Duplicate start must not add a row or refetch.
+    }
+
+    for offset in [9000, 19000] {
+        let progress = Data("""
+        {"NotificationContainer":{"type":"playing","PlaySessionStateNotification":[
+          {"key":"/library/metadata/2833","ratingKey":"2833","sessionKey":"92","state":"playing","transcodeSession":"transcode-next","viewOffset":\(offset)}
+        ]}}
+        """.utf8)
+        let events = PlexSessionEventsClient.decodeEventsIfPossible(from: progress)
+        #expect(events.count == 1)
+        for event in events {
+            try await onEvent(event)
+        }
+    }
+
+    #expect(store.sessions.map(\.canonicalSessionKey) == ["90", "92"])
+    #expect(store.sessions.first?.isPaused == true)
+    #expect(store.sessions.first?.viewOffset == 1574817)
+    #expect(store.sessions.last?.title == "Episode 11")
+    #expect(store.sessions.last?.viewOffset == 19000)
+    #expect(store.sessions.last?.transcodeSessionKey == "/transcode/sessions/transcode-next")
+    #expect(store.activeStreamCount == 2)
+    #expect(store.errorMessage == nil)
+    #expect(requestCount.value == 2)
+}
+
+@MainActor
+@Test func unknownPlayingEventRefreshesTheActiveSessionList() async throws {
+    let suiteName = "PlexBarTests.unknownPlayingEventRefreshesTheActiveSessionList"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defaults.removePersistentDomain(forName: suiteName)
     defer { defaults.removePersistentDomain(forName: suiteName) }
 
     let fullHydrateCounter = RequestCounter()
-    let targetedHydrateCounter = RequestCounter()
     let session = makeSessionStoreMockSession { request in
         let url = try #require(request.url)
 
@@ -1194,12 +1514,10 @@ struct PlexSessionStoreTests {
 
         if url.path == "/status/sessions", url.query == nil {
             fullHydrateCounter.increment()
-            return try sessionsResponse(for: url, metadata: [])
-        }
-
-        if url.path == "/status/sessions", url.query?.contains("sessionKey=55") == true {
-            targetedHydrateCounter.increment()
-            return try sessionsResponse(for: url, metadata: [sessionJSON(sessionKey: "55", ratingKey: "901", state: "playing", viewOffset: 4000)])
+            let metadata = fullHydrateCounter.value == 1
+                ? []
+                : [sessionJSON(sessionKey: "55", ratingKey: "901", state: "playing", viewOffset: 4000)]
+            return try sessionsResponse(for: url, metadata: metadata)
         }
 
         throw URLError(.unsupportedURL)
@@ -1226,8 +1544,7 @@ struct PlexSessionStoreTests {
 
     await waitForSessionStore(store) { $0.activeStreamCount == 1 && $0.sessions.first?.canonicalSessionKey == "55" }
 
-    #expect(fullHydrateCounter.value == 1)
-    #expect(targetedHydrateCounter.value == 1)
+    #expect(fullHydrateCounter.value == 2)
 }
 
 @MainActor
@@ -1281,6 +1598,8 @@ struct PlexSessionStoreTests {
 
     await waitForSessionStore(store) { $0.activeStreamCount == 0 && $0.lastUpdated != nil }
 
+    #expect(store.activitySummary.streamCount == 0)
+    #expect(store.lastHydratedAt != nil)
     #expect(fullHydrateCounter.value == 1)
     #expect(targetedHydrateCounter.value == 0)
 }
@@ -1399,14 +1718,13 @@ struct PlexSessionStoreTests {
 }
 
 @MainActor
-@Test func transcodeIdentityChangeTriggersOneTargetedHydrate() async throws {
-    let suiteName = "PlexBarTests.transcodeIdentityChangeTriggersOneTargetedHydrate"
+@Test func transcodeIdentityChangeRefreshesTheActiveSessionList() async throws {
+    let suiteName = "PlexBarTests.transcodeIdentityChangeRefreshesTheActiveSessionList"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
     defaults.removePersistentDomain(forName: suiteName)
     defer { defaults.removePersistentDomain(forName: suiteName) }
 
     let fullHydrateCounter = RequestCounter()
-    let targetedHydrateCounter = RequestCounter()
     let session = makeSessionStoreMockSession { request in
         let url = try #require(request.url)
 
@@ -1416,22 +1734,16 @@ struct PlexSessionStoreTests {
 
         if url.path == "/status/sessions", url.query == nil {
             fullHydrateCounter.increment()
-            return try sessionsResponse(for: url, metadata: [
-                sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)
-            ])
-        }
-
-        if url.path == "/status/sessions", url.query?.contains("sessionKey=44") == true {
-            targetedHydrateCounter.increment()
-            return try sessionsResponse(for: url, metadata: [
-                sessionJSON(
-                    sessionKey: "44",
-                    ratingKey: "900",
-                    state: "playing",
-                    viewOffset: 1000,
+            let metadata = fullHydrateCounter.value == 1
+                ? [
+                    sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000),
+                    sessionJSON(sessionKey: "55", ratingKey: "901", state: "playing", viewOffset: 1000)
+                ]
+                : [sessionJSON(
+                    sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000,
                     transcodeSessionKey: "/transcode/sessions/abc"
-                )
-            ])
+                )]
+            return try sessionsResponse(for: url, metadata: metadata)
         }
 
         throw URLError(.unsupportedURL)
@@ -1461,8 +1773,8 @@ struct PlexSessionStoreTests {
         $0.sessions.first?.transcodeSessionKey == "/transcode/sessions/abc"
     }
 
-    #expect(fullHydrateCounter.value == 1)
-    #expect(targetedHydrateCounter.value == 1)
+    #expect(fullHydrateCounter.value == 2)
+    #expect(store.sessions.map(\.canonicalSessionKey) == ["44"])
 }
 
 @MainActor
@@ -1633,6 +1945,33 @@ struct PlexSessionStoreTests {
     #expect(seenURLs == [localURL])
 }
 
+
+@MainActor
+@Test func activitySummaryClearsImmediatelyWhenServerChanges() async throws {
+    let defaults = try #require(UserDefaults(suiteName: "PlexBarTests.activitySummaryServerChange"))
+    defaults.removePersistentDomain(forName: "PlexBarTests.activitySummaryServerChange")
+    defer { defaults.removePersistentDomain(forName: "PlexBarTests.activitySummaryServerChange") }
+    let session = makeSessionStoreMockSession { request in
+        let url = try #require(request.url)
+        if url.path == "/identity" { return try identityResponse(for: url) }
+        return try sessionsResponse(for: url, metadata: [sessionJSON(sessionKey: "44", ratingKey: "900", state: "playing", viewOffset: 1000)])
+    }
+    let settings = makeSessionStoreSettings(defaults: defaults)
+    let store = makeSessionStore(settings: settings, session: session, eventsClient: PlexSessionEventsClient { _, onEvent in
+        try await onEvent(.connected)
+        try await Task.sleep(for: .seconds(60))
+    })
+    defer { stopSessionMonitoring(store: store, settings: settings) }
+    #expect(store.lastHydratedAt == nil)
+    await waitForSessionStore(store) { $0.activeStreamCount == 1 }
+    #expect(store.lastHydratedAt != nil)
+    settings.selectedServerIdentifier = "another-server"
+    store.didChangeConfiguration()
+    #expect(store.activitySummary.streamCount == 0)
+    #expect(store.lastHydratedAt == nil)
+    #expect(store.activityErrorMessage == nil)
+}
+
 }
 
 @MainActor
@@ -1677,7 +2016,8 @@ private func makeSessionStore(
     availableServers: [PlexServerResource] = [],
     connectionRecheckSleep: @escaping PlexSessionStore.ConnectionRecheckSleep = { duration in
         try await Task.sleep(for: duration)
-    }
+    },
+    activityClock: PlexActivityRefreshClock = .continuous
 ) -> PlexSessionStore {
     let resolver = PlexConnectionResolver(
         client: PlexAPIClient(session: session),
@@ -1721,7 +2061,8 @@ private func makeSessionStore(
         client: PlexAPIClient(session: session),
         geoIPClient: geoIPClient,
         eventsClient: eventsClient,
-        connectionRecheckSleep: connectionRecheckSleep
+        connectionRecheckSleep: connectionRecheckSleep,
+        activityClock: activityClock
     )
 
     store.didChangeConfiguration()
@@ -1791,7 +2132,9 @@ private func sessionJSON(
     playerAddress: String? = nil,
     remotePublicAddress: String? = nil,
     playerLocal: Bool? = nil,
-    playerRelayed: Bool? = nil
+    playerRelayed: Bool? = nil,
+    type: String = "movie",
+    title: String = "Heat"
 ) -> String {
     let sessionIDJSON = includeSessionID ? "\n        \"id\": \"\(sessionKey)\"," : ""
     let transcodeSessionJSON = transcodeSessionKey.map { key in
@@ -1807,8 +2150,8 @@ private func sessionJSON(
       "sessionKey": "\#(sessionKey)",
       "ratingKey": "\#(ratingKey)",
       "key": "/library/metadata/\#(ratingKey)",
-      "type": "movie",
-      "title": "Heat",
+      "type": "\#(type)",
+      "title": "\#(title)",
       "viewOffset": \#(viewOffset),
       "Player": {
         "title": "Apple TV",
@@ -1960,5 +2303,131 @@ private final class Locked<Value>: @unchecked Sendable {
         lock.lock()
         update(&storage)
         lock.unlock()
+    }
+}
+
+@MainActor
+private final class ActivityRefreshFixture {
+    let clock = ActivityTestClock()
+    let requests = RequestCounter()
+    let bandwidth = Locked(8000)
+    let invalidResponse = Locked(false)
+    let handler = Locked<PlexSessionEventsClient.MonitorHandler?>(nil)
+    let defaults: UserDefaults
+    let suiteName: String
+    let settings: PlexSettingsStore
+    let store: PlexSessionStore
+
+    init(empty: Bool = false, beforeResponse: @escaping @Sendable (Int) -> Void = { _ in }) throws {
+        suiteName = "PlexBarTests.activityRefresh.\(UUID())"
+        defaults = try #require(UserDefaults(suiteName: suiteName))
+        settings = makeSessionStoreSettings(defaults: defaults)
+        let requests = requests, bandwidth = bandwidth, invalidResponse = invalidResponse, handler = handler
+        let session = makeSessionStoreMockSession { request in
+            let url = try #require(request.url)
+            if url.path == "/identity" { return try identityResponse(for: url) }
+            #expect(url.path == "/status/sessions")
+            requests.increment()
+            let metadata = sessionJSON(sessionKey: "44", ratingKey: "900", state: "paused", viewOffset: 1000)
+                .replacingOccurrences(of: "\"location\":", with: "\"bandwidth\": \(bandwidth.value), \"location\":")
+            beforeResponse(requests.value)
+            if invalidResponse.value {
+                let response = try #require(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
+                return (response, Data("invalid JSON".utf8))
+            }
+            return try sessionsResponse(for: url, metadata: empty ? [] : [metadata])
+        }
+        store = makeSessionStore(
+            settings: settings, session: session,
+            eventsClient: PlexSessionEventsClient { _, onEvent in
+                try await onEvent(.connected)
+                handler.withValue { $0 = onEvent }
+                try await Task.sleep(for: .seconds(60))
+            },
+            activityClock: clock.clock
+        )
+    }
+
+    func ready() async {
+        await waitUntil { self.handler.value != nil && self.store.lastHydratedAt != nil }
+        #expect(store.lastHydratedAt != nil)
+        #expect(requests.value == 1)
+    }
+
+    func stop() {
+        stopSessionMonitoring(store: store, settings: settings)
+        defaults.removePersistentDomain(forName: suiteName)
+    }
+}
+
+private final class ActivityTestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var instant = ContinuousClock.now
+    private var waiters: [UUID: (ContinuousClock.Instant, CheckedContinuation<Void, Error>)] = [:]
+
+    var clock: PlexActivityRefreshClock {
+        PlexActivityRefreshClock(now: { self.now }, sleepUntil: { try await self.sleep(until: $0) })
+    }
+
+    var now: ContinuousClock.Instant {
+        lock.lock()
+        defer { lock.unlock() }
+        return instant
+    }
+
+    var pendingCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return waiters.count
+    }
+
+    func advance(by duration: Duration) {
+        lock.lock()
+        instant += duration
+        let ready = waiters.filter { $0.value.0 <= instant }
+        for id in ready.keys { waiters.removeValue(forKey: id) }
+        lock.unlock()
+        for waiter in ready.values { waiter.1.resume() }
+    }
+
+    private func sleep(until deadline: ContinuousClock.Instant) async throws {
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                lock.lock()
+                if Task.isCancelled {
+                    lock.unlock()
+                    continuation.resume(throwing: CancellationError())
+                } else if deadline <= instant {
+                    lock.unlock()
+                    continuation.resume()
+                } else {
+                    waiters[id] = (deadline, continuation)
+                    lock.unlock()
+                }
+            }
+        } onCancel: {
+            self.lock.lock()
+            let waiter = self.waiters.removeValue(forKey: id)
+            self.lock.unlock()
+            waiter?.1.resume(throwing: CancellationError())
+        }
+    }
+}
+
+@MainActor
+private final class ActivityVisibilityTestWindow: NSWindow {
+    private var reportedVisible = false
+    override var isVisible: Bool { reportedVisible }
+    override var occlusionState: NSWindow.OcclusionState { reportedVisible ? [.visible] : [] }
+
+    init() {
+        super.init(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+                   styleMask: .borderless, backing: .buffered, defer: true)
+    }
+
+    func setVisible(_ visible: Bool) {
+        reportedVisible = visible
+        NotificationCenter.default.post(name: NSWindow.didChangeOcclusionStateNotification, object: self)
     }
 }

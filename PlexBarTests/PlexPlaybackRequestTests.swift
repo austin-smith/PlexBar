@@ -44,8 +44,266 @@ extension PlexMediaRequestTests {
         let queryItems = try capturedQueryItems(capture)
         #expect(queryItems.contains { $0.name == "musicBitrate" && $0.value == "256" })
         #expect(!queryItems.contains { $0.name == "videoQuality" })
+        #expect(!queryItems.contains { $0.name == "autoAdjustQuality" })
+        #expect(!queryItems.contains { $0.name == "audioBoost" })
         #expect(plan.method == .directPlay)
         #expect(plan.mediaKind == .music)
+    }
+
+    @Test(arguments: PlexAudioBoost.allCases)
+    func videoPlaybackSendsTheExactAudioBoostPercentage(
+        audioBoost: PlexAudioBoost
+    ) async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, directPlayDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Charade",
+          "type": "movie",
+          "Media": [{
+            "container": "mp4",
+            "videoCodec": "h264",
+            "audioCodec": "ac3",
+            "Part": [{"key": "/library/parts/7/file.mp4"}]
+          }]
+        }
+        """#)
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            audioBoost: audioBoost
+        )
+
+        let queryItems = try capturedQueryItems(capture)
+        #expect(queryItems.contains {
+            $0.name == "audioBoost" && $0.value == String(audioBoost.rawValue)
+        })
+    }
+
+    @Test(arguments: [
+        (6, true),
+        (2, false),
+    ])
+    func playbackPlanExposesAudioBoostOnlyForAProvenSurroundDownmix(
+        sourceChannels: Int,
+        expectedSupport: Bool
+    ) async throws {
+        let session = makeMediaMockSession { request in
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, Data(#"""
+            {
+              "MediaContainer": {
+                "generalDecisionCode": "1000",
+                "Metadata": [{
+                  "ratingKey": "42",
+                  "title": "Charade",
+                  "Media": [{
+                    "selected": "1",
+                    "Part": [{
+                      "selected": "1",
+                      "decision": "transcode",
+                      "Stream": [
+                        { "streamType": "1", "decision": "copy" },
+                        { "streamType": "2", "decision": "transcode", "channels": "2" }
+                      ]
+                    }]
+                  }]
+                }]
+              }
+            }
+            """#.utf8))
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Charade",
+          "type": "movie",
+          "Media": [{
+            "container": "mp4",
+            "videoCodec": "h264",
+            "audioCodec": "ac3",
+            "Part": [{
+              "key": "/library/parts/7/file.mp4",
+              "Stream": [{
+                "streamType": "2",
+                "codec": "ac3",
+                "selected": "1",
+                "channels": "\#(sourceChannels)"
+              }]
+            }]
+          }]
+        }
+        """#)
+
+        let plan = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities
+        )
+
+        #expect(plan.supportsAudioBoost == expectedSupport)
+    }
+
+    @Test(arguments: [
+        (PlexMusicQuality.original, "1", "1", "1", "256"),
+        (PlexMusicQuality.kbps320, "1", "1", "1", "320"),
+        (PlexMusicQuality.kbps128, "0", "0", "0", "128"),
+    ])
+    func remoteMusicQualityIsAnExactServerEnforcedCeiling(
+        quality: PlexMusicQuality,
+        expectedDirectPlay: String,
+        expectedDirectStream: String,
+        expectedDirectStreamAudio: String,
+        expectedMusicBitrate: String
+    ) async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, directPlayDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Remote Track",
+          "type": "track",
+          "Media": [{
+            "container": "mp4",
+            "audioCodec": "aac",
+            "bitrate": "256",
+            "Part": [{"container": "mp4", "key": "/library/parts/7/track.m4a"}]
+          }]
+        }
+        """#)
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            musicQuality: quality
+        )
+
+        let queryItems = try capturedQueryItems(capture)
+        #expect(queryItems.contains {
+            $0.name == "directPlay" && $0.value == expectedDirectPlay
+        })
+        #expect(queryItems.contains {
+            $0.name == "directStream" && $0.value == expectedDirectStream
+        })
+        #expect(queryItems.contains {
+            $0.name == "directStreamAudio" && $0.value == expectedDirectStreamAudio
+        })
+        #expect(queryItems.contains {
+            $0.name == "musicBitrate" && $0.value == expectedMusicBitrate
+        })
+    }
+
+    @Test func musicQualityCeilingOverridesForceDirectPlay() async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, transcodeDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Lossless Remote Track",
+          "type": "track",
+          "Media": [{
+            "container": "mp4",
+            "audioCodec": "aac",
+            "bitrate": "921",
+            "Part": [{
+              "container": "mp4",
+              "key": "/library/parts/7/track.m4a",
+              "Stream": [{"streamType": "2", "codec": "aac", "selected": "1"}]
+            }]
+          }]
+        }
+        """#)
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            musicQuality: .kbps192,
+            streamingPolicy: PlexPlaybackStreamingPolicy(
+                allowsDirectPlay: true,
+                allowsDirectStream: true,
+                forceDirectPlay: true
+            )
+        )
+
+        let queryItems = try capturedQueryItems(capture)
+        #expect(queryItems.contains { $0.name == "directPlay" && $0.value == "0" })
+        #expect(queryItems.contains { $0.name == "directStreamAudio" && $0.value == "0" })
+        #expect(queryItems.contains { $0.name == "musicBitrate" && $0.value == "192" })
+    }
+
+    @Test func musicQualityCeilingDoesNotGuessWhenSourceBitrateIsMissing() async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, transcodeDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Unknown Bitrate Track",
+          "type": "track",
+          "Media": [{
+            "container": "mp4",
+            "audioCodec": "aac",
+            "Part": [{"container": "mp4", "key": "/library/parts/7/track.m4a"}]
+          }]
+        }
+        """#)
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            musicQuality: .kbps192
+        )
+
+        let queryItems = try capturedQueryItems(capture)
+        #expect(queryItems.contains { $0.name == "directPlay" && $0.value == "0" })
+        #expect(queryItems.contains { $0.name == "directStreamAudio" && $0.value == "0" })
+        #expect(queryItems.contains { $0.name == "musicBitrate" && $0.value == "192" })
     }
 
     @Test func trackWithoutSelectedAudioFactsDoesNotGuessAMusicContract() async throws {
@@ -124,8 +382,67 @@ extension PlexMediaRequestTests {
         #expect(queryItems.contains { $0.name == "partIndex" && $0.value == "0" })
         #expect(queryItems.contains { $0.name == "videoQuality" && $0.value == "99" })
         #expect(queryItems.contains { $0.name == "videoResolution" && $0.value == "3840x2160" })
-        #expect(queryItems.contains { $0.name == "videoBitrate" && $0.value == "48720" })
-        #expect(!queryItems.contains { $0.name == "videoBitrate" && $0.value == "60000" })
+        #expect(!queryItems.contains { $0.name == "videoBitrate" })
+    }
+
+    @Test func originalHEVCRemuxKeepsTheSameUncappedProfileThroughPlaybackStart() async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil
+            ))
+            // PMS still calls the container conversion a transcode; the stream
+            // decisions establish that video and audio are both copied intact.
+            return (response, Data(#"""
+            {"MediaContainer": {
+              "generalDecisionCode": 1001,
+              "Metadata": [{"ratingKey": "42", "title": "HEVC movie", "Media": [{
+                "selected": true, "container": "mp4", "videoCodec": "hevc",
+                "width": 1920, "height": 1080, "audioCodec": "aac", "audioChannels": 6,
+                "Part": [{"selected": true, "decision": "transcode", "Stream": [
+                  {"streamType": 1, "codec": "hevc", "decision": "copy"},
+                  {"streamType": 2, "codec": "aac", "channels": 6, "decision": "copy"}
+                ]}]
+              }]}]
+            }}
+            """#.utf8))
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42", "title": "HEVC movie", "Media": [{
+            "container": "mkv", "videoCodec": "hevc", "width": 1920, "height": 1080,
+            "bitrate": 2218, "audioCodec": "aac", "audioChannels": 6,
+            "Part": [{"key": "/library/parts/7/file.mkv"}]
+          }]
+        }
+        """#)
+
+        let plan = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            videoQuality: .original
+        )
+
+        #expect(plan.method == .directStream)
+        #expect(plan.url.path == "/video/:/transcode/universal/start.m3u8")
+        let startItems = try #require(URLComponents(
+            url: plan.url, resolvingAgainstBaseURL: false
+        )?.queryItems)
+        for items in [try capturedQueryItems(capture), startItems] {
+            #expect(!items.contains { $0.name == "videoBitrate" || $0.name == "maxVideoBitrate" })
+            #expect(items.contains { $0.name == "videoResolution" && $0.value == "1920x1080" })
+            #expect(items.contains { $0.name == "directStream" && $0.value == "1" })
+            #expect(items.contains { $0.name == "directStreamAudio" && $0.value == "1" })
+        }
+        let decisionProfile = try #require(capture.request?.value(
+            forHTTPHeaderField: "X-Plex-Client-Profile-Extra"
+        ))
+        #expect(decisionProfile.contains(
+            "container=mp4&videoCodec=h264,hevc&audioCodec=aac&replace=true"
+        ))
+        #expect(startItems.first { $0.name == "X-Plex-Client-Profile-Extra" }?.value == decisionProfile)
     }
 
     @Test func multipartVersionAsksPlexToJoinItsParts() throws {
@@ -239,6 +556,65 @@ extension PlexMediaRequestTests {
         let queryItems = try capturedQueryItems(capture)
         #expect(queryItems.contains { $0.name == "directPlay" && $0.value == "1" })
         #expect(queryItems.contains { $0.name == "directStream" && $0.value == "1" })
+    }
+
+    @Test(arguments: [
+        (PlexVideoQuality.fullHD8Mbps, false, "0", "0", "0"),
+        (PlexVideoQuality.fullHD8Mbps, true, "1", "1", "1"),
+        (PlexVideoQuality.original, false, "1", "1", "1"),
+    ])
+    func smallerVideoOriginalQualityPolicyControlsAdaptiveConversion(
+        quality: PlexVideoQuality,
+        playsSmallerAtOriginal: Bool,
+        expectedDirectPlay: String,
+        expectedDirectStream: String,
+        expectedDirectStreamAudio: String
+    ) async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, transcodeDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Already Small Enough",
+          "type": "movie",
+          "Media": [{
+            "videoCodec": "h264",
+            "width": "1280",
+            "height": "720",
+            "bitrate": "3500",
+            "Part": [{"key": "/library/parts/7/file.mp4"}]
+          }]
+        }
+        """#)
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            videoQuality: quality,
+            automaticallyAdjustVideoQuality: true,
+            playSmallerVideosAtOriginalQuality: playsSmallerAtOriginal
+        )
+
+        let queryItems = try capturedQueryItems(capture)
+        #expect(queryItems.contains {
+            $0.name == "directPlay" && $0.value == expectedDirectPlay
+        })
+        #expect(queryItems.contains {
+            $0.name == "directStream" && $0.value == expectedDirectStream
+        })
+        #expect(queryItems.contains {
+            $0.name == "directStreamAudio" && $0.value == expectedDirectStreamAudio
+        })
     }
 
     @Test func qualityCeilingRequiresServerEnforcementWhenSourceFactsAreIncomplete() async throws {
@@ -490,6 +866,328 @@ extension PlexMediaRequestTests {
         #expect(queryItems.contains {
             $0.name == "directStreamAudio" && $0.value == expectedDirectStreamAudio
         })
+    }
+
+    @Test(arguments: [
+        (PlexSubtitleBurnMode.automatic, "auto", "burn"),
+        (PlexSubtitleBurnMode.always, "burn", "burn"),
+        (PlexSubtitleBurnMode.imageFormatsOnly, "auto", "text"),
+    ])
+    func subtitleBurnModeMapsExactlyToPlexDecisionParameters(
+        mode: PlexSubtitleBurnMode,
+        expectedSubtitles: String,
+        expectedAdvancedSubtitles: String
+    ) async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, transcodeDecisionData())
+        }
+        let item = try JSONDecoder().decode(PlexMediaItem.self, from: playableItemData())
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            subtitleBurnMode: mode
+        )
+
+        let queryItems = try capturedQueryItems(capture)
+        #expect(queryItems.contains {
+            $0.name == "subtitles" && $0.value == expectedSubtitles
+        })
+        #expect(queryItems.contains {
+            $0.name == "advancedSubtitles" && $0.value == expectedAdvancedSubtitles
+        })
+    }
+
+    @Test(arguments: PlexSubtitleSize.allCases)
+    func subtitleSizeMapsToPlexDecisionPercentage(
+        size: PlexSubtitleSize
+    ) async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, transcodeDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Sized Subtitles",
+          "type": "movie",
+          "Media": [{
+            "container": "mp4",
+            "videoCodec": "h264",
+            "audioCodec": "aac",
+            "Part": [{"id": "700", "key": "/library/parts/700/file.mp4"}]
+          }]
+        }
+        """#)
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            subtitleSize: size
+        )
+
+        #expect(try capturedQueryItems(capture).contains {
+            $0.name == "subtitleSize" && $0.value == String(size.rawValue)
+        })
+    }
+
+    @Test(arguments: [
+        (true, true, "1"),
+        (true, false, "0"),
+        (false, true, "0"),
+    ])
+    func subtitleAutoSyncRequiresBothUserPreferenceAndStreamCapability(
+        isEnabled: Bool,
+        canAutoSync: Bool,
+        expectedValue: String
+    ) async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, transcodeDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Subtitle Sync",
+          "type": "movie",
+          "Media": [{
+            "container": "mp4",
+            "videoCodec": "h264",
+            "audioCodec": "aac",
+            "Part": [{
+              "id": "700",
+              "key": "/library/parts/700/file.mp4",
+              "Stream": [{
+                "id": "31",
+                "streamType": "3",
+                "codec": "srt",
+                "selected": "1",
+                "canAutoSync": ":canAutoSync"
+              }]
+            }]
+          }]
+        }
+        """#.replacing(":canAutoSync", with: canAutoSync ? "1" : "0"))
+
+        let plan = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            automaticallySyncSubtitles: isEnabled
+        )
+
+        let queryItems = try capturedQueryItems(capture)
+        #expect(queryItems.contains {
+            $0.name == "autoAdjustSubtitle" && $0.value == expectedValue
+        })
+        #expect(plan.supportsSubtitleAutoSync == canAutoSync)
+    }
+
+    @Test func musicDecisionOmitsVideoSubtitleParameters() async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, transcodeDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "track",
+          "title": "Track",
+          "type": "track",
+          "Media": [{
+            "container": "flac",
+            "audioCodec": "flac",
+            "Part": [{"id": "701", "key": "/library/parts/701/file.flac"}]
+          }]
+        }
+        """#)
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities
+        )
+
+        #expect(try !capturedQueryItems(capture).contains {
+            $0.name == "autoAdjustSubtitle"
+        })
+        #expect(try !capturedQueryItems(capture).contains {
+            $0.name == "subtitleSize"
+        })
+    }
+
+    @Test(arguments: [
+        (false, "0"),
+        (true, "1"),
+    ])
+    func automaticQualityMapsExactlyToPlexDecisionFlag(
+        isEnabled: Bool,
+        expectedValue: String
+    ) async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, transcodeDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Adaptive Movie",
+          "type": "movie",
+          "Media": [{
+            "videoCodec": "h264",
+            "width": "1920",
+            "height": "1080",
+            "bitrate": "8000",
+            "Part": [{"key": "/library/parts/7/file.mp4"}]
+          }]
+        }
+        """#)
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            automaticallyAdjustVideoQuality: isEnabled
+        )
+
+        let queryItems = try capturedQueryItems(capture)
+        #expect(queryItems.contains {
+            $0.name == "autoAdjustQuality" && $0.value == expectedValue
+        })
+    }
+
+    @Test func forcedAdaptiveConversionDisablesEveryOriginalVideoPath() async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, transcodeDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Convert This Movie",
+          "type": "movie",
+          "Media": [{
+            "container": "mp4",
+            "videoCodec": "h264",
+            "audioCodec": "aac",
+            "width": "1920",
+            "height": "1080",
+            "bitrate": "8000",
+            "Part": [{
+              "container": "mp4",
+              "key": "/library/parts/7/file.mp4",
+              "Stream": [
+                {"streamType": "1", "codec": "h264", "selected": "1"},
+                {"streamType": "2", "codec": "aac", "selected": "1"}
+              ]
+            }]
+          }]
+        }
+        """#)
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            streamingPolicy: PlexPlaybackStreamingPolicy(
+                allowsDirectPlay: true,
+                allowsDirectStream: true,
+                forceDirectPlay: true
+            ),
+            automaticallyAdjustVideoQuality: true,
+            forceVideoTranscode: true
+        )
+
+        let queryItems = try capturedQueryItems(capture)
+        #expect(queryItems.contains { $0.name == "directPlay" && $0.value == "0" })
+        #expect(queryItems.contains { $0.name == "directStream" && $0.value == "0" })
+        #expect(queryItems.contains { $0.name == "directStreamAudio" && $0.value == "0" })
+        #expect(queryItems.contains { $0.name == "autoAdjustQuality" && $0.value == "1" })
+    }
+
+    @Test func forcedVideoConversionDoesNotChangeMusicDecisions() async throws {
+        let capture = RequestCapture()
+        let session = makeMediaMockSession { request in
+            capture.record(request)
+            let response = try #require(HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            ))
+            return (response, directPlayDecisionData())
+        }
+        let item = try decodeItem(#"""
+        {
+          "ratingKey": "42",
+          "title": "Keep This Track Original",
+          "type": "track",
+          "Media": [{
+            "container": "mp4",
+            "audioCodec": "aac",
+            "bitrate": "256",
+            "Part": [{"key": "/library/parts/7/track.m4a"}]
+          }]
+        }
+        """#)
+
+        _ = try await PlexAPIClient(session: session).makePlaybackPlan(
+            for: item,
+            using: try playbackConfiguration,
+            capabilities: capabilities,
+            automaticallyAdjustVideoQuality: true,
+            forceVideoTranscode: true
+        )
+
+        let queryItems = try capturedQueryItems(capture)
+        #expect(queryItems.contains { $0.name == "directPlay" && $0.value == "1" })
+        #expect(queryItems.contains { $0.name == "directStream" && $0.value == "1" })
+        #expect(queryItems.contains { $0.name == "directStreamAudio" && $0.value == "1" })
+        #expect(!queryItems.contains { $0.name == "autoAdjustQuality" })
     }
 
     @Test func forceDirectPlayUsesAnExactNativeSinglePartWithoutRequestingADecision() async throws {

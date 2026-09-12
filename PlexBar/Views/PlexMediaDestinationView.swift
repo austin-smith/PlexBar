@@ -571,6 +571,13 @@ struct PlexMediaOverview: View {
                                 .foregroundStyle(.white.opacity(0.78))
                                 .lineLimit(2)
                         }
+
+                        if let genres = PlexMediaSummaryPresentation(item: item).genres {
+                            Text(genres)
+                                .font(.headline)
+                                .foregroundStyle(.white.opacity(0.78))
+                                .lineLimit(2)
+                        }
                     }
 
                     GlassEffectContainer(spacing: 10) {
@@ -699,11 +706,7 @@ struct PlexMediaOverview: View {
     }
 
     private var heroFactsLine: String? {
-        let genres = item.genres.prefix(3).map(\.tag).joined(separator: ", ").nilIfBlank
-        return [item.factsLine, genres]
-            .compactMap { $0 }
-            .joined(separator: "  ·  ")
-            .nilIfBlank
+        PlexMediaSummaryPresentation(item: item).heroFacts
     }
 
     private var artworkURL: URL? {

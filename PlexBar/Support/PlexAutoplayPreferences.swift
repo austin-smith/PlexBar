@@ -1,5 +1,7 @@
-import AppKit
 import Foundation
+#if canImport(AppKit)
+import AppKit
+#endif
 
 enum PlexCinemaPreplayPreference: Int, CaseIterable, Identifiable, Sendable {
     case off = -1
@@ -95,6 +97,7 @@ final class PlexUserInteractionStore {
     }
 }
 
+#if canImport(AppKit)
 @MainActor
 final class PlexUserInteractionMonitor {
     nonisolated(unsafe) private var eventMonitor: Any?
@@ -126,3 +129,4 @@ final class PlexUserInteractionMonitor {
         }
     }
 }
+#endif

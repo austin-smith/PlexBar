@@ -291,11 +291,11 @@ struct PlexMediaDetailsView: View {
                     }
                     .controlSize(.large)
 
-                    if playableMediaIndices.count > 1 {
+                    if playbackVersionOptions.count > 1 {
                         Picker("Version", selection: $selectedMediaIndex) {
-                            ForEach(playableMediaIndices, id: \.self) { mediaIndex in
-                                Text(versionLabel(at: mediaIndex))
-                                    .tag(mediaIndex)
+                            ForEach(playbackVersionOptions) { option in
+                                Text(option.label)
+                                    .tag(option.id)
                             }
                         }
                         .pickerStyle(.menu)
@@ -349,11 +349,11 @@ struct PlexMediaDetailsView: View {
                 .labelStyle(.iconOnly)
             }
 
-            if playableMediaIndices.count > 1 {
+            if playbackVersionOptions.count > 1 {
                 Picker("Version", selection: $selectedMediaIndex) {
-                    ForEach(playableMediaIndices, id: \.self) { mediaIndex in
-                        Text(versionLabel(at: mediaIndex))
-                            .tag(mediaIndex)
+                    ForEach(playbackVersionOptions) { option in
+                        Text(option.label)
+                            .tag(option.id)
                     }
                 }
                 .pickerStyle(.menu)
@@ -366,6 +366,13 @@ struct PlexMediaDetailsView: View {
         VStack(alignment: .leading, spacing: 10) {
             if let factsLine = heroFactsLine {
                 Text(factsLine)
+                    .font(.headline)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .lineLimit(2)
+            }
+
+            if let genres = PlexMediaSummaryPresentation(item: item).genres {
+                Text(genres)
                     .font(.headline)
                     .foregroundStyle(.white.opacity(0.72))
                     .lineLimit(2)
@@ -390,11 +397,7 @@ struct PlexMediaDetailsView: View {
     }
 
     private var heroFactsLine: String? {
-        let genres = item.genres.prefix(3).map(\.tag).joined(separator: ", ").nilIfBlank
-        return [item.factsLine, genres]
-            .compactMap { $0 }
-            .joined(separator: "  ·  ")
-            .nilIfBlank
+        PlexMediaSummaryPresentation(item: item).heroFacts
     }
 
     private var titleBlock: some View {
@@ -561,8 +564,8 @@ struct PlexMediaDetailsView: View {
         )
     }
 
-    private var playableMediaIndices: [Int] {
-        item.media.indices.filter { !item.media[$0].parts.isEmpty }
+    private var playbackVersionOptions: [PlexPlaybackVersionOption] {
+        item.playbackVersionOptions
     }
 
     private var selectedPlaybackSource: PlexPlaybackSource? {
@@ -571,38 +574,6 @@ struct PlexMediaDetailsView: View {
 
     private var activeConnectionKind: PlexConnectionKind? {
         connectionStore.activeConnection?.kind ?? settingsStore.cachedConnectionKind
-    }
-
-    private func versionLabel(at mediaIndex: Int) -> String {
-        let version = item.media[mediaIndex]
-        var facts: [String] = []
-
-        if let width = version.width, let height = version.height {
-            facts.append("\(width) × \(height)")
-        } else if let resolution = version.videoResolution?.nilIfBlank {
-            facts.append(resolution.uppercased())
-        }
-        if let videoCodec = version.videoCodec?.nilIfBlank {
-            facts.append(videoCodec.uppercased())
-        }
-        if let bitrate = version.bitrate, bitrate > 0 {
-            facts.append(formattedBitrate(bitrate))
-        }
-        if let container = version.container?.nilIfBlank {
-            facts.append(container.uppercased())
-        }
-
-        let prefix = "\(mediaIndex + 1)"
-        return facts.isEmpty ? prefix : "\(prefix) · \(facts.joined(separator: " · "))"
-    }
-
-    private func formattedBitrate(_ kilobitsPerSecond: Int) -> String {
-        guard kilobitsPerSecond >= 1_000 else {
-            return "\(kilobitsPerSecond) kbps"
-        }
-
-        let megabitsPerSecond = Double(kilobitsPerSecond) / 1_000
-        return megabitsPerSecond.formatted(.number.precision(.fractionLength(0...1))) + " Mbps"
     }
 
     private func preparePlayback(_ startOption: PlexPlaybackStartOption) {

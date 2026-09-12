@@ -301,9 +301,7 @@ struct PlexSession: Decodable, Identifiable {
     var detailLine: String {
         switch contentKind {
         case .tv, .liveTV:
-            let episodeLabel = episodeCode
-            let pieces = [episodeLabel, title].compactMap { $0 }
-            return pieces.joined(separator: " • ")
+            return PlexEpisodeText.subtitle(season: parentIndex, episode: index, title: title)
         case .track:
             let pieces = [parentTitle, title].compactMap { $0?.nilIfBlank }
             return pieces.joined(separator: " • ")
@@ -395,6 +393,9 @@ struct PlexSession: Decodable, Identifiable {
             return nil
         }
 
+        if transcodeSession?.key == transcodeSessionKey {
+            return transcodeSession
+        }
         return PlexTranscodeSession(key: transcodeSessionKey)
     }
 
@@ -482,19 +483,8 @@ struct PlexSession: Decodable, Identifiable {
         return max(duration - min(max(viewOffset, 0), duration), 0)
     }
 
-    private var episodeCode: String? {
-        let season = parentIndex.map { "S\($0)" }
-        let episode = index.map { String(format: "E%02d", $0) }
-
-        let code = [season, episode].compactMap { $0 }.joined()
-        return code.isEmpty ? nil : code
-    }
-
     private var seasonEpisodeLine: String? {
-        let season = parentIndex.map { "S\($0)" }
-        let episode = index.map { "E\($0)" }
-        let pieces = [season, episode].compactMap { $0 }
-        return pieces.isEmpty ? nil : pieces.joined(separator: " • ")
+        PlexEpisodeText.numbers(season: parentIndex, episode: index)
     }
 
     private var preferredPosterCandidates: [String?] {
@@ -593,32 +583,59 @@ struct PlexPlaybackSession: Decodable {
 
 struct PlexTranscodeSession: Decodable {
     let key: String?
+    let videoDecision: String?
+    let audioDecision: String?
+
+    init(key: String?, videoDecision: String? = nil, audioDecision: String? = nil) {
+        self.key = key
+        self.videoDecision = videoDecision
+        self.audioDecision = audioDecision
+    }
 }
 
 struct PlexMedia: Decodable {
     let part: [PlexPart]?
+    let selected: Bool?
 
-    init(part: [PlexPart]?) {
+    init(part: [PlexPart]?, selected: Bool? = nil) {
         self.part = part
+        self.selected = selected
     }
 
     enum CodingKeys: String, CodingKey {
         case part = "Part"
+        case selected
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        part = try container.decodeIfPresent([PlexPart].self, forKey: .part)
+        selected = try container.decodeFlexibleBoolIfPresent(forKey: .selected)
     }
 }
 
 struct PlexPart: Decodable {
     let decision: String?
     let stream: [PlexStream]?
+    let selected: Bool?
 
-    init(decision: String?, stream: [PlexStream]? = nil) {
+    init(decision: String?, stream: [PlexStream]? = nil, selected: Bool? = nil) {
         self.decision = decision
         self.stream = stream
+        self.selected = selected
     }
 
     enum CodingKeys: String, CodingKey {
         case decision
         case stream = "Stream"
+        case selected
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        decision = try container.decodeIfPresent(String.self, forKey: .decision)
+        stream = try container.decodeIfPresent([PlexStream].self, forKey: .stream)
+        selected = try container.decodeFlexibleBoolIfPresent(forKey: .selected)
     }
 }
 
@@ -627,16 +644,18 @@ struct PlexStream: Decodable {
     let streamType: Int?
     let codec: String?
     let selected: Bool?
+    let decision: String?
 
     var isAudio: Bool {
         streamType == 2
     }
 
-    init(id: Int?, streamType: Int?, codec: String? = nil, selected: Bool? = nil) {
+    init(id: Int?, streamType: Int?, codec: String? = nil, selected: Bool? = nil, decision: String? = nil) {
         self.id = id
         self.streamType = streamType
         self.codec = codec
         self.selected = selected
+        self.decision = decision
     }
 
     enum CodingKeys: String, CodingKey {
@@ -644,6 +663,7 @@ struct PlexStream: Decodable {
         case streamType
         case codec
         case selected
+        case decision
     }
 
     init(from decoder: Decoder) throws {
@@ -652,6 +672,7 @@ struct PlexStream: Decodable {
         streamType = try container.decodeFlexibleIntIfPresent(forKey: .streamType)
         codec = try container.decodeIfPresent(String.self, forKey: .codec)
         selected = try container.decodeFlexibleBoolIfPresent(forKey: .selected)
+        decision = try container.decodeIfPresent(String.self, forKey: .decision)
     }
 }
 

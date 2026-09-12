@@ -37,6 +37,72 @@ import Testing
         #expect(capabilities.directPlayAudioCodecs == ["aac", "eac3", "opus"])
     }
 
+    @Test(arguments: [
+        (true, true, "h264,hevc"),
+        (false, true, "h264"),
+        (true, false, "h264"),
+    ])
+    func hlsPreservesHEVCOnlyWithNativeDecodeAndMP4Support(
+        hardwareSupportsHEVC: Bool,
+        mp4SupportsHEVC: Bool,
+        expectedVideoCodecs: String
+    ) {
+        let capabilities = NativePlaybackCapabilityProbe.capabilities(
+            hardwareDecodeSupported: { codec in
+                codec != kCMVideoCodecType_HEVC || hardwareSupportsHEVC
+            },
+            playableExtendedMIMEType: { mimeType in
+                !mimeType.contains("hvc1") || mp4SupportsHEVC
+            }
+        )
+
+        let profile = capabilities.clientProfileExtra(for: .video)
+        #expect(profile.contains(
+            "add-transcode-target(type=videoProfile&context=streaming&protocol=hls" +
+                "&container=mp4&videoCodec=\(expectedVideoCodecs)&audioCodec=aac&replace=true)"
+        ))
+        // A codec supported for files (such as AV1) is not automatically an HLS codec.
+        #expect(!profile.contains("container=mp4&videoCodec=h264,hevc,av1"))
+        #expect(!profile.contains("container=mpegts"))
+        #expect(capabilities.clientProfileExtra(for: .music).contains("container=mpegts"))
+    }
+
+    @Test func hlsDolbySupportRequiresTheMP4ContainerUsedForDelivery() {
+        let capabilities = NativePlaybackCapabilityProbe.capabilities(
+            hardwareDecodeSupported: { _ in true },
+            playableExtendedMIMEType: { $0.hasPrefix("video/mp2t;") }
+        )
+
+        #expect(capabilities.hlsStreamingAudioCodecs.isEmpty)
+    }
+
+    @Test func advertisesOnlyVerifiedDolbyCodecsForHLSStreaming() {
+        let capabilities = NativePlaybackCapabilityProbe.capabilities(
+            hardwareDecodeSupported: { _ in false },
+            playableExtendedMIMEType: { mimeType in
+                mimeType == #"video/mp4; codecs="avc1.640028, ec-3""#
+            }
+        )
+
+        #expect(capabilities.hlsStreamingAudioCodecs == ["eac3"])
+        #expect(capabilities.clientProfileExtra(for: .video).contains(
+            "add-transcode-target-codec(type=videoProfile&context=streaming" +
+                "&protocol=hls&audioCodec=eac3)"
+        ))
+    }
+
+    @Test func omitsHLSAudioAugmentationWithoutNativeContainerCodecSupport() {
+        let capabilities = NativePlaybackCapabilityProbe.capabilities(
+            hardwareDecodeSupported: { _ in false },
+            playableExtendedMIMEType: { _ in false }
+        )
+
+        #expect(capabilities.hlsStreamingAudioCodecs.isEmpty)
+        #expect(!capabilities.clientProfileExtra(for: .video).contains(
+            "add-transcode-target-codec"
+        ))
+    }
+
     @Test func derivesExactMusicContainerCodecPairsFromAudioMIMEPlayability() {
         let capabilities = NativePlaybackCapabilityProbe.capabilities(
             hardwareDecodeSupported: { _ in false },

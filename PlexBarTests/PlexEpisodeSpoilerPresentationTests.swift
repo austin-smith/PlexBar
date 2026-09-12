@@ -78,6 +78,18 @@ struct PlexEpisodeSpoilerPresentationTests {
         #expect(episode.nowPlayingArtworkPaths.isEmpty)
     }
 
+    @Test func contentProposalPrefersTheEpisodePreviewAndDeduplicatesArtwork() throws {
+        let episode = try item(
+            #"{"ratingKey":"1","type":"episode","title":"Episode","thumb":"/episode/still","art":"/show/backdrop","parentThumb":"/season/poster","grandparentThumb":"/show/backdrop"}"#
+        )
+
+        #expect(episode.contentProposalArtworkPaths == [
+            "/episode/still",
+            "/show/backdrop",
+            "/season/poster",
+        ])
+    }
+
     private func item(_ json: String) throws -> PlexMediaItem {
         try JSONDecoder().decode(PlexMediaItem.self, from: Data(json.utf8))
     }

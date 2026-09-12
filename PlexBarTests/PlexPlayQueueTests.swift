@@ -4,6 +4,66 @@ import Testing
 
 @Suite(.serialized)
 struct PlexPlayQueueTests {
+    @Test func queueMutationRequestsShareValidatedServerPathComponents() throws {
+        #expect(try PlexPlayQueueMutationRequest(
+            queueID: 91,
+            mutation: .shuffled(true)
+        ).endpointPathComponents == ["91", "shuffle"])
+        #expect(try PlexPlayQueueMutationRequest(
+            queueID: 91,
+            mutation: .shuffled(false)
+        ).endpointPathComponents == ["91", "unshuffle"])
+        #expect(try PlexPlayQueueMutationRequest(
+            queueID: 91,
+            mutation: .reset
+        ).endpointPathComponents == ["91", "reset"])
+        #expect(throws: PlexAPIError.self) {
+            _ = try PlexPlayQueueMutationRequest(
+                queueID: 0,
+                mutation: .reset
+            )
+        }
+    }
+
+    @Test func queueItemMutationRequestsShareValidatedServerContracts() throws {
+        let removal = try PlexPlayQueueItemMutationRequest(
+            queueID: 91,
+            mutation: .remove(playQueueItemID: "503")
+        )
+        #expect(removal.endpointPathComponents == ["91", "items", "503"])
+        #expect(removal.method == "DELETE")
+        #expect(removal.queryItems.isEmpty)
+
+        let move = try PlexPlayQueueItemMutationRequest(
+            queueID: 91,
+            mutation: .move(PlexPlayQueueItemMove(
+                playQueueItemID: "504",
+                afterPlayQueueItemID: "502"
+            ))
+        )
+        #expect(move.endpointPathComponents == ["91", "items", "504", "move"])
+        #expect(move.method == "PUT")
+        #expect(move.queryItems == [URLQueryItem(name: "after", value: "502")])
+
+        for invalidIdentifier in ["", " ", "item-503", "50/3"] {
+            #expect(throws: PlexAPIError.self) {
+                _ = try PlexPlayQueueItemMutationRequest(
+                    queueID: 91,
+                    mutation: .remove(playQueueItemID: invalidIdentifier)
+                )
+            }
+        }
+        #expect(throws: PlexAPIError.self) {
+            _ = try PlexPlayQueueItemMutationRequest(
+                queueID: 91,
+                mutation: .move(PlexPlayQueueItemMove(
+                    playQueueItemID: "503",
+                    afterPlayQueueItemID: "503"
+                ))
+            )
+        }
+    }
+
     @Test(arguments: [0, 2, 5])
     func createsServerAuthoredCinemaQueueWithExactPrefixCount(
         extrasPrefixCount: Int
@@ -43,12 +103,14 @@ struct PlexPlayQueueTests {
         #expect(queryValue("continuous", in: components) == "0")
         #expect(queryValue("extrasPrefixCount", in: components) == String(extrasPrefixCount))
         #expect(queue.purpose == .cinemaPreplay(primaryRatingKey: "77"))
+        #expect(queue.isCinemaPreplayQueue)
         #expect(queue.currentItem.ratingKey == "700")
         #expect(queue.isCurrentCinemaPreplayItem)
         #expect(!queue.canChangeShuffle)
         #expect(!queue.canRepeatAll)
         #expect(!queue.canAdd(movie))
         #expect(queue.move(.next)?.ratingKey == "77")
+        #expect(queue.isCinemaPreplayQueue)
         #expect(!queue.isCurrentCinemaPreplayItem)
     }
 
@@ -121,6 +183,8 @@ struct PlexPlayQueueTests {
         #expect(queue.currentItem.ratingKey == "42")
         #expect(queue.canMovePrevious)
         #expect(queue.canMoveNext)
+        #expect(queue.previousItem?.ratingKey == "41")
+        #expect(queue.nextItem?.ratingKey == "43")
     }
 
     @Test func createsContinuousTrackQueueAsDocumentedAudioType() async throws {
@@ -1086,6 +1150,24 @@ struct PlexPlayQueueTests {
         #expect(presentation.totalCount == 100)
         #expect(presentation.remainingCount == 49)
         #expect(presentation.unloadedRemainingCount == 47)
+        #expect(presentation.canRemoveUpcomingItems)
+        #expect(presentation.canReorderUpcomingItems)
+        #expect(presentation.canMoveUpcomingItem(
+            playQueueItemID: "503",
+            direction: .up
+        ) == false)
+        #expect(presentation.canMoveUpcomingItem(
+            playQueueItemID: "503",
+            direction: .down
+        ))
+        #expect(presentation.canMoveUpcomingItem(
+            playQueueItemID: "504",
+            direction: .up
+        ))
+        #expect(presentation.canMoveUpcomingItem(
+            playQueueItemID: "504",
+            direction: .down
+        ) == false)
     }
 
     @Test func movesDirectlyToAnAuthoritativeLoadedQueueItem() throws {

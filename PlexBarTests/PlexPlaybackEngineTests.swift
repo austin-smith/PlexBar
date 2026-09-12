@@ -385,8 +385,8 @@ struct PlexPlaybackEngineTests {
                     source: secondPresentation.plan.source
                 ),
                 nativeAvailability: PlexNativeMediaSelectionAvailability(
-                    hasAudio: false,
-                    hasSubtitles: true
+                    audioOptionCount: 0,
+                    subtitleOptionCount: 0
                 )
             ),
             canChange: true,
@@ -740,6 +740,59 @@ struct PlexPlaybackEngineTests {
         ])
     }
 
+    @Test func timelineReporterPreservesFinalStopAfterPeriodicCallerCancellation() async throws {
+        var events: [String] = []
+        var releasePlayingReport: CheckedContinuation<Void, Never>?
+        let reporter = PlexTimelineReportSequencer { update in
+            events.append("start-\(update.state.rawValue)")
+            if update.state == .playing {
+                await withCheckedContinuation { continuation in
+                    releasePlayingReport = continuation
+                }
+            }
+            events.append("finish-\(update.state.rawValue)")
+            return nil
+        }
+        let playingUpdate = PlexTimelineUpdate(
+            ratingKey: "42",
+            state: .playing,
+            time: 1_000,
+            duration: 10_000,
+            sessionIdentifier: "session-a"
+        )
+        let stoppedUpdate = PlexTimelineUpdate(
+            ratingKey: "42",
+            state: .stopped,
+            time: 2_000,
+            duration: 10_000,
+            sessionIdentifier: "session-a"
+        )
+
+        let periodicCaller = Task { await reporter.report(playingUpdate) }
+        for _ in 0..<20 where releasePlayingReport == nil {
+            await Task.yield()
+        }
+        let playingReportContinuation = try #require(releasePlayingReport)
+
+        periodicCaller.cancel()
+        let finalStopCaller = Task { await reporter.report(stoppedUpdate) }
+        for _ in 0..<20 {
+            await Task.yield()
+        }
+
+        #expect(events == ["start-playing"])
+
+        playingReportContinuation.resume()
+        _ = await (periodicCaller.value, finalStopCaller.value)
+
+        #expect(events == [
+            "start-playing",
+            "finish-playing",
+            "start-stopped",
+            "finish-stopped",
+        ])
+    }
+
     @Test func coordinatorRunsSeekCommandsOnlyForTheActiveSeekOwner() {
         let coordinator = PlexPlayerCoordinator()
         var offsets: [TimeInterval] = []
@@ -909,8 +962,8 @@ struct PlexPlaybackEngineTests {
                 source: PlexPlaybackSource(mediaIndex: 0, partIndex: 0)
             ),
             nativeAvailability: PlexNativeMediaSelectionAvailability(
-                hasAudio: false,
-                hasSubtitles: false
+                audioOptionCount: 0,
+                subtitleOptionCount: 0
             )
         )
         let coordinator = PlexPlayerCoordinator()

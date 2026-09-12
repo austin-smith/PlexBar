@@ -62,6 +62,7 @@ extension PlexBrowserStore {
         forceRefresh: Bool = false,
         load: (String) async throws -> [PlexMediaItem]
     ) async {
+        guard item.supportsMediaExtras else { return }
         guard connectionStore.settings.hasValidConfiguration else {
             resetMediaExtras()
             return

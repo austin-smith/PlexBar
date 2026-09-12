@@ -16,9 +16,13 @@ enum PlexConnectionStoreError: LocalizedError {
 
 extension Error {
     var isPlexConnectivityFailure: Bool {
+        plexConnectivityFailureCode != nil
+    }
+
+    var plexConnectivityFailureCode: URLError.Code? {
         let urlError = (self as? URLError) ?? (self as NSError).userInfo[NSUnderlyingErrorKey] as? URLError
         guard let urlError else {
-            return false
+            return nil
         }
 
         switch urlError.code {
@@ -42,9 +46,9 @@ extension Error {
              .cannotCloseFile,
              .cannotWriteToFile,
              .timedOut:
-            return true
+            return urlError.code
         default:
-            return false
+            return nil
         }
     }
 }

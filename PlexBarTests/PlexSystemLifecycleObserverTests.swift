@@ -7,13 +7,17 @@ import Testing
 @Test func systemWakeNotificationRunsWakeHandler() async throws {
     let notificationCenter = NotificationCenter()
     let counter = LifecycleObserverCounter()
+    let sleepCounter = LifecycleObserverCounter()
     do {
         let observer = PlexSystemLifecycleObserver(
-            notificationCenter: notificationCenter
+            notificationCenter: notificationCenter,
+            onWillSleep: { sleepCounter.increment() }
         ) {
             counter.increment()
         }
 
+        notificationCenter.post(name: NSWorkspace.willSleepNotification, object: nil)
+        #expect(sleepCounter.value == 1)
         notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
 
         await waitForLifecycleObserver {
@@ -24,6 +28,8 @@ import Testing
         withExtendedLifetime(observer) {}
     }
 
+    notificationCenter.post(name: NSWorkspace.willSleepNotification, object: nil)
+    #expect(sleepCounter.value == 1)
     notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
     try await Task.sleep(for: .milliseconds(50))
 

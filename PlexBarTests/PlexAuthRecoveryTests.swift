@@ -110,7 +110,7 @@ struct PlexAuthRecoveryTests {
         let identity = try PlexDeviceSigningIdentity.generate(keyID: "device-key")
         let authClient = PlexAuthClient(session: session)
         let tokenManager = PlexAccountJWTManager(
-            settings: settings,
+            storage: settings,
             client: authClient,
             deviceIdentityStore: PlexMemoryDeviceIdentityStore(identity: identity)
         )

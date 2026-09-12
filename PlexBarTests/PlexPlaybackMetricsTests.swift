@@ -103,12 +103,37 @@ struct PlexPlaybackMetricsTests {
         #expect(sample.measuredAt == responseEnd)
         #expect(sample.byteCount == 2_000_000)
         #expect(sample.transferDuration == 2)
+        #expect(facts.previousMeasuredBandwidth == nil)
         #expect(facts.lastMeasuredBandwidth == sample)
         #expect(facts.diagnosticFacts.last == PlexPlaybackMetricDiagnosticFact(
             kind: .measuredBandwidth,
             label: "Last Measured Bandwidth",
             value: "8 Mbps"
         ))
+    }
+
+    @Test func bandwidthFactsKeepThePreviousAndLatestExactMeasurements() throws {
+        let first = try #require(PlexPlaybackBandwidthSample(
+            byteCount: 1_000_000,
+            responseStartTime: Date(timeIntervalSince1970: 100),
+            responseEndTime: Date(timeIntervalSince1970: 102),
+            wasReadFromCache: false,
+            hadError: false
+        ))
+        let second = try #require(PlexPlaybackBandwidthSample(
+            byteCount: 3_000_000,
+            responseStartTime: Date(timeIntervalSince1970: 103),
+            responseEndTime: Date(timeIntervalSince1970: 105),
+            wasReadFromCache: false,
+            hadError: false
+        ))
+        var facts = PlexPlaybackMetricFacts()
+
+        facts.recordBandwidthSample(first)
+        facts.recordBandwidthSample(second)
+
+        #expect(facts.previousMeasuredBandwidth == first)
+        #expect(facts.lastMeasuredBandwidth == second)
     }
 
     @Test func cachedFailedEmptyAndInvalidTransfersNeverBecomeBandwidthFacts() {

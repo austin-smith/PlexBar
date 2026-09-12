@@ -1,7 +1,6 @@
 import AppKit
 import CoreGraphics
 import Foundation
-import ImageIO
 
 struct PlexFetchedImage {
     let image: NSImage
@@ -14,12 +13,22 @@ struct PlexFetchedCGImage {
 }
 
 struct PlexImageClient: Sendable {
+    // Share one transport for image loaders created throughout the app. Mock
+    // images must remain loadable after cache eviction and at any requested size.
+    static let defaultSession: URLSession = {
+        #if DEBUG && os(macOS)
+        PlexAppRuntime.makeImageSession(arguments: ProcessInfo.processInfo.arguments)
+        #else
+        URLSession.shared
+        #endif
+    }()
+
     private let session: URLSession
     private let cache: PlexImageMemoryCache
     private let requestCoordinator: PlexImageRequestCoordinator
 
     init(
-        session: URLSession = .shared,
+        session: URLSession = PlexImageClient.defaultSession,
         cache: PlexImageMemoryCache = .shared,
         requestCoordinator: PlexImageRequestCoordinator = .shared
     ) {
@@ -165,7 +174,7 @@ struct PlexImageClient: Sendable {
 
                 guard let httpResponse = response as? HTTPURLResponse,
                       (200..<300).contains(httpResponse.statusCode),
-                      let imageBox = await Self.decodeCGImage(
+                      let imageBox = await PlexImageDecoder.decodeCGImage(
                         from: data,
                         maximumPixelSize: maximumPixelSize
                       ) else {
@@ -197,30 +206,6 @@ struct PlexImageClient: Sendable {
         return url.absoluteString + sizeSuffix
     }
 
-    @concurrent
-    private static func decodeCGImage(
-        from data: Data,
-        maximumPixelSize: Int?
-    ) async -> PlexCGImageBox? {
-        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
-            return nil
-        }
-
-        if let maximumPixelSize, maximumPixelSize > 0 {
-            let options: [CFString: Any] = [
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceCreateThumbnailWithTransform: true,
-                kCGImageSourceThumbnailMaxPixelSize: maximumPixelSize,
-                kCGImageSourceShouldCache: false,
-                kCGImageSourceShouldCacheImmediately: true,
-            ]
-            return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
-                .map(PlexCGImageBox.init)
-        }
-
-        return CGImageSourceCreateImageAtIndex(source, 0, nil)
-            .map(PlexCGImageBox.init)
-    }
 }
 
 final class PlexImageMemoryCache: @unchecked Sendable {
@@ -392,13 +377,5 @@ private final class PlexArtworkPaletteBox {
 
     init(_ palette: PlexArtworkPalette) {
         self.palette = palette
-    }
-}
-
-final class PlexCGImageBox: @unchecked Sendable {
-    let image: CGImage
-
-    init(_ image: CGImage) {
-        self.image = image
     }
 }

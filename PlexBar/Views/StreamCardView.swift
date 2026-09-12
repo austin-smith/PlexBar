@@ -224,17 +224,11 @@ struct StreamCardView: View {
                             actionsButton(isTerminating: isTerminating)
                         }
 
-                    if session.contentKind == .tv || session.contentKind == .liveTV,
-                       let metaLine = session.contentMetaLine,
-                       let subtitle = session.contentSubtitle {
-                        HStack(spacing: 8) {
-                            HStack(spacing: 6) {
-                                Image(systemName: session.contentKind.contentMetaSymbolName)
-                                    .foregroundStyle(.tertiary)
-                                Text(metaLine)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Text(subtitle)
+                    if session.contentKind == .tv || session.contentKind == .liveTV {
+                        HStack(spacing: 6) {
+                            Image(systemName: session.contentKind.contentMetaSymbolName)
+                                .foregroundStyle(.tertiary)
+                            Text(session.detailLine)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }

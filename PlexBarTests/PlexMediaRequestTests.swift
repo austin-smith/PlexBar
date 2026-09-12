@@ -17,7 +17,7 @@ struct PlexMediaRequestTests {
             return (response, promotedHubsData())
         }
 
-        let hubs = try await PlexAPIClient(session: session).fetchPromotedHubs(
+        let hubs = try await PlexAPIClient(session: session).fetchHubs(
             endpointPath: "/provider/promoted?includeTypeFirst=1&count=4",
             using: try configuration,
             count: 24
@@ -191,6 +191,8 @@ struct PlexMediaRequestTests {
                 return (response, libraryProviderData())
             case "/provider/promoted":
                 return (response, promotedHubsData())
+            case "/provider/continue":
+                return (response, Data(#"{"MediaContainer":{"Hub":[]}}"#.utf8))
             default:
                 Issue.record("Unexpected request: \(request.url?.absoluteString ?? "nil")")
                 return (response, Data(#"{"MediaContainer":{}}"#.utf8))
@@ -294,6 +296,13 @@ struct PlexMediaRequestTests {
                     "url": "/library/metadata/40/clearLogo/1700000000",
                     "alt": "Example Show"
                   }],
+                  "Chapter": [{
+                    "id": 8,
+                    "index": 1,
+                    "startTimeOffset": 0,
+                    "endTimeOffset": 30000,
+                    "thumb": "/library/media/99/chapterImages/1"
+                  }],
                   "Marker": [{
                     "id": 7,
                     "type": "intro",
@@ -323,12 +332,15 @@ struct PlexMediaRequestTests {
         )
         #expect(components.path == "/library/metadata/42")
         #expect(components.queryItems == [
-            URLQueryItem(name: "includeOptionalElements", value: "Image,Marker,Rating"),
+            URLQueryItem(name: "includeOptionalElements", value: "Chapter,Image,Marker,Rating"),
             URLQueryItem(name: "includeGuids", value: "1"),
         ])
         #expect(item.clearLogoPath == "/library/metadata/40/clearLogo/1700000000")
         #expect(item.images.first?.alt == "Example Show")
         #expect(item.markers.map(\.id) == ["7"])
+        #expect(item.chapters.map(\.id) == ["8"])
+        #expect(item.chapters.first?.startTimeOffset == 0)
+        #expect(item.chapters.first?.endTimeOffset == 30_000)
         #expect(item.ratings.count == 1)
         #expect(item.ratings.first?.image == "imdb://image.rating")
         #expect(item.ratings.first?.type == "audience")
@@ -602,6 +614,9 @@ private func libraryProviderData() -> Data {
           "Feature": [{
             "type": "promoted",
             "key": "/provider/promoted?includeTypeFirst=1"
+          }, {
+            "type": "continuewatching",
+            "key": "/provider/continue"
           }, {
             "type": "search",
             "key": "/provider/search"

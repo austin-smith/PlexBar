@@ -59,7 +59,7 @@ final class PlexAuthStore {
         self.client = client
         self.deviceIdentityStore = deviceIdentityStore
         self.accountJWTManager = accountJWTManager ?? PlexAccountJWTManager(
-            settings: settings,
+            storage: settings,
             client: client,
             deviceIdentityStore: deviceIdentityStore
         )
@@ -335,14 +335,5 @@ private extension PlexAuthStore {
                 accountErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             }
         }
-    }
-}
-
-private extension PlexAuthError {
-    var requiresTokenRefresh: Bool {
-        guard case .badStatusCode(let statusCode) = self else {
-            return false
-        }
-        return statusCode == 401 || statusCode == 498
     }
 }

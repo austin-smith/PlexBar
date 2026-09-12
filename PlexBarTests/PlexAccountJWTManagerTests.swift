@@ -370,7 +370,7 @@ struct PlexAccountJWTManagerTests {
         identity: PlexDeviceSigningIdentity? = nil
     ) -> PlexAccountJWTManager {
         PlexAccountJWTManager(
-            settings: settings,
+            storage: settings,
             client: client,
             deviceIdentityStore: PlexMemoryDeviceIdentityStore(identity: identity),
             now: { now }

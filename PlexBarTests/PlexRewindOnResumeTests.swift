@@ -62,4 +62,37 @@ struct PlexRewindOnResumeTests {
             hasPendingRewind: false
         ) == .play)
     }
+
+    @Test func nativePlayPauseRemainsOwnedByAVKitUnlessPlexMustIntervene() {
+        #expect(!PlexRewindOnResumePolicy.shouldInterceptNativePlayPausePress(
+            status: .playing,
+            hasPendingRewind: false,
+            isPlaybackControlBusy: false,
+            preference: PlexRewindOnResume(seconds: 10)
+        ))
+        #expect(!PlexRewindOnResumePolicy.shouldInterceptNativePlayPausePress(
+            status: .paused,
+            hasPendingRewind: false,
+            isPlaybackControlBusy: false,
+            preference: .none
+        ))
+        #expect(PlexRewindOnResumePolicy.shouldInterceptNativePlayPausePress(
+            status: .paused,
+            hasPendingRewind: false,
+            isPlaybackControlBusy: false,
+            preference: PlexRewindOnResume(seconds: 10)
+        ))
+        #expect(PlexRewindOnResumePolicy.shouldInterceptNativePlayPausePress(
+            status: .playing,
+            hasPendingRewind: true,
+            isPlaybackControlBusy: false,
+            preference: .none
+        ))
+        #expect(PlexRewindOnResumePolicy.shouldInterceptNativePlayPausePress(
+            status: .paused,
+            hasPendingRewind: false,
+            isPlaybackControlBusy: true,
+            preference: .none
+        ))
+    }
 }

@@ -82,7 +82,8 @@ struct PlexHistoryStoreTests {
         #expect(store.devicesByID[12]?.displayLine == "Living Room · tvOS")
     }
 
-    @Test func preservesHistoryWhenAccountFetchFails() async throws {
+    @Test(arguments: [#""title": "Bob's Burgers","#, "", #""title": null,"#])
+    func preservesHistoryWhenAccountFetchFails(titleField: String) async throws {
         let suiteName = "PlexBarTests.preservesHistoryWhenAccountFetchFails"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
@@ -139,7 +140,7 @@ struct PlexHistoryStoreTests {
                             "historyKey": "/status/sessions/history/9",
                             "key": "/library/metadata/500",
                             "ratingKey": "500",
-                            "title": "Bob's Burgers",
+                            \#(titleField)
                             "type": "episode",
                             "grandparentTitle": "Bob's Burgers",
                             "viewedAt": 1712452410,
@@ -235,7 +236,11 @@ struct PlexHistoryStoreTests {
         await waitForHistoryRefresh(on: store)
 
         #expect(store.recentItems.count == 1)
-        #expect(store.recentItems.first?.title == "Bob's Burgers")
+        #expect(store.recentItems.first?.title == (titleField.contains("Bob's Burgers") ? "Bob's Burgers" : "Untitled"))
+        #expect(store.totalPlayCount == 1)
+        #expect(store.distinctViewerCount == 1)
+        #expect(store.topUserEntries.count == 1)
+        #expect(store.topTitleEntries.first?.title == "Bob's Burgers")
         #expect(store.accountsByID.isEmpty)
         #expect(store.errorMessage == nil)
         #expect(store.lastUpdated != nil)

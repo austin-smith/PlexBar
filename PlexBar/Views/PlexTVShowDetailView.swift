@@ -167,6 +167,13 @@ struct PlexTVShowDetailView: View {
                         .lineLimit(1)
                 }
 
+                if let genres = PlexMediaSummaryPresentation(item: selectedEpisode).genres {
+                    Text(genres)
+                        .font(.headline)
+                        .foregroundStyle(.white.opacity(0.72))
+                        .lineLimit(2)
+                }
+
                 if let summary = PlexEpisodeSpoilerPresentation(
                     item: selectedEpisode,
                     policy: settingsStore.episodeSpoilerPolicy
@@ -224,26 +231,7 @@ struct PlexTVShowDetailView: View {
                         .font(.title2.weight(.semibold))
                         .accessibilityAddTraits(.isHeader)
                 } else {
-                    Menu {
-                        ForEach(seasons) { season in
-                            Button {
-                                selectedSeasonID = season.id
-                            } label: {
-                                if season.id == selectedSeasonID {
-                                    Label(season.title, systemImage: "checkmark")
-                                } else {
-                                    Text(season.title)
-                                }
-                            }
-                        }
-                    } label: {
-                        Text(selectedSeason?.title ?? "Season")
-                            .font(.title2.weight(.semibold))
-                    }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
-                    .accessibilityLabel("Season")
-                    .accessibilityValue(selectedSeason?.title ?? "No season selected")
+                    PlexSeasonPicker(seasons: seasons, selection: $selectedSeasonID)
                 }
             }
 
@@ -390,9 +378,7 @@ struct PlexTVShowDetailView: View {
     }
 
     private func episodeHeading(_ episode: PlexMediaItem) -> String {
-        [episode.episodeIdentifier, episode.title]
-            .compactMap { $0?.nilIfBlank }
-            .joined(separator: " — ")
+        PlexMediaSummaryPresentation(item: episode).episodeHeading
     }
 
     private func episodeCardTitle(_ episode: PlexMediaItem) -> String {
@@ -403,16 +389,7 @@ struct PlexTVShowDetailView: View {
     }
 
     private func episodeFacts(_ episode: PlexMediaItem) -> String? {
-        [
-            episode.formattedDuration,
-            PlexMediaMetadataPresentation(item: episode).facts.first {
-                $0.kind == .releaseDate
-            }?.value,
-            episode.contentRating?.nilIfBlank,
-        ]
-        .compactMap { $0 }
-        .joined(separator: "  ·  ")
-        .nilIfBlank
+        PlexMediaSummaryPresentation(item: episode).episodeFacts
     }
 
     private func showsDownloadControl(for episode: PlexMediaItem) -> Bool {

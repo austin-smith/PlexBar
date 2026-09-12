@@ -13,6 +13,7 @@ struct MenuBarContentView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var selectedSection: DashboardSection = .streams
     @State private var streamContentHeight: CGFloat = 0
+    @State private var activitySummaryHeight: CGFloat = 0
     @State private var historyContentHeight: CGFloat = 0
     @State private var usersContentHeight: CGFloat = 0
     @State private var libraryContentHeight: CGFloat = 0
@@ -51,33 +52,33 @@ struct MenuBarContentView: View {
         }
         .padding(16)
         .frame(width: 420)
+        .modifier(PlexActivityVisibility(store: sessionStore, isEnabled: selectedSection == .streams))
         .animation(
             accessibilityReduceMotion ? nil : .snappy(duration: 0.18),
             value: terminatePrompt?.id
         )
     }
 
+    @ViewBuilder
     private var header: some View {
         switch selectedSection {
         case .streams:
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 10) {
-                    Text("Active Streams")
-                        .font(.headline)
-
-                    Spacer()
-
+            if sessionStore.lastHydratedAt != nil {
+                HStack(alignment: .top, spacing: 8) {
+                    PlexActivitySummaryView(
+                        summary: sessionStore.activitySummary,
+                        isStale: sessionStore.activityErrorMessage != nil
+                    )
                     if sessionStore.isLoading {
                         ProgressView()
                             .controlSize(.small)
                     }
                 }
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.height
+                } action: { height in
+                    activitySummaryHeight = height
+                }
             }
         case .history:
             VStack(alignment: .leading, spacing: 4) {
@@ -198,7 +199,10 @@ struct MenuBarContentView: View {
                 librariesContent
             }
 
-            if let inlineErrorMessage = selectedSection.inlineErrorMessage(
+            if selectedSection == .streams, !sessionStore.sessions.isEmpty,
+               let message = sessionStore.activityErrorMessage {
+                InlineWarningBanner(message: message)
+            } else if let inlineErrorMessage = selectedSection.inlineErrorMessage(
                 sessionStore: sessionStore,
                 historyStore: historyStore,
                 libraryStore: libraryStore
@@ -210,7 +214,7 @@ struct MenuBarContentView: View {
 
     @ViewBuilder
     private var streamsContent: some View {
-        if let errorMessage = sessionStore.errorMessage, sessionStore.sessions.isEmpty {
+        if let errorMessage = sessionStore.activityErrorMessage ?? sessionStore.errorMessage, sessionStore.sessions.isEmpty {
             EmptyStateView(
                 icon: "exclamationmark.triangle",
                 title: "Couldn’t Reach Plex",
@@ -219,6 +223,9 @@ struct MenuBarContentView: View {
             ) {
                 refreshAllData()
             }
+        } else if sessionStore.lastHydratedAt == nil {
+            ProgressView("Loading activity…")
+                .frame(maxWidth: .infinity, minHeight: 132)
         } else if sessionStore.sessions.isEmpty {
             EmptyStateView(
                 icon: "popcorn",
@@ -419,15 +426,11 @@ struct MenuBarContentView: View {
 
         switch selectedSection {
         case .streams:
-            let count = sessionStore.activeStreamCount
-            let streamsLabel = count == 1 ? "1 stream" : "\(count) streams"
-
-            if let lastUpdated = sessionStore.lastUpdated {
-                return "\(streamsLabel) on \(serverLabel) • Updated \(lastUpdated.formatted(date: .omitted, time: .shortened))"
-            }
-
-            return "\(streamsLabel) on \(serverLabel)"
+            return serverLabel
         case .history:
+            guard historyStore.lastUpdated != nil else {
+                return "Watch history on \(serverLabel)"
+            }
             let count = historyStore.totalPlayCount
             let historyLabel = count == 1
                 ? "1 watch in \(historyStore.historyWindowLabel.lowercased())"
@@ -439,6 +442,9 @@ struct MenuBarContentView: View {
 
             return "\(historyLabel) on \(serverLabel)"
         case .users:
+            guard historyStore.lastUpdated != nil else {
+                return "User activity on \(serverLabel)"
+            }
             let viewerCount = historyStore.distinctViewerCount
             let userLabel = viewerCount == 1
                 ? "1 user in \(historyStore.historyWindowLabel.lowercased())"
@@ -524,7 +530,9 @@ struct MenuBarContentView: View {
             return fallbackHeight
         }
 
-        let reservedVerticalChrome: CGFloat = playerCoordinator.currentPlayback == nil ? 180 : 280
+        let summaryHeight = selectedSection == .streams && sessionStore.lastHydratedAt != nil ? activitySummaryHeight : 0
+        let baseChrome: CGFloat = selectedSection == .streams ? 140 : 180
+        let reservedVerticalChrome = baseChrome + (playerCoordinator.currentPlayback == nil ? 0 : 100) + summaryHeight
         let screenAwareHeight = max(visibleFrame.height - reservedVerticalChrome, 360)
         return min(screenAwareHeight, fallbackHeight)
     }
@@ -776,7 +784,7 @@ private struct EmptyStateView: View {
     }
 }
 
-private struct InlineWarningBanner: View {
+struct InlineWarningBanner: View {
     let message: String
 
     var body: some View {

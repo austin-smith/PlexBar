@@ -41,6 +41,7 @@ import Testing
     )
 
     #expect(session.posterPath == "/library/metadata/show-thumb")
+    #expect(session.detailLine == "S51 • E17 - Colman Domingo; Anitta")
 }
 
 @Test func classifiesMovieSessionFromExplicitType() async throws {

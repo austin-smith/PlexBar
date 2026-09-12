@@ -35,12 +35,18 @@ enum NativePlaybackCapabilityProbe {
                 audioCodec: candidate.plexCodec
             )
         }
+        let hlsAudioCodecs: [String] = hlsAudioCandidates.compactMap { candidate in
+            playableExtendedMIMEType(candidate.extendedMIMEType)
+                ? candidate.plexCodec
+                : nil
+        }
 
         return PlexPlaybackCapabilities(
             directPlayContainers: ["m4v", "mov", "mp4"],
             directPlayVideoCodecs: Set(videoCodecs),
             directPlayAudioCodecs: Set(audioCodecs),
-            directPlayMusicProfiles: Set(musicProfiles)
+            directPlayMusicProfiles: Set(musicProfiles),
+            hlsStreamingAudioCodecs: Set(hlsAudioCodecs)
         )
     }
 
@@ -120,6 +126,17 @@ enum NativePlaybackCapabilityProbe {
             plexContainer: "ogg",
             plexCodec: "opus",
             extendedMIMEType: #"audio/ogg; codecs="opus""#
+        ),
+    ]
+
+    private static let hlsAudioCandidates = [
+        AudioCandidate(
+            plexCodec: "ac3",
+            extendedMIMEType: #"video/mp4; codecs="avc1.640028, ac-3""#
+        ),
+        AudioCandidate(
+            plexCodec: "eac3",
+            extendedMIMEType: #"video/mp4; codecs="avc1.640028, ec-3""#
         ),
     ]
 }

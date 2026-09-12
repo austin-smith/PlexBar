@@ -1,8 +1,14 @@
-import AppKit
 import CoreGraphics
 import Foundation
 @preconcurrency import MediaPlayer
 
+#if os(macOS)
+import AppKit
+#elseif os(tvOS)
+import UIKit
+#endif
+
+#if os(macOS)
 struct PlexNowPlayingArtworkRequest: Hashable, Sendable {
     static let maximumPixelSize = 1_200
 
@@ -72,14 +78,19 @@ final class PlexNowPlayingArtworkLoader {
         loadGeneration &+= 1
     }
 }
+#endif
 
 enum PlexNowPlayingArtworkFactory {
     static func make(from image: CGImage) -> MPMediaItemArtwork {
-        let imageBox = PlexCGImageBox(image)
+        let imageBox = PlexNowPlayingArtworkImageBox(image)
         let boundsSize = CGSize(width: image.width, height: image.height)
         return MPMediaItemArtwork(boundsSize: boundsSize) { requestedSize in
+#if os(macOS)
             let size = validRequestedSize(requestedSize, boundedBy: boundsSize)
             return NSImage(cgImage: imageBox.image, size: size)
+#elseif os(tvOS)
+            return UIImage(cgImage: imageBox.image)
+#endif
         }
     }
 
@@ -97,6 +108,14 @@ enum PlexNowPlayingArtworkFactory {
             width: min(requestedSize.width, boundsSize.width),
             height: min(requestedSize.height, boundsSize.height)
         )
+    }
+}
+
+private final class PlexNowPlayingArtworkImageBox: @unchecked Sendable {
+    let image: CGImage
+
+    init(_ image: CGImage) {
+        self.image = image
     }
 }
 
@@ -156,9 +175,14 @@ struct PlexNowPlayingLanguageOptions {
         var currentOptions: [MPNowPlayingInfoLanguageOption] = []
         var hasSelectedSubtitle = false
 
-        if !nativeAvailability.hasAudio,
+        let serverManagedSelection = PlexServerManagedMediaSelection(
+            selection: selection,
+            nativeAvailability: nativeAvailability
+        )
+
+        if !serverManagedSelection.audioOptions.isEmpty,
            let audioGroup = Self.group(
-               options: selection.audioOptions,
+               options: serverManagedSelection.audioOptions,
                type: .audible,
                requiresMultipleOptions: true,
                allowsEmptySelection: false
@@ -169,9 +193,9 @@ struct PlexNowPlayingLanguageOptions {
             }
         }
 
-        if !nativeAvailability.hasSubtitles,
+        if !serverManagedSelection.subtitleOptions.isEmpty,
            let subtitleGroup = Self.group(
-               options: selection.subtitleOptions,
+               options: serverManagedSelection.subtitleOptions,
                type: .legible,
                requiresMultipleOptions: false,
                allowsEmptySelection: true
@@ -358,11 +382,11 @@ struct PlexNowPlayingMetadata: Equatable, Sendable {
         queuePosition: Int? = nil,
         queueCount: Int? = nil
     ) {
-        title = item.title
+        let presentation = PlexPlayerPlaybackInfoPresentation(item: item)
+        title = presentation.title
         artist = item.grandparentTitle?.nilIfBlank ?? item.originalTitle?.nilIfBlank
         albumTitle = item.parentTitle?.nilIfBlank
-        let genres = item.genres.compactMap(\.tag.nilIfBlank)
-        genre = genres.isEmpty ? nil : genres.joined(separator: ", ")
+        genre = presentation.genre
         mediaKind = Self.mediaKind(for: item.type)
         self.duration = duration.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
         creditsStartTime = PlexPlaybackMarkerAction.creditsStartTime(
@@ -510,6 +534,7 @@ struct PlexNowPlayingMetadata: Equatable, Sendable {
     }
 }
 
+#if os(macOS)
 struct PlexRemotePlaybackActions: Sendable {
     let play: @MainActor @Sendable () -> Void
     let pause: @MainActor @Sendable () -> Void
@@ -875,6 +900,7 @@ final class PlexNowPlayingController {
             canChangeLanguageOptions && languageOptions.hasSelectedSubtitle
     }
 }
+#endif
 
 private extension PlexMediaItem {
     var nowPlayingCollectionRatingKey: String? {
@@ -889,6 +915,7 @@ private extension PlexMediaItem {
     }
 }
 
+#if os(macOS)
 private extension PlexPlaybackRepeatMode {
     init?(remoteCommandValue: MPRepeatType) {
         switch remoteCommandValue {
@@ -926,3 +953,4 @@ private extension PlexPlaybackStatus {
         }
     }
 }
+#endif

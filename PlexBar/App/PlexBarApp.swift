@@ -62,9 +62,10 @@ struct PlexBarApp: App {
         _mainNavigationStore = State(initialValue: PlexMainNavigationStore())
         _serverPreviewStore = State(initialValue: serverPreviewStore)
         _authStore = State(initialValue: authStore)
-        systemLifecycleObserver = PlexSystemLifecycleObserver {
-            sessionStore.refreshNow()
-        }
+        systemLifecycleObserver = PlexSystemLifecycleObserver(
+            onWillSleep: { sessionStore.systemWillSleep() },
+            onDidWake: { sessionStore.systemDidWake() }
+        )
         userInteractionMonitor = PlexUserInteractionMonitor(store: userInteractionStore)
         updateService = PlexUpdateService()
         let downloadCreationStore = PlexDownloadCreationStore(

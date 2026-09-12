@@ -181,7 +181,7 @@
         "bandwidth": 12000,
         "location": "lan"
       },
-      "mediaDecision": "direct play"
+      "mediaDecision": "directplay"
     },
     {
       "sessionKey": "stream-2",
@@ -210,7 +210,11 @@
       "transcodeSession": {
         "key": "transcode-2"
       },
-      "mediaDecision": "transcode"
+      "mediaDecision": "transcode",
+      "mediaStreams": [
+        { "streamType": 1, "decision": "copy" },
+        { "streamType": 2, "selected": true, "decision": "transcode" }
+      ]
     },
     {
       "sessionKey": "stream-3",
@@ -236,7 +240,11 @@
         "bandwidth": 10200,
         "location": "lan"
       },
-      "mediaDecision": "direct play"
+      "mediaDecision": "transcode",
+      "mediaStreams": [
+        { "streamType": 1, "decision": "copy" },
+        { "streamType": 2, "selected": true, "decision": "copy" }
+      ]
     },
     {
       "sessionKey": "stream-4",
@@ -262,7 +270,7 @@
         "bandwidth": 320,
         "location": "wan"
       },
-      "mediaDecision": "direct play",
+      "mediaDecision": "directplay",
       "audioStream": {
         "id": 3103001,
         "streamType": 2,

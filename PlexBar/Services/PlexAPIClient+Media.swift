@@ -102,7 +102,7 @@ extension PlexAPIClient {
         using configuration: PlexConnectionConfiguration
     ) async throws -> PlexMediaItem {
         try await fetchMediaMetadata(
-            path: "/library/metadata/\(ratingKey)?includeOptionalElements=Image,Marker,Rating&includeGuids=1",
+            path: "/library/metadata/\(ratingKey)?includeOptionalElements=Chapter,Image,Marker,Rating&includeGuids=1",
             using: configuration
         )
     }
@@ -132,7 +132,23 @@ extension PlexAPIClient {
         }
     }
 
-    func fetchPromotedHubs(
+    func fetchHomeHubs(
+        endpoints: PlexLibraryProviderEndpoints,
+        using configuration: PlexConnectionConfiguration,
+        count: Int = 20
+    ) async throws -> [PlexHub] {
+        guard let promotedPath = endpoints.promotedPath else {
+            throw PlexAPIError.missingLibraryPromotedFeature
+        }
+        guard let continueWatchingPath = endpoints.continueWatchingPath else {
+            throw PlexAPIError.missingLibraryContinueWatchingFeature
+        }
+        async let promoted = fetchHubs(endpointPath: promotedPath, using: configuration, count: count)
+        async let continuation = fetchHubs(endpointPath: continueWatchingPath, using: configuration, count: count)
+        return try await PlexHub.homeHubs(promoted: promoted, continueWatching: continuation)
+    }
+
+    func fetchHubs(
         endpointPath: String,
         using configuration: PlexConnectionConfiguration,
         count: Int = 20
@@ -289,7 +305,15 @@ extension PlexAPIClient {
         capabilities: PlexPlaybackCapabilities,
         source requestedSource: PlexPlaybackSource? = nil,
         videoQuality: PlexVideoQuality = .original,
+        musicQuality: PlexMusicQuality = .original,
+        audioBoost: PlexAudioBoost = .none,
         streamingPolicy: PlexPlaybackStreamingPolicy = .automatic,
+        subtitleBurnMode: PlexSubtitleBurnMode = .automatic,
+        subtitleSize: PlexSubtitleSize = .normal,
+        automaticallySyncSubtitles: Bool = true,
+        automaticallyAdjustVideoQuality: Bool = false,
+        playSmallerVideosAtOriginalQuality: Bool = true,
+        forceVideoTranscode: Bool = false,
         startTimeOverride: TimeInterval? = nil,
         forceServerMediaSelection: Bool = false
     ) async throws -> PlexPlaybackPlan {
@@ -314,7 +338,15 @@ extension PlexAPIClient {
             item: item,
             source: source,
             videoQuality: videoQuality,
+            musicQuality: musicQuality,
+            audioBoost: audioBoost,
             streamingPolicy: streamingPolicy,
+            subtitleBurnMode: subtitleBurnMode,
+            subtitleSize: subtitleSize,
+            automaticallySyncSubtitles: automaticallySyncSubtitles,
+            automaticallyAdjustVideoQuality: automaticallyAdjustVideoQuality,
+            playSmallerVideosAtOriginalQuality: playSmallerVideosAtOriginalQuality,
+            forceVideoTranscode: forceVideoTranscode,
             sessionIdentifier: sessionIdentifier,
             startTime: startTime,
             forceServerMediaSelection: forceServerMediaSelection
@@ -370,7 +402,10 @@ extension PlexAPIClient {
             duration: item.duration.map { TimeInterval($0) / 1_000 },
             startTime: startTime,
             source: source,
-            usesServerMediaSelection: forceServerMediaSelection
+            usesServerMediaSelection: forceServerMediaSelection,
+            supportsAudioBoost: selection.supportsAudioBoost
+                && requestParameters.hasMultichannelAudioSource,
+            supportsSubtitleAutoSync: requestParameters.supportsSubtitleAutoSync
         )
     }
 
@@ -381,25 +416,22 @@ extension PlexAPIClient {
         allParts: Bool = true,
         using configuration: PlexConnectionConfiguration
     ) async throws {
-        guard audioStreamID != nil || subtitleStreamID != nil else {
+        let parameters = PlexMediaSelectionRequestParameters(
+            partID: partID,
+            audioStreamID: audioStreamID,
+            subtitleStreamID: subtitleStreamID,
+            allParts: allParts
+        )
+        guard parameters.hasSelection else {
             throw PlexAPIError.invalidResponse
         }
         guard let endpoint = PlexURLBuilder.endpointURL(
             serverURL: configuration.serverURL,
-            path: "/library/parts/\(partID)"
+            path: parameters.path
         ), var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
             throw PlexAPIError.invalidServerURL
         }
-
-        var queryItems: [URLQueryItem] = []
-        if let audioStreamID {
-            queryItems.append(URLQueryItem(name: "audioStreamID", value: String(audioStreamID)))
-        }
-        if let subtitleStreamID {
-            queryItems.append(URLQueryItem(name: "subtitleStreamID", value: String(subtitleStreamID)))
-        }
-        queryItems.append(URLQueryItem(name: "allParts", value: allParts ? "1" : "0"))
-        components.queryItems = queryItems
+        components.queryItems = parameters.queryItems
 
         guard let url = components.url else {
             throw PlexAPIError.invalidServerURL
@@ -420,7 +452,8 @@ extension PlexAPIClient {
         ), var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false) else {
             throw PlexAPIError.invalidServerURL
         }
-        components.queryItems = (components.queryItems ?? []) + timelineQueryItems(update)
+        components.queryItems = (components.queryItems ?? [])
+            + PlexTimelineRequestParameters(update: update).queryItems
 
         guard let url = components.url else {
             throw PlexAPIError.invalidServerURL
@@ -524,30 +557,14 @@ extension PlexAPIClient {
         from decision: PlexPlaybackDecisionContainer,
         mediaKind: PlexPlaybackMediaKind
     ) throws -> PlexPlaybackSelection {
-        if let code = decision.generalDecisionCode,
-           !(1_000..<2_000).contains(code) {
-            throw PlexAPIError.playbackRejected(
-                decision.generalDecisionText ?? "decision code \(code)"
-            )
-        }
-
-        guard let item = decision.metadata.first,
-              let media = item.media.first(where: { $0.selected == true }) ?? item.media.first,
-              let part = media.parts.first(where: { $0.selected == true }) ?? media.parts.first else {
+        switch PlexPlaybackDecisionResolver.resolve(decision, mediaKind: mediaKind) {
+        case .selected(let selection):
+            return selection
+        case .rejected(let reason):
+            throw PlexAPIError.playbackRejected(reason)
+        case .noPlayableMedia:
             throw PlexAPIError.noPlayableMedia
         }
-
-        if part.decision?.lowercased() == "directplay", let key = part.key {
-            return PlexPlaybackSelection(method: .directPlay, path: key)
-        }
-
-        let transcodes = part.streams.contains { stream in
-            ["transcode", "burn"].contains(stream.decision?.lowercased())
-        }
-        return PlexPlaybackSelection(
-            method: transcodes ? .transcode : .directStream,
-            path: mediaKind.startPath
-        )
     }
 
     private func playbackURL(
@@ -585,26 +602,6 @@ extension PlexAPIClient {
         return url
     }
 
-    private func timelineQueryItems(_ update: PlexTimelineUpdate) -> [URLQueryItem] {
-        var queryItems = [
-            URLQueryItem(name: "key", value: "/library/metadata/\(update.ratingKey)"),
-            URLQueryItem(name: "ratingKey", value: update.ratingKey),
-            URLQueryItem(name: "state", value: update.state.rawValue),
-            URLQueryItem(name: "time", value: String(max(update.time, 0))),
-            URLQueryItem(name: "duration", value: String(max(update.duration, 0)))
-        ]
-        if let playQueueItemID = update.playQueueItemID?.nilIfBlank {
-            queryItems.append(URLQueryItem(name: "playQueueItemID", value: playQueueItemID))
-        }
-        if update.state == .stopped, let continuing = update.continuing {
-            queryItems.append(URLQueryItem(name: "continuing", value: continuing ? "1" : "0"))
-        }
-        if update.offline {
-            queryItems.append(URLQueryItem(name: "offline", value: "1"))
-        }
-        return queryItems
-    }
-
     private func authenticatedMediaURL(
         configuration: PlexConnectionConfiguration,
         path: String,
@@ -625,9 +622,4 @@ extension PlexAPIClient {
         ]
         return components.url
     }
-}
-
-private struct PlexPlaybackSelection {
-    let method: PlexPlaybackPlan.Method
-    let path: String
 }

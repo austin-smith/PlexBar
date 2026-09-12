@@ -4,6 +4,23 @@ import Testing
 
 @Suite(.serialized)
 struct PlexMediaExtrasTests {
+    @MainActor
+    @Test func anExtraDoesNotRequestItsOwnExtras() async throws {
+        let suiteName = "PlexBarTests.extraDoesNotHaveExtras"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = try makeStore(defaults: defaults, scenario: MediaExtrasScenario())
+        let clip = try JSONDecoder().decode(PlexMediaItem.self, from: Data(
+            #"{"ratingKey":"42","type":"clip","title":"Trailer"}"#.utf8
+        ))
+        await store.loadMediaExtras(for: clip) { _ in
+            Issue.record("An extra must not request the unsupported nested extras endpoint.")
+            return []
+        }
+        #expect(store.mediaExtras(for: clip).isEmpty)
+        #expect(store.mediaExtrasErrorMessage(for: clip) == nil)
+    }
+
     @Test func documentedPrimaryExtraKeyProducesOnlyServerSupportedDetailActions() throws {
         let movie = try JSONDecoder().decode(
             PlexMediaItem.self,

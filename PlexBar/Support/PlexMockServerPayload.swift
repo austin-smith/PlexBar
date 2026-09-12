@@ -148,6 +148,7 @@ extension PlexMockServerPayload {
         let session: PlaybackSession?
         let transcodeSession: TranscodeSession?
         let mediaDecision: String?
+        let mediaStreams: [PlexStream]?
         let audioStream: AudioStream?
     }
 

@@ -43,36 +43,6 @@ enum PlexDownloadVideoQuality: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum PlexDownloadMusicQuality: String, CaseIterable, Identifiable, Sendable {
-    case original
-    case kbps320
-    case kbps256
-    case kbps192
-    case kbps128
-
-    var id: Self { self }
-
-    var label: String {
-        switch self {
-        case .original: "Original"
-        case .kbps320: "320 kbps"
-        case .kbps256: "256 kbps"
-        case .kbps192: "192 kbps"
-        case .kbps128: "128 kbps"
-        }
-    }
-
-    fileprivate var bitrate: Int? {
-        switch self {
-        case .original: nil
-        case .kbps320: 320
-        case .kbps256: 256
-        case .kbps192: 192
-        case .kbps128: 128
-        }
-    }
-}
-
 enum PlexDownloadSubtitlePreference: String, CaseIterable, Identifiable, Sendable {
     case selectable
     case burn
@@ -111,7 +81,7 @@ struct PlexDownloadPreferences: Equatable, Sendable {
     )
 
     let videoQuality: PlexDownloadVideoQuality
-    let musicQuality: PlexDownloadMusicQuality
+    let musicQuality: PlexMusicQuality
     let subtitlePreference: PlexDownloadSubtitlePreference
 
     func decisionParameters(
@@ -260,18 +230,6 @@ private extension PlexDownloadVideoQuality {
         return width > constraints.width
             || height > constraints.height
             || bitrate > constraints.bitrate
-    }
-}
-
-private extension PlexDownloadMusicQuality {
-    func limits(media: PlexMediaVersion) -> Bool {
-        guard let bitrate else {
-            return false
-        }
-        guard let sourceBitrate = media.positiveBitrate else {
-            return true
-        }
-        return sourceBitrate > bitrate
     }
 }
 

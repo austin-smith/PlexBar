@@ -89,7 +89,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
         historyKey = try container.decodeIfPresent(String.self, forKey: .historyKey)
         key = try container.decodeIfPresent(String.self, forKey: .key)
         ratingKey = try container.decodeIfPresent(String.self, forKey: .ratingKey)
-        title = try container.decode(String.self, forKey: .title)
+        title = try container.decodeIfPresent(String.self, forKey: .title) ?? "Untitled"
         type = try container.decodeIfPresent(String.self, forKey: .type)
         thumb = try container.decodeIfPresent(String.self, forKey: .thumb)
         parentThumb = try container.decodeIfPresent(String.self, forKey: .parentThumb)
@@ -174,8 +174,7 @@ struct PlexHistoryItem: Decodable, Identifiable {
     var detailLine: String? {
         switch contentKind {
         case .tv:
-            let pieces = [episodeCode, title.nilIfBlank].compactMap { $0 }
-            return pieces.isEmpty ? nil : pieces.joined(separator: " • ")
+            return PlexEpisodeText.subtitle(season: parentIndex, episode: index, title: title).nilIfBlank
         case .track:
             let pieces = [parentTitle?.nilIfBlank, title.nilIfBlank].compactMap { $0 }
             return pieces.isEmpty ? nil : pieces.joined(separator: " • ")
@@ -299,13 +298,6 @@ struct PlexHistoryItem: Decodable, Identifiable {
         }
 
         return String(component).nilIfBlank
-    }
-
-    private var episodeCode: String? {
-        let season = parentIndex.map { "S\($0)" }
-        let episode = index.map { String(format: "E%02d", $0) }
-        let code = [season, episode].compactMap { $0 }.joined()
-        return code.isEmpty ? nil : code
     }
 
     private var preferredPosterCandidates: [String?] {

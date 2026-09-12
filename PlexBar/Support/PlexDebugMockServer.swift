@@ -375,12 +375,17 @@ private struct PlexDebugMockFixture {
                                     },
                                 ],
                                 ["type": "promoted", "key": "/hubs/promoted"],
+                                ["type": "continuewatching", "key": "/hubs/continueWatching"],
                                 ["type": "search", "key": "/hubs/search"],
                             ],
                         ]]
                     ]
                 ]
             )
+        }
+
+        if url.path == "/hubs/continueWatching" {
+            return jsonResponse(url: url, object: ["MediaContainer": ["Hub": []]])
         }
 
         if url.path == "/hubs/promoted" {
@@ -886,9 +891,10 @@ private struct PlexDebugMockFixture {
 
         if let media = session.media {
             object["Media"] = media.map { media in
-                [
+                compactObject([
+                    "selected": media.selected,
                     "Part": (media.part ?? []).map { part in
-                        var partObject = compactObject(["decision": part.decision])
+                        var partObject = compactObject(["decision": part.decision, "selected": part.selected])
 
                         if let stream = part.stream {
                             partObject["Stream"] = stream.map { stream in
@@ -897,13 +903,14 @@ private struct PlexDebugMockFixture {
                                     "streamType": stream.streamType,
                                     "codec": stream.codec,
                                     "selected": stream.selected,
+                                    "decision": stream.decision,
                                 ])
                             }
                         }
 
                         return partObject
                     }
-                ]
+                ])
             }
         }
 
@@ -1262,7 +1269,7 @@ private struct PlexDebugMockFixture {
             }
             mediaParts = [PlexMedia(part: [PlexPart(
                 decision: session.mediaDecision,
-                stream: stream.map { [$0] }
+                stream: (session.mediaStreams ?? []) + (stream.map { [$0] } ?? [])
             )])]
         } else {
             mediaParts = nil

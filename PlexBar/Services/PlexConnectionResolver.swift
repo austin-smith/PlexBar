@@ -14,6 +14,7 @@ actor PlexConnectionResolver {
         clientContext: PlexClientContext,
         cachedURL: URL?
     ) async throws -> PlexResolvedConnection {
+        var failureCodes: [URLError.Code] = []
         if let cachedURL,
            let cachedConnection = server.connections.first(where: { $0.uri == cachedURL }) {
             switch try await probe(
@@ -24,8 +25,8 @@ actor PlexConnectionResolver {
             ) {
             case .success(let resolved):
                 return resolved
-            case .unreachable:
-                break
+            case .unreachable(let code):
+                failureCodes.append(code)
             case .hardFailure(let error):
                 throw error
             }
@@ -42,13 +43,14 @@ actor PlexConnectionResolver {
                 candidates,
                 expectedServerID: server.id,
                 token: server.accessToken,
-                clientContext: clientContext
+                clientContext: clientContext,
+                failureCodes: &failureCodes
             ) {
                 return resolved
             }
         }
 
-        throw PlexConnectionResolutionError.noReachableConnection(server.name)
+        throw PlexServerConnectionFailure(serverName: server.name, failureCodes: failureCodes)
     }
 
     func validateCachedConnection(
@@ -74,11 +76,9 @@ actor PlexConnectionResolver {
             return resolved
         case .hardFailure(let error):
             throw error
-        case .unreachable:
-            break
+        case .unreachable(let code):
+            throw PlexServerConnectionFailure(serverName: url.host ?? "server", failureCodes: [code])
         }
-
-        throw PlexConnectionResolutionError.noReachableConnection(url.host ?? "server")
     }
 
     private func rankedConnections(for connections: [PlexServerConnection]) -> [PlexServerConnection] {
@@ -101,7 +101,8 @@ actor PlexConnectionResolver {
         _ connections: [PlexServerConnection],
         expectedServerID: String,
         token: String,
-        clientContext: PlexClientContext
+        clientContext: PlexClientContext,
+        failureCodes: inout [URLError.Code]
     ) async throws -> PlexResolvedConnection? {
         for connection in connections {
             switch try await probe(
@@ -112,7 +113,8 @@ actor PlexConnectionResolver {
             ) {
             case .success(let resolved):
                 return resolved
-            case .unreachable:
+            case .unreachable(let code):
+                failureCodes.append(code)
                 continue
             case .hardFailure(let error):
                 throw error
@@ -159,8 +161,8 @@ actor PlexConnectionResolver {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            if error.isPlexConnectivityFailure {
-                return .unreachable
+            if let code = error.plexConnectivityFailureCode {
+                return .unreachable(code)
             }
 
             return .hardFailure(error)
@@ -170,18 +172,15 @@ actor PlexConnectionResolver {
 
 private enum ConnectionProbeResult {
     case success(PlexResolvedConnection)
-    case unreachable
+    case unreachable(URLError.Code)
     case hardFailure(Error)
 }
 
 enum PlexConnectionResolutionError: LocalizedError {
-    case noReachableConnection(String)
     case identityMismatch(expected: String, actual: String, url: URL)
 
     var errorDescription: String? {
         switch self {
-        case .noReachableConnection(let serverName):
-            return "PlexBar could not reach any advertised connection for \(serverName)."
         case .identityMismatch(let expected, let actual, let url):
             return "PlexBar expected server \(expected) at \(url.host ?? url.absoluteString), but PMS reported \(actual)."
         }
