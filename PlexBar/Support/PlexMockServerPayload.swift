@@ -146,7 +146,7 @@ extension PlexMockServerPayload {
         let viewOffset: Int?
         let player: Player
         let session: PlaybackSession?
-        let transcodeSession: TranscodeSession?
+        let transcodeSession: PlexTranscodeSession?
         let mediaDecision: String?
         let mediaStreams: [PlexStream]?
         let audioStream: AudioStream?
@@ -229,12 +229,5 @@ extension PlexMockServerPayload {
         }
     }
 
-    struct TranscodeSession: Decodable {
-        let key: String?
-
-        func materialize() -> PlexTranscodeSession {
-            PlexTranscodeSession(key: key)
-        }
-    }
 }
 #endif

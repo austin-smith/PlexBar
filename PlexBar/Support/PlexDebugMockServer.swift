@@ -886,7 +886,17 @@ private struct PlexDebugMockFixture {
         ])
 
         if let transcodeSession = session.transcodeSession {
-            object["TranscodeSession"] = compactObject(["key": transcodeSession.key])
+            object["TranscodeSession"] = compactObject([
+                "key": transcodeSession.key,
+                "videoDecision": transcodeSession.videoDecision,
+                "audioDecision": transcodeSession.audioDecision,
+                "sourceVideoCodec": transcodeSession.sourceVideoCodec,
+                "sourceAudioCodec": transcodeSession.sourceAudioCodec,
+                "videoCodec": transcodeSession.videoCodec,
+                "audioCodec": transcodeSession.audioCodec,
+                "transcodeHwDecoding": transcodeSession.transcodeHwDecoding,
+                "transcodeHwEncoding": transcodeSession.transcodeHwEncoding,
+            ])
         }
 
         if let media = session.media {
@@ -904,6 +914,9 @@ private struct PlexDebugMockFixture {
                                     "codec": stream.codec,
                                     "selected": stream.selected,
                                     "decision": stream.decision,
+                                    "displayTitle": stream.displayTitle,
+                                    "language": stream.language,
+                                    "bitrate": stream.bitrate,
                                 ])
                             }
                         }
@@ -1297,7 +1310,7 @@ private struct PlexDebugMockFixture {
             user: user,
             player: session.player.materialize(),
             session: session.session?.materialize(),
-            transcodeSession: session.transcodeSession?.materialize(),
+            transcodeSession: session.transcodeSession,
             media: mediaParts
         )
     }

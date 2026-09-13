@@ -585,11 +585,26 @@ struct PlexTranscodeSession: Decodable {
     let key: String?
     let videoDecision: String?
     let audioDecision: String?
+    let transcodeHwDecoding: String?
+    let transcodeHwEncoding: String?
+    let sourceVideoCodec: String?
+    let sourceAudioCodec: String?
+    let videoCodec: String?
+    let audioCodec: String?
 
-    init(key: String?, videoDecision: String? = nil, audioDecision: String? = nil) {
+    init(key: String?, videoDecision: String? = nil, audioDecision: String? = nil,
+         transcodeHwDecoding: String? = nil, transcodeHwEncoding: String? = nil,
+         sourceVideoCodec: String? = nil, sourceAudioCodec: String? = nil,
+         videoCodec: String? = nil, audioCodec: String? = nil) {
         self.key = key
         self.videoDecision = videoDecision
         self.audioDecision = audioDecision
+        self.transcodeHwDecoding = transcodeHwDecoding
+        self.transcodeHwEncoding = transcodeHwEncoding
+        self.sourceVideoCodec = sourceVideoCodec
+        self.sourceAudioCodec = sourceAudioCodec
+        self.videoCodec = videoCodec
+        self.audioCodec = audioCodec
     }
 }
 
@@ -645,17 +660,23 @@ struct PlexStream: Decodable {
     let codec: String?
     let selected: Bool?
     let decision: String?
+    let displayTitle: String?
+    let language: String?
+    let bitrate: Int?
 
     var isAudio: Bool {
         streamType == 2
     }
 
-    init(id: Int?, streamType: Int?, codec: String? = nil, selected: Bool? = nil, decision: String? = nil) {
+    init(id: Int?, streamType: Int?, codec: String? = nil, selected: Bool? = nil, decision: String? = nil, displayTitle: String? = nil, language: String? = nil, bitrate: Int? = nil) {
         self.id = id
         self.streamType = streamType
         self.codec = codec
         self.selected = selected
         self.decision = decision
+        self.displayTitle = displayTitle
+        self.language = language
+        self.bitrate = bitrate
     }
 
     enum CodingKeys: String, CodingKey {
@@ -664,6 +685,9 @@ struct PlexStream: Decodable {
         case codec
         case selected
         case decision
+        case displayTitle
+        case language
+        case bitrate
     }
 
     init(from decoder: Decoder) throws {
@@ -673,6 +697,9 @@ struct PlexStream: Decodable {
         codec = try container.decodeIfPresent(String.self, forKey: .codec)
         selected = try container.decodeFlexibleBoolIfPresent(forKey: .selected)
         decision = try container.decodeIfPresent(String.self, forKey: .decision)
+        displayTitle = try container.decodeIfPresent(String.self, forKey: .displayTitle)
+        language = try container.decodeIfPresent(String.self, forKey: .language)
+        bitrate = try container.decodeFlexibleIntIfPresent(forKey: .bitrate)
     }
 }
 

@@ -60,6 +60,9 @@ private enum StreamArtworkMetrics {
 
 struct StreamCardView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @FocusState private var isCardFocused: Bool
+    @State private var isCardHovered = false
     let session: PlexSession
     let sessionStore: PlexSessionStore
     let onRequestTerminate: (PlexSession) -> Void
@@ -73,6 +76,7 @@ struct StreamCardView: View {
     let resolvedLocation: String?
     @State private var artwork: PlexArtworkPresentationState
     @State private var isShowingActionsPopover = false
+    @State private var isShowingPlaybackDetails = false
 
     init(
         session: PlexSession,
@@ -120,9 +124,47 @@ struct StreamCardView: View {
     var body: some View {
         let theme = StreamCardTheme.make(for: colorScheme, hasPalette: artwork.palette != nil)
         let isTerminating = sessionStore.isTerminating(session)
-        defaultCardContent(isTerminating: isTerminating)
+        let details = PlexSessionPlaybackDetails(session: session)
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: togglePlaybackDetails) {
+                defaultCardContent(details: details)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .background {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.primary.opacity(isCardHovered ? 0.05 : 0))
+                }
+            }
+            .buttonStyle(.plain)
+            .focused($isCardFocused)
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
+                    .opacity(isCardFocused ? 1 : 0)
+                    .allowsHitTesting(false)
+            }
+            .onHover { isCardHovered = $0 }
+            .accessibilityElement(children: .ignore)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { togglePlaybackDetails() }
+            .accessibilityLabel("\(session.headline), \(session.userDisplayName)")
+            .accessibilityValue([details.method + (details.usesHardware ? ", hardware accelerated" : ""), details.bandwidth, isShowingPlaybackDetails ? "Expanded" : "Collapsed"].compactMap { $0 }.joined(separator: ", "))
+            .accessibilityHint(isShowingPlaybackDetails ? "Hide playback details" : "Show playback details")
+            .disabled(isTerminating || isShowingTerminatePrompt)
+            .overlay(alignment: .topTrailing) {
+                actionsButton(isTerminating: isTerminating)
+                    .padding(12)
+            }
+
+            StreamDetailsReveal(isExpanded: isShowingPlaybackDetails) {
+                Divider().padding(.horizontal, 12)
+                StreamPlaybackDetailsView(details: details)
+                    .padding(12)
+                    .textSelection(.enabled)
+            }
+        }
         .opacity(isShowingTerminatePrompt ? 0.38 : 1)
-        .padding(12)
         .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
         .background {
             StreamCardBackground(palette: artwork.palette, theme: theme)
@@ -160,6 +202,12 @@ struct StreamCardView: View {
         }
         .task(id: waveformRequestKey) {
             sessionStore.loadWaveformLevelsIfNeeded(for: session)
+        }
+    }
+
+    private func togglePlaybackDetails() {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+            isShowingPlaybackDetails.toggle()
         }
     }
 
@@ -204,7 +252,7 @@ struct StreamCardView: View {
     }
 
     @ViewBuilder
-    private func defaultCardContent(isTerminating: Bool) -> some View {
+    private func defaultCardContent(details: PlexSessionPlaybackDetails) -> some View {
         HStack(alignment: .top, spacing: 12) {
             StreamArtworkView(
                 artwork: artwork,
@@ -220,9 +268,6 @@ struct StreamCardView: View {
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.trailing, 36)
-                        .overlay(alignment: .trailing) {
-                            actionsButton(isTerminating: isTerminating)
-                        }
 
                     if session.contentKind == .tv || session.contentKind == .liveTV {
                         HStack(spacing: 6) {
@@ -280,6 +325,7 @@ struct StreamCardView: View {
                     UserIdentityRow(
                         userName: session.userDisplayName,
                         playerName: session.playerDisplayName,
+                        playbackDetails: details,
                         resolvedLocation: resolvedLocation,
                         thumb: session.user?.thumb,
                         serverURL: serverURL,
@@ -304,6 +350,7 @@ struct StreamCardView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Playback actions for \(session.headline)")
         .disabled(isTerminating || isShowingTerminatePrompt)
         .popover(isPresented: $isShowingActionsPopover, arrowEdge: .top) {
             SessionActionsPopover {
@@ -564,6 +611,7 @@ private struct StreamCardBackground: View {
 private struct UserIdentityRow: View {
     let userName: String
     let playerName: String
+    let playbackDetails: PlexSessionPlaybackDetails
     let resolvedLocation: String?
     let thumb: String?
     let serverURL: URL?
@@ -587,10 +635,7 @@ private struct UserIdentityRow: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
-                Text(playerName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                StreamDeviceSummaryView(playerName: playerName, details: playbackDetails)
 
                 if let resolvedLocation {
                     Text(resolvedLocation)

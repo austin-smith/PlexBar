@@ -181,7 +181,11 @@
         "bandwidth": 12000,
         "location": "lan"
       },
-      "mediaDecision": "directplay"
+      "mediaDecision": "directplay",
+      "mediaStreams": [
+        { "streamType": 1, "codec": "h264", "displayTitle": "1080p (H.264)" },
+        { "streamType": 2, "selected": true, "codec": "ac3", "displayTitle": "English (AC3 5.1)" }
+      ]
     },
     {
       "sessionKey": "stream-2",
@@ -208,12 +212,21 @@
         "location": "wan"
       },
       "transcodeSession": {
-        "key": "transcode-2"
+        "key": "transcode-2",
+        "videoDecision": "transcode",
+        "audioDecision": "transcode",
+        "sourceVideoCodec": "hevc",
+        "sourceAudioCodec": "ac3",
+        "videoCodec": "h264",
+        "audioCodec": "aac",
+        "transcodeHwDecoding": "videotoolbox",
+        "transcodeHwEncoding": "videotoolbox"
       },
       "mediaDecision": "transcode",
       "mediaStreams": [
-        { "streamType": 1, "decision": "copy" },
-        { "streamType": 2, "selected": true, "decision": "transcode" }
+        { "streamType": 1, "decision": "transcode", "codec": "h264", "displayTitle": "1080p (HEVC Main 10)", "bitrate": 8000 },
+        { "streamType": 2, "selected": true, "decision": "transcode", "codec": "aac", "displayTitle": "English (AC3 5.1)", "bitrate": 256 },
+        { "streamType": 3, "selected": true, "decision": "transcode", "codec": "ass", "language": "English", "displayTitle": "English (SRT)" }
       ]
     },
     {
@@ -242,8 +255,8 @@
       },
       "mediaDecision": "transcode",
       "mediaStreams": [
-        { "streamType": 1, "decision": "copy" },
-        { "streamType": 2, "selected": true, "decision": "copy" }
+        { "streamType": 1, "decision": "copy", "codec": "h264", "displayTitle": "1080p (H.264)" },
+        { "streamType": 2, "selected": true, "decision": "copy", "codec": "aac", "displayTitle": "English (AAC Stereo)" }
       ]
     },
     {

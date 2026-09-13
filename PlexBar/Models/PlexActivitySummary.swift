@@ -72,8 +72,7 @@ extension PlexSession {
             return Self.deliveryMethod(for: decisions)
         }
 
-        guard let activeMedia = Self.activeItem(in: media ?? [], selected: \.selected),
-              let activePart = Self.activeItem(in: activeMedia.part ?? [], selected: \.selected) else {
+        guard let activePart = activePlaybackPart else {
             return .unknown
         }
 
@@ -111,6 +110,21 @@ extension PlexSession {
         if decisions.contains("transcode") { return .transcoding }
         if decisions.contains("copy") { return .directStream }
         return .directPlay
+    }
+
+    var activePlaybackPart: PlexPart? {
+        guard let media = Self.activeItem(in: media ?? [], selected: \.selected) else { return nil }
+        return Self.activeItem(in: media.part ?? [], selected: \.selected)
+    }
+
+    func activePlaybackStream(type: Int) -> PlexStream? {
+        let candidates = (activePlaybackPart?.stream ?? []).filter {
+            $0.streamType == type && $0.selected != false
+                && (type != 3 || $0.selected == true || $0.decision?.nilIfBlank != nil)
+                && $0.decision?.lowercased() != "ignore"
+                && $0.decision?.lowercased() != "none"
+        }
+        return Self.activeItem(in: candidates, selected: \.selected)
     }
 
     private static func activeItem<Item>(in items: [Item], selected: KeyPath<Item, Bool?>) -> Item? {
