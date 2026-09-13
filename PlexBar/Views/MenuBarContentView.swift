@@ -589,12 +589,9 @@ private struct PlexMenuBarNowPlayingView: View {
                             .lineLimit(1)
                     }
 
-                    if let factsLine = item.factsLine {
-                        Text(factsLine)
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                            .lineLimit(1)
-                    }
+                    PlexMediaFactsView(presentation: item.factsPresentation, badgeFont: .caption2)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 }
 
                 Spacer(minLength: 8)

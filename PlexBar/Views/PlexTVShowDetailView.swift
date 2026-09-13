@@ -160,29 +160,18 @@ struct PlexTVShowDetailView: View {
                     .lineLimit(2)
                     .accessibilityAddTraits(.isHeader)
 
-                if let facts = episodeFacts(selectedEpisode) {
-                    Text(facts)
-                        .font(.headline)
-                        .foregroundStyle(.white.opacity(0.72))
-                        .lineLimit(1)
-                }
-
-                if let genres = PlexMediaSummaryPresentation(item: selectedEpisode).genres {
-                    Text(genres)
-                        .font(.headline)
-                        .foregroundStyle(.white.opacity(0.72))
-                        .lineLimit(2)
-                }
+                PlexMediaFactsView(
+                    presentation: PlexMediaSummaryPresentation(item: selectedEpisode).episodeFactsPresentation,
+                    genres: PlexMediaSummaryPresentation(item: show).genres
+                )
+                .font(.headline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.72))
 
                 if let summary = PlexEpisodeSpoilerPresentation(
                     item: selectedEpisode,
                     policy: settingsStore.episodeSpoilerPolicy
                 ).summary {
-                    Text(summary)
-                        .font(.body)
-                        .lineSpacing(3)
-                        .lineLimit(4)
-                        .textSelection(.enabled)
+                    PlexMediaDescriptionView(title: episodeHeading(selectedEpisode), summary: summary)
                 }
 
             }
@@ -386,10 +375,6 @@ struct PlexTVShowDetailView: View {
             return "\(index). \(episode.title)"
         }
         return episode.title
-    }
-
-    private func episodeFacts(_ episode: PlexMediaItem) -> String? {
-        PlexMediaSummaryPresentation(item: episode).episodeFacts
     }
 
     private func showsDownloadControl(for episode: PlexMediaItem) -> Bool {

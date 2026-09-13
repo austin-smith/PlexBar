@@ -195,13 +195,6 @@ struct PlexMediaDetailsView: View {
             VStack(alignment: .leading, spacing: 18) {
                 titleBlock
 
-                if let tagline = item.tagline?.nilIfBlank {
-                    Text(tagline)
-                        .font(.title3)
-                        .italic()
-                        .foregroundStyle(.secondary)
-                }
-
                 if let summary = spoilerPresentation.summary {
                     Text(summary)
                         .font(.body)
@@ -303,9 +296,7 @@ struct PlexMediaDetailsView: View {
                     }
 
                     if let summary = spoilerPresentation.summary {
-                        Text(summary)
-                            .lineLimit(8)
-                            .textSelection(.enabled)
+                        PlexMediaDescriptionView(title: item.title, summary: summary)
                     }
                 }
                 .frame(maxWidth: 680, alignment: .leading)
@@ -364,40 +355,18 @@ struct PlexMediaDetailsView: View {
 
     private var heroDescription: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if let factsLine = heroFactsLine {
-                Text(factsLine)
-                    .font(.headline)
-                    .foregroundStyle(.white.opacity(0.72))
-                    .lineLimit(2)
-            }
-
-            if let genres = PlexMediaSummaryPresentation(item: item).genres {
-                Text(genres)
-                    .font(.headline)
-                    .foregroundStyle(.white.opacity(0.72))
-                    .lineLimit(2)
-            }
-
-            if let tagline = item.tagline?.nilIfBlank {
-                Text(tagline)
-                    .font(.title3)
-                    .italic()
-                    .foregroundStyle(.white.opacity(0.80))
-            }
+            PlexMediaFactsView(
+                presentation: item.factsPresentation,
+                genres: PlexMediaSummaryPresentation(item: item).genres
+            )
+                .font(.headline.weight(.medium))
+                .foregroundStyle(.white.opacity(0.72))
 
             if let summary = spoilerPresentation.summary {
-                Text(summary)
-                    .font(.body)
-                    .lineSpacing(3)
-                    .lineLimit(5)
-                    .textSelection(.enabled)
+                PlexMediaDescriptionView(title: item.title, summary: summary)
             }
 
         }
-    }
-
-    private var heroFactsLine: String? {
-        PlexMediaSummaryPresentation(item: item).heroFacts
     }
 
     private var titleBlock: some View {
@@ -411,10 +380,8 @@ struct PlexMediaDetailsView: View {
                 PlexMediaHierarchyBreadcrumbs(destinations: item.hierarchyDestinations)
             }
 
-            if let factsLine = item.factsLine {
-                Text(factsLine)
-                    .foregroundStyle(.secondary)
-            }
+            PlexMediaFactsView(presentation: item.factsPresentation)
+                .foregroundStyle(.secondary)
         }
     }
 

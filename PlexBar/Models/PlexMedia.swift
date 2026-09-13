@@ -22,7 +22,6 @@ struct PlexMediaItem: Decodable, Equatable, Hashable, Identifiable, Sendable {
     let parentIndex: Int?
     let duration: Int?
     let summary: String?
-    let tagline: String?
     let thumb: String?
     let composite: String?
     let parentThumb: String?
@@ -309,7 +308,6 @@ struct PlexMediaItem: Decodable, Equatable, Hashable, Identifiable, Sendable {
         case parentIndex
         case duration
         case summary
-        case tagline
         case thumb
         case composite
         case parentThumb
@@ -373,7 +371,6 @@ struct PlexMediaItem: Decodable, Equatable, Hashable, Identifiable, Sendable {
         parentIndex = values.decodePlexIntIfPresent(forKey: .parentIndex)
         duration = values.decodePlexIntIfPresent(forKey: .duration)
         summary = try values.decodeIfPresent(String.self, forKey: .summary)
-        tagline = try values.decodeIfPresent(String.self, forKey: .tagline)
         thumb = try values.decodeIfPresent(String.self, forKey: .thumb)
         composite = try values.decodeIfPresent(String.self, forKey: .composite)
         parentThumb = try values.decodeIfPresent(String.self, forKey: .parentThumb)

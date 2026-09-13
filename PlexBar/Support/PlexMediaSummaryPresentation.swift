@@ -1,5 +1,19 @@
 import Foundation
 
+struct PlexMediaFactsPresentation {
+    let facts: [String]
+    let contentRating: String?
+
+    init(facts: [String?], contentRating: String?) {
+        self.facts = facts.compactMap { $0?.nilIfBlank }
+        self.contentRating = contentRating?.nilIfBlank
+    }
+
+    func plainText(separator: String = " · ") -> String? {
+        (facts + [contentRating].compactMap { $0 }).joined(separator: separator).nilIfBlank
+    }
+}
+
 enum PlexEpisodeText {
     static func numbers(season: Int?, episode: Int?) -> String? {
         [season.map { "S\($0)" }, episode.map { "E\($0)" }]
@@ -24,14 +38,17 @@ struct PlexMediaSummaryPresentation {
     }
 
     var episodeFacts: String? {
-        [
-            item.formattedDuration,
-            PlexMediaMetadataPresentation(item: item).facts.first { $0.kind == .releaseDate }?.value,
-            item.contentRating?.nilIfBlank,
-        ]
-        .compactMap { $0 }
-        .joined(separator: "  ·  ")
-        .nilIfBlank
+        episodeFactsPresentation.plainText(separator: "  ·  ")
+    }
+
+    var episodeFactsPresentation: PlexMediaFactsPresentation {
+        PlexMediaFactsPresentation(
+            facts: [
+                item.formattedDuration,
+                PlexMediaMetadataPresentation(item: item).facts.first { $0.kind == .releaseDate }?.value,
+            ],
+            contentRating: item.contentRating
+        )
     }
 
     var heroFacts: String? {
@@ -55,8 +72,13 @@ extension PlexMediaItem {
     }
 
     var factsLine: String? {
-        let values = [episodeIdentifier, year.map(String.init), formattedDuration, contentRating?.nilIfBlank]
-            .compactMap { $0 }
-        return values.isEmpty ? nil : values.joined(separator: " · ")
+        factsPresentation.plainText()
+    }
+
+    var factsPresentation: PlexMediaFactsPresentation {
+        PlexMediaFactsPresentation(
+            facts: [episodeIdentifier, year.map(String.init), formattedDuration],
+            contentRating: contentRating
+        )
     }
 }

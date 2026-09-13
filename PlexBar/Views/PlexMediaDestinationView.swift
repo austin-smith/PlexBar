@@ -565,19 +565,12 @@ struct PlexMediaOverview: View {
                             PlexMediaHierarchyBreadcrumbs(destinations: item.hierarchyDestinations)
                         }
 
-                        if let factsLine = heroFactsLine {
-                            Text(factsLine)
-                                .font(.headline)
-                                .foregroundStyle(.white.opacity(0.78))
-                                .lineLimit(2)
-                        }
-
-                        if let genres = PlexMediaSummaryPresentation(item: item).genres {
-                            Text(genres)
-                                .font(.headline)
-                                .foregroundStyle(.white.opacity(0.78))
-                                .lineLimit(2)
-                        }
+                        PlexMediaFactsView(
+                            presentation: item.factsPresentation,
+                            genres: PlexMediaSummaryPresentation(item: item).genres
+                        )
+                            .font(.headline.weight(.medium))
+                            .foregroundStyle(.white.opacity(0.78))
                     }
 
                     GlassEffectContainer(spacing: 10) {
@@ -614,11 +607,7 @@ struct PlexMediaOverview: View {
                 .frame(maxWidth: 460, alignment: .leading)
 
                 if let summary = item.summary?.nilIfBlank {
-                    Text(summary)
-                        .font(.body)
-                        .lineSpacing(3)
-                        .lineLimit(5)
-                        .textSelection(.enabled)
+                    PlexMediaDescriptionView(title: item.title, summary: summary)
                         .frame(maxWidth: 560, alignment: .leading)
                 }
             }
@@ -651,10 +640,8 @@ struct PlexMediaOverview: View {
                         PlexMediaHierarchyBreadcrumbs(destinations: item.hierarchyDestinations)
                     }
 
-                    if let factsLine = item.factsLine {
-                        Text(factsLine)
-                            .foregroundStyle(.secondary)
-                    }
+                    PlexMediaFactsView(presentation: item.factsPresentation)
+                        .foregroundStyle(.secondary)
 
                     HStack(spacing: 10) {
                         if showsPlaybackControl {
@@ -685,9 +672,7 @@ struct PlexMediaOverview: View {
                     .controlSize(.large)
 
                     if let summary = item.summary?.nilIfBlank {
-                        Text(summary)
-                            .lineLimit(6)
-                            .textSelection(.enabled)
+                        PlexMediaDescriptionView(title: item.title, summary: summary)
                     }
                 }
                 .frame(maxWidth: 680, alignment: .leading)
@@ -703,10 +688,6 @@ struct PlexMediaOverview: View {
             return nil
         }
         return PlexURLBuilder.mediaURL(serverURL: serverURL, path: item.art?.nilIfBlank)
-    }
-
-    private var heroFactsLine: String? {
-        PlexMediaSummaryPresentation(item: item).heroFacts
     }
 
     private var artworkURL: URL? {
