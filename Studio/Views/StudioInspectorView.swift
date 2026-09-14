@@ -123,11 +123,16 @@ struct StudioInspectorView: View {
 
     private func artworkCarousel(_ assets: [StudioAsset]) -> some View {
         let widestRatio = assets.map(\.role.ratio).max() ?? 1
+        let previewItems = assets.compactMap { store.artworkURL(for: $0.path) }
 
         return ScrollView(.horizontal) {
             HStack(spacing: 12) {
                 ForEach(assets) { asset in
-                    StudioImagePreview(url: store.artworkURL(for: asset.path), revision: store.artworkRevision)
+                    StudioImagePreview(
+                        url: store.artworkURL(for: asset.path),
+                        revision: store.artworkRevision,
+                        previewItems: previewItems
+                    )
                         .aspectRatio(asset.role.ratio, contentMode: .fit)
                         .containerRelativeFrame(.horizontal) { width, _ in
                             // Fit the widest artwork while leaving a glimpse of its neighbor.

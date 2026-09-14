@@ -3,6 +3,24 @@ import Testing
 @testable import PlexBarStudio
 
 @Suite struct StudioMovieArtworkTests {
+    @Test(arguments: [false, true]) func posterPrecedesBackdropRegardlessOfRegistrationOrder(reversed: Bool) {
+        let poster: StudioJSON = .object(["path": .string("/poster"), "resource": .string("poster.png")])
+        let backdrop: StudioJSON = .object(["path": .string("/backdrop"), "resource": .string("backdrop.jpg")])
+        let record = StudioCatalogRecord(
+            sources: [], addedAtSecondsAgo: 0, relatedIDs: [], extraIDs: [],
+            metadata: .object([
+                "thumb": .string("/poster"),
+                "parentThumb": .string("/poster"),
+                "art": .string("/backdrop"),
+            ])
+        )
+        let pack = StudioPack(records: [record], payload: .object([
+            "artwork": .array(reversed ? [backdrop, poster] : [poster, backdrop]),
+        ]))
+
+        #expect(pack.artwork(for: record).map(\.path) == ["/poster", "/backdrop"])
+    }
+
     @Test func existingMovieFoldersRemainStableWhenTitlesChange() throws {
         let pack = try StudioFiles.loadPack(at: StudioFiles.repositoryContentURL)
         for record in pack.records where record.type == "movie" && !pack.artwork(for: record).isEmpty {

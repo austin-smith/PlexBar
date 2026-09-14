@@ -5,6 +5,7 @@ import QuickLook
 struct StudioImagePreview: View {
     let url: URL?
     var revision = 0
+    var previewItems: [URL]?
     @State private var previewURL: URL?
     @State private var isHovered = false
     @FocusState private var isFocused: Bool
@@ -35,6 +36,6 @@ struct StudioImagePreview: View {
         .onHover { isHovered = $0 }
         .accessibilityLabel("View larger image")
         .help("View larger image")
-        .quickLookPreview($previewURL)
+        .quickLookPreview($previewURL, in: previewItems ?? [url].compactMap { $0 })
     }
 }

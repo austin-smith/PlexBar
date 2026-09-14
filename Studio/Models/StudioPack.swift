@@ -13,8 +13,13 @@ struct StudioPack: Sendable {
     }
 
     func artwork(for record: StudioCatalogRecord) -> [StudioAsset] {
-        let paths = Set(["thumb", "art", "parentThumb", "grandparentThumb"].compactMap { record.metadata[$0]?.string })
-        return assets.filter { paths.contains($0.path) }
+        let registeredAssets = assets
+        var seen: Set<String> = []
+        // Primary and inherited posters/covers precede the backdrop, regardless of registration order.
+        return ["thumb", "parentThumb", "grandparentThumb", "art"].compactMap { field in
+            guard let path = record.metadata[field]?.string, seen.insert(path).inserted else { return nil }
+            return registeredAssets.first { $0.path == path }
+        }
     }
 
     func validate() -> [StudioValidationIssue] {
