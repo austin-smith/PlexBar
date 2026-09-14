@@ -5,7 +5,6 @@ struct StudioInspectorView: View {
     @Bindable var store: StudioStore
     @State private var showGenerate = false
     @State private var editingRecord: StudioCatalogRecord?
-    @State private var previewPath: String?
     @State private var editingUser: StudioUserEdit?
 
     var body: some View {
@@ -20,16 +19,11 @@ struct StudioInspectorView: View {
                         }
                         if let record = store.selectedRecord, let pack = store.pack {
                             let assets = pack.artwork(for: record)
-                            let path = previewPath ?? record.metadata["thumb"]?.string
-                            let ratio = assets.first(where: { $0.path == path })?.role.ratio ?? item.ratio
-                            artworkPreview(url: store.artworkURL(for: path), ratio: ratio)
                             if assets.count > 1 {
-                                HStack {
-                                    ForEach(assets) { asset in
-                                        Button(asset.role.title) { previewPath = asset.path }
-                                            .buttonStyle(.bordered)
-                                    }
-                                }
+                                artworkCarousel(assets)
+                                    .id(record.id)
+                            } else {
+                                artworkPreview(url: item.previewURL, ratio: item.ratio)
                             }
                         } else {
                             artworkPreview(url: item.previewURL, ratio: item.ratio)
@@ -110,7 +104,6 @@ struct StudioInspectorView: View {
             }
         }
         .background(Color(nsColor: .controlBackgroundColor))
-        .onChange(of: store.selection) { previewPath = nil }
         .sheet(isPresented: $showGenerate) {
             if let item = store.selectedItem { StudioGenerateSheet(store: store, item: item) }
         }
@@ -121,10 +114,32 @@ struct StudioInspectorView: View {
     }
 
     private func artworkPreview(url: URL?, ratio: Double) -> some View {
-        StudioImageView(url: url, revision: store.artworkRevision)
+        StudioImagePreview(url: url, revision: store.artworkRevision)
             .aspectRatio(ratio, contentMode: .fit)
             .frame(maxWidth: 275 * ratio)
             .clipShape(.rect(cornerRadius: 8))
             .frame(maxWidth: .infinity)
+    }
+
+    private func artworkCarousel(_ assets: [StudioAsset]) -> some View {
+        let widestRatio = assets.map(\.role.ratio).max() ?? 1
+
+        return ScrollView(.horizontal) {
+            HStack(spacing: 12) {
+                ForEach(assets) { asset in
+                    StudioImagePreview(url: store.artworkURL(for: asset.path), revision: store.artworkRevision)
+                        .aspectRatio(asset.role.ratio, contentMode: .fit)
+                        .containerRelativeFrame(.horizontal) { width, _ in
+                            // Fit the widest artwork while leaving a glimpse of its neighbor.
+                            min(275, (width - 24) / widestRatio) * asset.role.ratio
+                        }
+                        .clipShape(.rect(cornerRadius: 8))
+                        .accessibilityLabel("View larger \(asset.role.title.lowercased())")
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.viewAligned)
+        .accessibilityLabel("Artwork")
     }
 }

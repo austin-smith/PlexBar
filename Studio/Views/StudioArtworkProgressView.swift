@@ -9,7 +9,7 @@ struct StudioArtworkProgressView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 if let referenceURL {
-                    StudioImageView(url: referenceURL)
+                    StudioImagePreview(url: referenceURL)
                         .frame(height: 240)
                         .accessibilityLabel("Reference image")
                 }

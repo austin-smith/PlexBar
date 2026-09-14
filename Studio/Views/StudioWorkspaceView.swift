@@ -1,4 +1,5 @@
 import SwiftUI
+import QuickLook
 
 struct StudioWorkspaceView: View {
     @Bindable var store: StudioStore
@@ -186,6 +187,7 @@ private struct StudioGalleryCard: View {
     let selected: Bool
     let revision: Int
     let action: () -> Void
+    @State private var previewURL: URL?
 
     var body: some View {
         Button(action: action) {
@@ -210,5 +212,11 @@ private struct StudioGalleryCard: View {
         }.buttonStyle(.plain)
             .accessibilityLabel("\(item.title), \(item.category.rawValue)")
             .accessibilityAddTraits(selected ? .isSelected : [])
+            .contextMenu {
+                if let url = item.previewURL {
+                    Button("Quick Look", systemImage: "eye") { previewURL = url }
+                }
+            }
+            .quickLookPreview($previewURL)
     }
 }

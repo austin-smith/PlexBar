@@ -81,7 +81,7 @@ struct StudioGenerateSheet: View {
                     StudioArtworkProgressView(runtime: jobID.flatMap { store.generations.runtimes[$0] }, referenceURL: jobReferenceURL, queued: job?.status == .queued)
                 } else if let candidate {
                     VStack(spacing: 12) {
-                        StudioImageView(url: store.historyURL.flatMap { try? StudioFiles.resolved(candidate.file, in: $0) })
+                        StudioImagePreview(url: store.historyURL.flatMap { try? StudioFiles.resolved(candidate.file, in: $0) })
                             .accessibilityLabel("Generated artwork")
                         Text("\(candidate.role.title) · \(Int(candidate.role.exportSize.width)) × \(Int(candidate.role.exportSize.height))")
                             .font(.caption).foregroundStyle(.secondary)
@@ -215,12 +215,12 @@ struct StudioGenerateSheet: View {
                 HStack {
                     VStack {
                         Text("Image 1 · Reference").font(.caption)
-                        StudioImageView(url: referenceURL)
+                        StudioImagePreview(url: referenceURL)
                     }
                     if let revising = activeRevision, let history = store.historyURL {
                         VStack {
                             Text("Image 2 · Previous candidate").font(.caption)
-                            StudioImageView(url: try? StudioFiles.resolved(revising.file, in: history))
+                            StudioImagePreview(url: try? StudioFiles.resolved(revising.file, in: history))
                         }
                     }
                 }.frame(height: 180)

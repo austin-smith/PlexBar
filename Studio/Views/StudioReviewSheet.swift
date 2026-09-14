@@ -180,11 +180,11 @@ struct StudioReviewSheet: View {
         HStack(alignment: .top, spacing: 16) {
             VStack {
                 Text("Current").font(.caption).foregroundStyle(.secondary)
-                StudioImageView(url: store.artworkURL(for: candidate.assetPath), revision: store.artworkRevision)
+                StudioImagePreview(url: store.artworkURL(for: candidate.assetPath), revision: store.artworkRevision)
             }
             VStack {
                 Text(candidate.decision == .pending ? "Candidate" : candidate.decision.rawValue.capitalized).font(.caption).foregroundStyle(.secondary)
-                StudioImageView(url: store.historyURL.flatMap { try? StudioFiles.resolved(candidate.file, in: $0) })
+                StudioImagePreview(url: store.historyURL.flatMap { try? StudioFiles.resolved(candidate.file, in: $0) })
             }
         }.frame(height: 370)
         Text("\(candidate.role.title) · \(Int(candidate.role.exportSize.width)) × \(Int(candidate.role.exportSize.height)) export").font(.caption).foregroundStyle(.secondary)
