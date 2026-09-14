@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 
 final class PlexDownloadHandoffStore: @unchecked Sendable {

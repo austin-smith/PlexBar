@@ -1,539 +1,1149 @@
 {
-  "authenticatedUser": {
-    "id": 16,
-    "username": "D0loresH4ze",
-    "email": "d0loresh4ze@proton.me",
-    "thumb": "/mock/avatars/darlene-alderson.png"
-  },
-  "server": {
-    "id": "debug-mock-server",
-    "name": "Mock Server",
-    "productVersion": "1.43.1.10611-1e34174b1",
-    "accessToken": "plexbar-debug-mock-server-token",
-    "connections": [
+  "activeSessions" : [
+    {
+      "deviceID" : 1,
+      "mediaDecision" : "directplay",
+      "mediaID" : "1101",
+      "mediaStreams" : [
+        {
+          "codec" : "h264",
+          "displayTitle" : "1080p (H.264)",
+          "streamType" : 1
+        },
+        {
+          "codec" : "ac3",
+          "displayTitle" : "English (AC3 5.1)",
+          "selected" : true,
+          "streamType" : 2
+        }
+      ],
+      "mediaType" : "movie",
+      "session" : {
+        "bandwidth" : 12000,
+        "id" : "playback-1"
+      },
+      "sessionKey" : "stream-1",
+      "state" : "playing",
+      "userID" : 11,
+      "viewOffset" : 3146000
+    },
+    {
+      "deviceID" : 2,
+      "mediaDecision" : "transcode",
+      "mediaID" : "1102",
+      "mediaStreams" : [
+        {
+          "bitrate" : 8000,
+          "codec" : "h264",
+          "decision" : "transcode",
+          "displayTitle" : "1080p (HEVC Main 10)",
+          "streamType" : 1
+        },
+        {
+          "bitrate" : 256,
+          "codec" : "aac",
+          "decision" : "transcode",
+          "displayTitle" : "English (AC3 5.1)",
+          "selected" : true,
+          "streamType" : 2
+        },
+        {
+          "codec" : "ass",
+          "decision" : "transcode",
+          "displayTitle" : "English (SRT)",
+          "language" : "English",
+          "selected" : true,
+          "streamType" : 3
+        }
+      ],
+      "mediaType" : "movie",
+      "session" : {
+        "bandwidth" : 8400,
+        "id" : "playback-2"
+      },
+      "sessionKey" : "stream-2",
+      "state" : "paused",
+      "transcodeSession" : {
+        "audioCodec" : "aac",
+        "audioDecision" : "transcode",
+        "key" : "transcode-2",
+        "sourceAudioCodec" : "ac3",
+        "sourceVideoCodec" : "hevc",
+        "transcodeHwDecoding" : "videotoolbox",
+        "transcodeHwEncoding" : "videotoolbox",
+        "videoCodec" : "h264",
+        "videoDecision" : "transcode"
+      },
+      "userID" : 12,
+      "viewOffset" : 3750000
+    },
+    {
+      "deviceID" : 3,
+      "mediaDecision" : "transcode",
+      "mediaID" : "1103",
+      "mediaStreams" : [
+        {
+          "codec" : "h264",
+          "decision" : "copy",
+          "displayTitle" : "1080p (H.264)",
+          "streamType" : 1
+        },
+        {
+          "codec" : "aac",
+          "decision" : "copy",
+          "displayTitle" : "English (AAC Stereo)",
+          "selected" : true,
+          "streamType" : 2
+        }
+      ],
+      "mediaType" : "movie",
+      "session" : {
+        "bandwidth" : 10200,
+        "id" : "playback-3"
+      },
+      "sessionKey" : "stream-3",
+      "state" : "playing",
+      "userID" : 13,
+      "viewOffset" : 1458000
+    },
+    {
+      "audioStream" : {
+        "codec" : "aac",
+        "id" : 3103001,
+        "levels" : [
+          -26.9,
+          -28.2,
+          -28.2,
+          -27.9,
+          -29.4,
+          -29.1,
+          -28.5,
+          -28.9,
+          -27.8,
+          -28,
+          -27.5,
+          -27.7,
+          -27.2,
+          -27.9,
+          -29,
+          -27.4,
+          -29.2,
+          -29.8,
+          -29.5,
+          -29.2,
+          -29.8,
+          -29.5,
+          -28.7,
+          -27.9,
+          -28.2,
+          -28.1,
+          -27.5,
+          -28.1,
+          -28.1,
+          -27.8,
+          -27.3,
+          -27.5,
+          -27.7,
+          -27.3,
+          -28.3,
+          -28,
+          -28.3,
+          -28.4,
+          -27.4,
+          -26.5,
+          -26.6,
+          -26.5,
+          -27.1,
+          -28.1,
+          -27.4,
+          -25.7,
+          -25.5,
+          -25.8,
+          -26.7,
+          -26.8,
+          -25.7,
+          -27.1,
+          -27.8,
+          -26.9,
+          -28.8,
+          -28.5,
+          -28.4,
+          -27.8,
+          -27.5,
+          -28,
+          -27.8,
+          -28.3,
+          -26.2,
+          -26.7,
+          -27.6,
+          -26.9,
+          -28,
+          -28.1,
+          -27.7,
+          -27.5,
+          -30.3,
+          -29.4,
+          -27.2,
+          -21.7,
+          -22.9,
+          -22.1,
+          -21.2,
+          -21.9,
+          -22,
+          -23,
+          -26.6,
+          -27.1,
+          -27.3,
+          -27.9,
+          -27.8,
+          -28.1,
+          -26.2,
+          -27.7,
+          -27.6,
+          -27.7,
+          -27.3,
+          -27.2,
+          -27.7,
+          -27.3,
+          -27.5,
+          -39.9
+        ],
+        "selected" : true,
+        "streamType" : 2
+      },
+      "deviceID" : 5,
+      "mediaDecision" : "directplay",
+      "mediaID" : "32301",
+      "mediaType" : "track",
+      "session" : {
+        "bandwidth" : 320,
+        "id" : "playback-4"
+      },
+      "sessionKey" : "stream-4",
+      "state" : "playing",
+      "userID" : 15,
+      "viewOffset" : 120000
+    }
+  ],
+  "artwork" : [
+    {
+      "path" : "/mock/avatars/dana-scully.png",
+      "resource" : "avatars/dana-scully.png"
+    },
+    {
+      "path" : "/mock/avatars/darlene-alderson.png",
+      "resource" : "avatars/darlene-alderson.png"
+    },
+    {
+      "path" : "/mock/avatars/elliot-alderson.png",
+      "resource" : "avatars/elliot-alderson.png"
+    },
+    {
+      "path" : "/mock/avatars/le-petit-prince.png",
+      "resource" : "avatars/le-petit-prince.png"
+    },
+    {
+      "path" : "/mock/avatars/popeye.png",
+      "resource" : "avatars/popeye.png"
+    },
+    {
+      "path" : "/mock/avatars/scrump-toggins.png",
+      "resource" : "avatars/scrump-toggins.png"
+    },
+    {
+      "path" : "/mock/avatars/tommy-shelby.png",
+      "resource" : "avatars/tommy-shelby.png"
+    },
+    {
+      "path" : "/mock/art/movies/charade/poster.png",
+      "resource" : "art/movies/charade/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/night-of-the-living-dead/poster.png",
+      "resource" : "art/movies/night-of-the-living-dead/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/sherlock-jr/poster.png",
+      "resource" : "art/movies/sherlock-jr/poster.png"
+    },
+    {
+      "path" : "/mock/art/tv/abbott-and-costello/poster.png",
+      "resource" : "art/tv/abbott-and-costello/poster.png"
+    },
+    {
+      "path" : "/mock/art/tv/adventures-of-ozzie-and-harriet/poster.png",
+      "resource" : "art/tv/adventures-of-ozzie-and-harriet/poster.png"
+    },
+    {
+      "path" : "/mock/art/tv/one-step-beyond/poster.png",
+      "resource" : "art/tv/one-step-beyond/poster.png"
+    },
+    {
+      "path" : "/mock/art/audiobooks/dracula/cover.png",
+      "resource" : "art/audiobooks/dracula/cover.png"
+    },
+    {
+      "path" : "/mock/art/audiobooks/the-time-machine/cover.png",
+      "resource" : "art/audiobooks/the-time-machine/cover.png"
+    },
+    {
+      "path" : "/mock/art/audiobooks/war-of-the-worlds/cover.png",
+      "resource" : "art/audiobooks/war-of-the-worlds/cover.png"
+    },
+    {
+      "path" : "/mock/art/movies/charade/backdrop.jpg",
+      "resource" : "art/movies/charade/backdrop.jpg",
+      "source" : "https://images.plex.tv/photo?size=large-1920&scale=1&url=https%3A%2F%2Fmetadata-static.plex.tv%2F7%2Fgracenote%2F7959fdb01594576f8fa42332f6ab1500.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/night-of-the-living-dead/backdrop.jpg",
+      "resource" : "art/movies/night-of-the-living-dead/backdrop.jpg",
+      "source" : "https://images.plex.tv/photo?size=large-1920&scale=1&url=https%3A%2F%2Fmetadata-static.plex.tv%2F2%2Fgracenote%2F2b8d354188de1d779b63dd49ee5af6e3.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/sherlock-jr/backdrop.jpg",
+      "resource" : "art/movies/sherlock-jr/backdrop.jpg",
+      "source" : "https://images.plex.tv/photo?size=large-1920&scale=1&url=https%3A%2F%2Fmetadata-static.plex.tv%2Ff%2Fgracenote%2Ff2628c473cad8772cc173b9e37a763d2.jpg"
+    },
+    {
+      "path" : "/mock/art/tv/one-step-beyond/backdrop.jpg",
+      "resource" : "art/tv/one-step-beyond/backdrop.jpg",
+      "source" : "https://images.plex.tv/photo?size=large-1920&scale=1&url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2FrYWPWFUF3N8zIEzyH2git8hbXWy.jpg"
+    },
+    {
+      "path" : "/mock/art/tv/adventures-of-ozzie-and-harriet/backdrop.jpg",
+      "resource" : "art/tv/adventures-of-ozzie-and-harriet/backdrop.jpg",
+      "source" : "https://images.plex.tv/photo?size=large-1920&scale=1&url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2Fz9ipjaUaoRWMl6vvQnLhpuFfkBu.jpg"
+    },
+    {
+      "path" : "/mock/art/tv/abbott-and-costello/backdrop.jpg",
+      "resource" : "art/tv/abbott-and-costello/backdrop.jpg",
+      "source" : "https://images.plex.tv/photo?size=large-1920&scale=1&url=https%3A%2F%2Fimage.tmdb.org%2Ft%2Fp%2Foriginal%2F7gWTV42DZa6qCqm0OLqEEiWDs7h.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/metropolis/poster.png",
+      "resource" : "art/movies/metropolis/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/metropolis/backdrop.jpg",
+      "resource" : "art/movies/metropolis/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/a-star-is-born/poster.png",
+      "resource" : "art/movies/a-star-is-born/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/nosferatu/backdrop.jpg",
+      "resource" : "art/movies/nosferatu/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/nosferatu/poster.png",
+      "resource" : "art/movies/nosferatu/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/a-star-is-born/backdrop.jpg",
+      "resource" : "art/movies/a-star-is-born/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/the-lost-world/backdrop.jpg",
+      "resource" : "art/movies/the-lost-world/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/the-phantom-of-the-opera/poster.png",
+      "resource" : "art/movies/the-phantom-of-the-opera/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/the-phantom-of-the-opera/backdrop.jpg",
+      "resource" : "art/movies/the-phantom-of-the-opera/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/the-lost-world/poster.png",
+      "resource" : "art/movies/the-lost-world/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/fear-and-desire/poster.png",
+      "resource" : "art/movies/fear-and-desire/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/fear-and-desire/backdrop.jpg",
+      "resource" : "art/movies/fear-and-desire/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/my-man-godfrey/backdrop.jpg",
+      "resource" : "art/movies/my-man-godfrey/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/its-a-wonderful-life/backdrop.jpg",
+      "resource" : "art/movies/its-a-wonderful-life/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/its-a-wonderful-life/poster.png",
+      "resource" : "art/movies/its-a-wonderful-life/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/my-man-godfrey/poster.png",
+      "resource" : "art/movies/my-man-godfrey/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/plan-9-from-outer-space/backdrop.jpg",
+      "resource" : "art/movies/plan-9-from-outer-space/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/plan-9-from-outer-space/poster.png",
+      "resource" : "art/movies/plan-9-from-outer-space/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/reefer-madness/backdrop.jpg",
+      "resource" : "art/movies/reefer-madness/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/reefer-madness/poster.png",
+      "resource" : "art/movies/reefer-madness/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/the-little-shop-of-horrors/backdrop.jpg",
+      "resource" : "art/movies/the-little-shop-of-horrors/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/the-general/backdrop.jpg",
+      "resource" : "art/movies/the-general/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/the-bat/backdrop.jpg",
+      "resource" : "art/movies/the-bat/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/the-last-man-on-earth/backdrop.jpg",
+      "resource" : "art/movies/the-last-man-on-earth/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/the-general/poster.png",
+      "resource" : "art/movies/the-general/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/the-little-shop-of-horrors/poster.png",
+      "resource" : "art/movies/the-little-shop-of-horrors/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/the-bat/poster.png",
+      "resource" : "art/movies/the-bat/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/the-last-man-on-earth/poster.png",
+      "resource" : "art/movies/the-last-man-on-earth/poster.png"
+    },
+    {
+      "path" : "/mock/art/studio/2111/backdrop.jpg",
+      "resource" : "art/studio/2111/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/the-stranger/poster.png",
+      "resource" : "art/movies/the-stranger/poster.png"
+    },
+    {
+      "path" : "/mock/art/studio/2111/poster.png",
+      "resource" : "art/studio/2111/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/the-stranger/backdrop.jpg",
+      "resource" : "art/movies/the-stranger/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/studio/2110/backdrop.jpg",
+      "resource" : "art/studio/2110/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/studio/2110/poster.png",
+      "resource" : "art/studio/2110/poster.png"
+    },
+    {
+      "path" : "/mock/art/studio/2107/backdrop.jpg",
+      "resource" : "art/studio/2107/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/studio/2107/poster.png",
+      "resource" : "art/studio/2107/poster.png"
+    },
+    {
+      "path" : "/mock/art/studio/2108/poster.png",
+      "resource" : "art/studio/2108/poster.png"
+    },
+    {
+      "path" : "/mock/art/studio/2104/poster.png",
+      "resource" : "art/studio/2104/poster.png"
+    },
+    {
+      "path" : "/mock/art/studio/2104/backdrop.jpg",
+      "resource" : "art/studio/2104/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/studio/2105/poster.png",
+      "resource" : "art/studio/2105/poster.png"
+    },
+    {
+      "path" : "/mock/art/studio/2105/backdrop.jpg",
+      "resource" : "art/studio/2105/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/studio/2106/backdrop.jpg",
+      "resource" : "art/studio/2106/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/studio/2108/backdrop.jpg",
+      "resource" : "art/studio/2108/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/studio/2109/poster.png",
+      "resource" : "art/studio/2109/poster.png"
+    },
+    {
+      "path" : "/mock/art/studio/2109/backdrop.jpg",
+      "resource" : "art/studio/2109/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/studio/2106/poster.png",
+      "resource" : "art/studio/2106/poster.png"
+    },
+    {
+      "path" : "/mock/art/studio/2112/poster.png",
+      "resource" : "art/studio/2112/poster.png"
+    },
+    {
+      "path" : "/mock/art/studio/2112/backdrop.jpg",
+      "resource" : "art/studio/2112/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/studio/3104/cover.png",
+      "resource" : "art/studio/3104/cover.png"
+    },
+    {
+      "path" : "/mock/art/studio/3106/cover.png",
+      "resource" : "art/studio/3106/cover.png"
+    },
+    {
+      "path" : "/mock/art/studio/3107/cover.png",
+      "resource" : "art/studio/3107/cover.png"
+    },
+    {
+      "path" : "/mock/art/studio/3105/cover.png",
+      "resource" : "art/studio/3105/cover.png"
+    },
+    {
+      "path" : "/mock/avatars/thebaumer.png",
+      "resource" : "avatars/thebaumer.png"
+    },
+    {
+      "path" : "/mock/avatars/le0n.png",
+      "resource" : "avatars/le0n.png"
+    },
+    {
+      "path" : "/mock/avatars/joi.png",
+      "resource" : "avatars/joi.png"
+    },
+    {
+      "path" : "/mock/art/studio/3109/cover.png",
+      "resource" : "art/studio/3109/cover.png"
+    },
+    {
+      "path" : "/mock/art/studio/3110/cover.png",
+      "resource" : "art/studio/3110/cover.png"
+    },
+    {
+      "path" : "/mock/art/studio/3108/cover.png",
+      "resource" : "art/studio/3108/cover.png"
+    },
+    {
+      "path" : "/mock/art/movies/all-quiet-on-the-western-front/poster.png",
+      "resource" : "art/movies/all-quiet-on-the-western-front/poster.png"
+    },
+    {
+      "path" : "/mock/art/movies/animal-crackers/backdrop.jpg",
+      "resource" : "art/movies/animal-crackers/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/all-quiet-on-the-western-front/backdrop.jpg",
+      "resource" : "art/movies/all-quiet-on-the-western-front/backdrop.jpg"
+    },
+    {
+      "path" : "/mock/art/movies/animal-crackers/poster.png",
+      "resource" : "art/movies/animal-crackers/poster.png"
+    }
+  ],
+  "authenticatedUserID" : 16,
+  "historyEvents" : [
+    {
+      "deviceID" : 1,
+      "historyKey" : "/status/sessions/history/801",
+      "mediaID" : "1101",
+      "mediaType" : "movie",
+      "userID" : 11,
+      "viewedAtSecondsAgo" : 3600
+    },
+    {
+      "deviceID" : 2,
+      "historyKey" : "/status/sessions/history/802",
+      "mediaID" : "1102",
+      "mediaType" : "movie",
+      "userID" : 12,
+      "viewedAtSecondsAgo" : 7200
+    },
+    {
+      "deviceID" : 3,
+      "historyKey" : "/status/sessions/history/803",
+      "mediaID" : "1103",
+      "mediaType" : "movie",
+      "userID" : 13,
+      "viewedAtSecondsAgo" : 43200
+    },
+    {
+      "deviceID" : 4,
+      "historyKey" : "/status/sessions/history/804",
+      "mediaID" : "1101",
+      "mediaType" : "movie",
+      "userID" : 14,
+      "viewedAtSecondsAgo" : 86400
+    },
+    {
+      "deviceID" : 5,
+      "historyKey" : "/status/sessions/history/805",
+      "mediaID" : "1102",
+      "mediaType" : "movie",
+      "userID" : 15,
+      "viewedAtSecondsAgo" : 172800
+    },
+    {
+      "deviceID" : 1,
+      "historyKey" : "/status/sessions/history/806",
+      "mediaID" : "1103",
+      "mediaType" : "movie",
+      "userID" : 11,
+      "viewedAtSecondsAgo" : 345600
+    },
+    {
+      "deviceID" : 5,
+      "historyKey" : "/status/sessions/history/807",
+      "mediaID" : "2201",
+      "mediaType" : "episode",
+      "userID" : 15,
+      "viewedAtSecondsAgo" : 10800
+    },
+    {
+      "deviceID" : 4,
+      "historyKey" : "/status/sessions/history/808",
+      "mediaID" : "2202",
+      "mediaType" : "episode",
+      "userID" : 14,
+      "viewedAtSecondsAgo" : 216000
+    },
+    {
+      "deviceID" : 2,
+      "historyKey" : "/status/sessions/history/809",
+      "mediaID" : "2203",
+      "mediaType" : "episode",
+      "userID" : 12,
+      "viewedAtSecondsAgo" : 259200
+    },
+    {
+      "deviceID" : 6,
+      "historyKey" : "/status/sessions/history/810",
+      "mediaID" : "2201",
+      "mediaType" : "episode",
+      "userID" : 16,
+      "viewedAtSecondsAgo" : 14400
+    },
+    {
+      "deviceID" : 6,
+      "historyKey" : "/status/sessions/history/811",
+      "mediaID" : "1102",
+      "mediaType" : "movie",
+      "userID" : 16,
+      "viewedAtSecondsAgo" : 129600
+    },
+    {
+      "deviceID" : 7,
+      "historyKey" : "/status/sessions/history/812",
+      "mediaID" : "2203",
+      "mediaType" : "episode",
+      "userID" : 17,
+      "viewedAtSecondsAgo" : 1800
+    },
+    {
+      "deviceID" : 7,
+      "historyKey" : "/status/sessions/history/813",
+      "mediaID" : "1101",
+      "mediaType" : "movie",
+      "userID" : 17,
+      "viewedAtSecondsAgo" : 28800
+    },
+    {
+      "deviceID" : 7,
+      "historyKey" : "/status/sessions/history/814",
+      "mediaID" : "2202",
+      "mediaType" : "episode",
+      "userID" : 17,
+      "viewedAtSecondsAgo" : 604800
+    },
+    {
+      "deviceID" : 1,
+      "historyKey" : "/status/sessions/history/815",
+      "mediaID" : "2202",
+      "mediaType" : "episode",
+      "userID" : 11,
+      "viewedAtSecondsAgo" : 93600
+    },
+    {
+      "deviceID" : 1,
+      "historyKey" : "/status/sessions/history/816",
+      "mediaID" : "1102",
+      "mediaType" : "movie",
+      "userID" : 11,
+      "viewedAtSecondsAgo" : 432000
+    },
+    {
+      "deviceID" : 2,
+      "historyKey" : "/status/sessions/history/817",
+      "mediaID" : "1101",
+      "mediaType" : "movie",
+      "userID" : 12,
+      "viewedAtSecondsAgo" : 691200
+    },
+    {
+      "deviceID" : 5,
+      "historyKey" : "/status/sessions/history/818",
+      "mediaID" : "1103",
+      "mediaType" : "movie",
+      "userID" : 15,
+      "viewedAtSecondsAgo" : 777600
+    },
+    {
+      "deviceID" : 8,
+      "historyKey" : "/status/sessions/history/819",
+      "mediaID" : "1110",
+      "mediaType" : "movie",
+      "userID" : 18,
+      "viewedAtSecondsAgo" : 86400
+    },
+    {
+      "deviceID" : 8,
+      "historyKey" : "/status/sessions/history/820",
+      "mediaID" : "1110",
+      "mediaType" : "movie",
+      "userID" : 18,
+      "viewedAtSecondsAgo" : 345600
+    },
+    {
+      "deviceID" : 8,
+      "historyKey" : "/status/sessions/history/821",
+      "mediaID" : "1101",
+      "mediaType" : "movie",
+      "userID" : 18,
+      "viewedAtSecondsAgo" : 604800
+    },
+    {
+      "deviceID" : 9,
+      "historyKey" : "/status/sessions/history/822",
+      "mediaID" : "1103",
+      "mediaType" : "movie",
+      "userID" : 19,
+      "viewedAtSecondsAgo" : 172800
+    },
+    {
+      "deviceID" : 9,
+      "historyKey" : "/status/sessions/history/823",
+      "mediaID" : "1103",
+      "mediaType" : "movie",
+      "userID" : 19,
+      "viewedAtSecondsAgo" : 691200
+    },
+    {
+      "deviceID" : 9,
+      "historyKey" : "/status/sessions/history/824",
+      "mediaID" : "1107",
+      "mediaType" : "movie",
+      "userID" : 19,
+      "viewedAtSecondsAgo" : 432000
+    },
+    {
+      "deviceID" : 10,
+      "historyKey" : "/status/sessions/history/825",
+      "mediaID" : "1105",
+      "mediaType" : "movie",
+      "userID" : 20,
+      "viewedAtSecondsAgo" : 172800
+    },
+    {
+      "deviceID" : 10,
+      "historyKey" : "/status/sessions/history/826",
+      "mediaID" : "32406",
+      "mediaType" : "track",
+      "userID" : 20,
+      "viewedAtSecondsAgo" : 432000
+    },
+    {
+      "deviceID" : 10,
+      "historyKey" : "/status/sessions/history/827",
+      "mediaID" : "32601",
+      "mediaType" : "track",
+      "userID" : 20,
+      "viewedAtSecondsAgo" : 86400
+    }
+  ],
+  "libraries" : [
+    {
+      "contentChangedAtSecondsAgo" : 7200,
+      "entries" : [
+        {
+          "mediaID" : "1101"
+        },
+        {
+          "mediaID" : "1102"
+        },
+        {
+          "mediaID" : "1103"
+        },
+        {
+          "mediaID" : "1104"
+        },
+        {
+          "mediaID" : "1105"
+        },
+        {
+          "mediaID" : "1106"
+        },
+        {
+          "mediaID" : "1107"
+        },
+        {
+          "mediaID" : "1108"
+        },
+        {
+          "mediaID" : "1109"
+        },
+        {
+          "mediaID" : "1110"
+        },
+        {
+          "mediaID" : "1111"
+        },
+        {
+          "mediaID" : "1112"
+        },
+        {
+          "mediaID" : "1113"
+        },
+        {
+          "mediaID" : "1114"
+        },
+        {
+          "mediaID" : "1115"
+        },
+        {
+          "mediaID" : "1116"
+        },
+        {
+          "mediaID" : "1117"
+        },
+        {
+          "mediaID" : "1118"
+        },
+        {
+          "mediaID" : "1119"
+        },
+        {
+          "mediaID" : "1120"
+        }
+      ],
+      "id" : "library-movies",
+      "scannedAtSecondsAgo" : 9600,
+      "title" : "Movies",
+      "type" : "movie",
+      "updatedAtSecondsAgo" : 10800
+    },
+    {
+      "contentChangedAtSecondsAgo" : 18000,
+      "entries" : [
+        {
+          "mediaID" : "2103"
+        },
+        {
+          "mediaID" : "2102"
+        },
+        {
+          "mediaID" : "2101"
+        },
+        {
+          "mediaID" : "2104"
+        },
+        {
+          "mediaID" : "2105"
+        },
+        {
+          "mediaID" : "2106"
+        },
+        {
+          "mediaID" : "2107"
+        },
+        {
+          "mediaID" : "2108"
+        },
+        {
+          "mediaID" : "2109"
+        },
+        {
+          "mediaID" : "2110"
+        },
+        {
+          "mediaID" : "2111"
+        },
+        {
+          "mediaID" : "2112"
+        }
+      ],
+      "id" : "library-tv-shows",
+      "scannedAtSecondsAgo" : 20400,
+      "title" : "TV Shows",
+      "type" : "show",
+      "updatedAtSecondsAgo" : 21600
+    },
+    {
+      "contentChangedAtSecondsAgo" : 28800,
+      "entries" : [
+        {
+          "mediaID" : "3001"
+        },
+        {
+          "mediaID" : "3002"
+        },
+        {
+          "mediaID" : "3003"
+        },
+        {
+          "mediaID" : "3004"
+        },
+        {
+          "mediaID" : "3005"
+        },
+        {
+          "mediaID" : "3006"
+        },
+        {
+          "mediaID" : "3007"
+        },
+        {
+          "mediaID" : "3008"
+        }
+      ],
+      "id" : "library-audiobooks",
+      "scannedAtSecondsAgo" : 34200,
+      "title" : "Audiobooks",
+      "type" : "artist",
+      "updatedAtSecondsAgo" : 36000
+    }
+  ],
+  "server" : {
+    "accessToken" : "plexbar-debug-mock-server-token",
+    "connections" : [
       {
-        "uri": "https://demo.plexbar.local:32400",
-        "local": true,
-        "relay": false
+        "local" : true,
+        "relay" : false,
+        "uri" : "https://demo.plexbar.local:32400"
       }
-    ]
+    ],
+    "id" : "debug-mock-server",
+    "name" : "Mock Server",
+    "productVersion" : "1.43.1.10611-1e34174b1"
   },
-  "users": [
+  "users" : [
     {
-      "id": 11,
-      "name": "scully",
-      "avatar": "/mock/avatars/dana-scully.png"
-    },
-    {
-      "id": 12,
-      "name": "Elliot",
-      "avatar": "/mock/avatars/elliot-alderson.png"
-    },
-    {
-      "id": 13,
-      "name": "petit_prince",
-      "avatar": "/mock/avatars/le-petit-prince.png"
-    },
-    {
-      "id": 14,
-      "name": "popeye23",
-      "avatar": "/mock/avatars/popeye.png"
-    },
-    {
-      "id": 15,
-      "name": "TommyS",
-      "avatar": "/mock/avatars/tommy-shelby.png"
-    },
-    {
-      "id": 16,
-      "name": "D0loresH4ze",
-      "avatar": "/mock/avatars/darlene-alderson.png"
-    },
-    {
-      "id": 17,
-      "name": "scrump-toggins",
-      "avatar": "/mock/avatars/scrump-toggins.png"
-    }
-  ],
-  "movies": [
-    {
-      "id": "1101",
-      "title": "Charade",
-      "year": 1963,
-      "poster": "/mock/art/movies/charade.png",
-      "art": "/mock/art/movies/charade.png",
-      "originallyAvailableAt": "1963-12-05"
-    },
-    {
-      "id": "1102",
-      "title": "Night of the Living Dead",
-      "year": 1968,
-      "poster": "/mock/art/movies/night-of-the-living-dead.png",
-      "art": "/mock/art/movies/night-of-the-living-dead.png",
-      "originallyAvailableAt": "1968-10-01"
-    },
-    {
-      "id": "1103",
-      "title": "Sherlock Jr.",
-      "year": 1924,
-      "poster": "/mock/art/movies/sherlock-jr.png",
-      "art": "/mock/art/movies/sherlock-jr.png",
-      "originallyAvailableAt": "1924-04-21"
-    }
-  ],
-  "shows": [
-    {
-      "id": "2103",
-      "title": "One Step Beyond",
-      "poster": "/mock/art/tv/one-step-beyond.png",
-      "art": "/mock/art/tv/one-step-beyond.png"
-    },
-    {
-      "id": "2102",
-      "title": "The Adventures of Ozzie and Harriet",
-      "poster": "/mock/art/tv/adventures-of-ozzie-and-harriet.png",
-      "art": "/mock/art/tv/adventures-of-ozzie-and-harriet.png"
-    },
-    {
-      "id": "2101",
-      "title": "The Abbott and Costello Show",
-      "poster": "/mock/art/tv/abbott-and-costello.png",
-      "art": "/mock/art/tv/abbott-and-costello.png"
-    }
-  ],
-  "episodes": [
-    {
-      "id": "2201",
-      "showID": "2103",
-      "title": "The Bride Possessed",
-      "seasonNumber": 1,
-      "episodeNumber": 14,
-      "originallyAvailableAt": "1959-01-20"
-    },
-    {
-      "id": "2202",
-      "showID": "2102",
-      "title": "The Girls' Club",
-      "seasonNumber": 1,
-      "episodeNumber": 5,
-      "originallyAvailableAt": "1952-11-14"
-    },
-    {
-      "id": "2203",
-      "showID": "2101",
-      "title": "The Dentist",
-      "seasonNumber": 1,
-      "episodeNumber": 3,
-      "originallyAvailableAt": "1953-01-16"
-    }
-  ],
-  "audiobooks": [
-    {
-      "id": "3101",
-      "title": "Dracula",
-      "year": 1897,
-      "cover": "/mock/art/audiobooks/dracula.png",
-      "artistTitle": "Bram Stoker",
-      "albumTitle": "Dracula",
-      "trackTitle": "Dracula"
-    },
-    {
-      "id": "3102",
-      "title": "The Time Machine",
-      "year": 1895,
-      "cover": "/mock/art/audiobooks/the-time-machine.png",
-      "artistTitle": "H. G. Wells",
-      "albumTitle": "The Time Machine",
-      "trackTitle": "The Time Machine"
-    },
-    {
-      "id": "3103",
-      "title": "The War of the Worlds",
-      "year": 1898,
-      "cover": "/mock/art/audiobooks/war-of-the-worlds.png",
-      "artistTitle": "H. G. Wells",
-      "albumTitle": "The War of the Worlds",
-      "trackTitle": "The War of the Worlds"
-    }
-  ],
-  "activeSessions": [
-    {
-      "sessionKey": "stream-1",
-      "userID": 11,
-      "mediaType": "movie",
-      "mediaID": "1101",
-      "duration": 5520000,
-      "viewOffset": 3146000,
-      "player": {
-        "address": "192.168.1.11",
-        "machineIdentifier": "den-apple-tv",
-        "platform": "tvOS",
-        "product": "Plex for Apple TV",
-        "remotePublicAddress": "198.51.100.11",
-        "state": "playing",
-        "title": "Apple TV",
-        "local": true,
-        "relayed": false,
-        "secure": true
-      },
-      "session": {
-        "id": "playback-1",
-        "bandwidth": 12000,
-        "location": "lan"
-      },
-      "mediaDecision": "directplay",
-      "mediaStreams": [
-        { "streamType": 1, "codec": "h264", "displayTitle": "1080p (H.264)" },
-        { "streamType": 2, "selected": true, "codec": "ac3", "displayTitle": "English (AC3 5.1)" }
-      ]
-    },
-    {
-      "sessionKey": "stream-2",
-      "userID": 12,
-      "mediaType": "movie",
-      "mediaID": "1102",
-      "duration": 4560000,
-      "viewOffset": 3750000,
-      "player": {
-        "address": "172.16.0.41",
-        "machineIdentifier": "elliot-android",
-        "platform": "Linux",
-        "product": "Plex Web",
-        "remotePublicAddress": "203.0.113.24",
-        "state": "paused",
-        "title": "Iceweasel",
-        "local": false,
-        "relayed": false,
-        "secure": true
-      },
-      "session": {
-        "id": "playback-2",
-        "bandwidth": 8400,
-        "location": "wan"
-      },
-      "transcodeSession": {
-        "key": "transcode-2",
-        "videoDecision": "transcode",
-        "audioDecision": "transcode",
-        "sourceVideoCodec": "hevc",
-        "sourceAudioCodec": "ac3",
-        "videoCodec": "h264",
-        "audioCodec": "aac",
-        "transcodeHwDecoding": "videotoolbox",
-        "transcodeHwEncoding": "videotoolbox"
-      },
-      "mediaDecision": "transcode",
-      "mediaStreams": [
-        { "streamType": 1, "decision": "transcode", "codec": "h264", "displayTitle": "1080p (HEVC Main 10)", "bitrate": 8000 },
-        { "streamType": 2, "selected": true, "decision": "transcode", "codec": "aac", "displayTitle": "English (AC3 5.1)", "bitrate": 256 },
-        { "streamType": 3, "selected": true, "decision": "transcode", "codec": "ass", "language": "English", "displayTitle": "English (SRT)" }
-      ]
-    },
-    {
-      "sessionKey": "stream-3",
-      "userID": 13,
-      "mediaType": "movie",
-      "mediaID": "1103",
-      "duration": 2700000,
-      "viewOffset": 1458000,
-      "player": {
-        "address": "10.0.0.18",
-        "machineIdentifier": "office-safari",
-        "platform": "macOS",
-        "product": "Plex Web",
-        "remotePublicAddress": "198.51.100.73",
-        "state": "playing",
-        "title": "Safari",
-        "local": true,
-        "relayed": false,
-        "secure": true
-      },
-      "session": {
-        "id": "playback-3",
-        "bandwidth": 10200,
-        "location": "lan"
-      },
-      "mediaDecision": "transcode",
-      "mediaStreams": [
-        { "streamType": 1, "decision": "copy", "codec": "h264", "displayTitle": "1080p (H.264)" },
-        { "streamType": 2, "selected": true, "decision": "copy", "codec": "aac", "displayTitle": "English (AAC Stereo)" }
-      ]
-    },
-    {
-      "sessionKey": "stream-4",
-      "userID": 15,
-      "mediaType": "audiobook",
-      "mediaID": "3103",
-      "duration": 1314000,
-      "viewOffset": 486000,
-      "player": {
-        "address": "10.20.0.44",
-        "machineIdentifier": "tommy-plexamp",
-        "platform": "iOS",
-        "product": "Prologue",
-        "remotePublicAddress": "203.0.113.91",
-        "state": "playing",
-        "title": "iPhone",
-        "local": false,
-        "relayed": false,
-        "secure": true
-      },
-      "session": {
-        "id": "playback-4",
-        "bandwidth": 320,
-        "location": "wan"
-      },
-      "mediaDecision": "directplay",
-      "audioStream": {
-        "id": 3103001,
-        "streamType": 2,
-        "codec": "aac",
-        "selected": true,
-        "levels": [
-          -26.9, -28.2, -28.2, -27.9, -29.4, -29.1, -28.5, -28.9,
-          -27.8, -28.0, -27.5, -27.7, -27.2, -27.9, -29.0, -27.4,
-          -29.2, -29.8, -29.5, -29.2, -29.8, -29.5, -28.7, -27.9,
-          -28.2, -28.1, -27.5, -28.1, -28.1, -27.8, -27.3, -27.5,
-          -27.7, -27.3, -28.3, -28.0, -28.3, -28.4, -27.4, -26.5,
-          -26.6, -26.5, -27.1, -28.1, -27.4, -25.7, -25.5, -25.8,
-          -26.7, -26.8, -25.7, -27.1, -27.8, -26.9, -28.8, -28.5,
-          -28.4, -27.8, -27.5, -28.0, -27.8, -28.3, -26.2, -26.7,
-          -27.6, -26.9, -28.0, -28.1, -27.7, -27.5, -30.3, -29.4,
-          -27.2, -21.7, -22.9, -22.1, -21.2, -21.9, -22.0, -23.0,
-          -26.6, -27.1, -27.3, -27.9, -27.8, -28.1, -26.2, -27.7,
-          -27.6, -27.7, -27.3, -27.2, -27.7, -27.3, -27.5, -39.9
-        ]
-      }
-    }
-  ],
-  "resolvedLocationsBySessionKey": {
-    "stream-1": "Portland, OR",
-    "stream-2": "Brooklyn, NY",
-    "stream-3": "Lyon, France",
-    "stream-4": "Birmingham, UK"
-  },
-  "historyEvents": [
-    {
-      "historyKey": "/status/sessions/history/801",
-      "userID": 11,
-      "mediaType": "movie",
-      "mediaID": "1101",
-      "viewedAtSecondsAgo": 3600,
-      "deviceID": 1
-    },
-    {
-      "historyKey": "/status/sessions/history/802",
-      "userID": 12,
-      "mediaType": "movie",
-      "mediaID": "1102",
-      "viewedAtSecondsAgo": 7200,
-      "deviceID": 2
-    },
-    {
-      "historyKey": "/status/sessions/history/803",
-      "userID": 13,
-      "mediaType": "movie",
-      "mediaID": "1103",
-      "viewedAtSecondsAgo": 43200,
-      "deviceID": 3
-    },
-    {
-      "historyKey": "/status/sessions/history/804",
-      "userID": 14,
-      "mediaType": "movie",
-      "mediaID": "1101",
-      "viewedAtSecondsAgo": 86400,
-      "deviceID": 4
-    },
-    {
-      "historyKey": "/status/sessions/history/805",
-      "userID": 15,
-      "mediaType": "movie",
-      "mediaID": "1102",
-      "viewedAtSecondsAgo": 172800,
-      "deviceID": 5
-    },
-    {
-      "historyKey": "/status/sessions/history/806",
-      "userID": 11,
-      "mediaType": "movie",
-      "mediaID": "1103",
-      "viewedAtSecondsAgo": 345600,
-      "deviceID": 1
-    },
-    {
-      "historyKey": "/status/sessions/history/807",
-      "userID": 15,
-      "mediaType": "episode",
-      "mediaID": "2201",
-      "viewedAtSecondsAgo": 10800,
-      "deviceID": 5
-    },
-    {
-      "historyKey": "/status/sessions/history/808",
-      "userID": 14,
-      "mediaType": "episode",
-      "mediaID": "2202",
-      "viewedAtSecondsAgo": 216000,
-      "deviceID": 4
-    },
-    {
-      "historyKey": "/status/sessions/history/809",
-      "userID": 12,
-      "mediaType": "episode",
-      "mediaID": "2203",
-      "viewedAtSecondsAgo": 259200,
-      "deviceID": 2
-    },
-    {
-      "historyKey": "/status/sessions/history/810",
-      "userID": 16,
-      "mediaType": "episode",
-      "mediaID": "2201",
-      "viewedAtSecondsAgo": 14400,
-      "deviceID": 6
-    },
-    {
-      "historyKey": "/status/sessions/history/811",
-      "userID": 16,
-      "mediaType": "movie",
-      "mediaID": "1102",
-      "viewedAtSecondsAgo": 129600,
-      "deviceID": 6
-    },
-    {
-      "historyKey": "/status/sessions/history/812",
-      "userID": 17,
-      "mediaType": "episode",
-      "mediaID": "2203",
-      "viewedAtSecondsAgo": 1800,
-      "deviceID": 7
-    },
-    {
-      "historyKey": "/status/sessions/history/813",
-      "userID": 17,
-      "mediaType": "movie",
-      "mediaID": "1101",
-      "viewedAtSecondsAgo": 28800,
-      "deviceID": 7
-    },
-    {
-      "historyKey": "/status/sessions/history/814",
-      "userID": 17,
-      "mediaType": "episode",
-      "mediaID": "2202",
-      "viewedAtSecondsAgo": 604800,
-      "deviceID": 7
-    },
-    {
-      "historyKey": "/status/sessions/history/815",
-      "userID": 11,
-      "mediaType": "episode",
-      "mediaID": "2202",
-      "viewedAtSecondsAgo": 93600,
-      "deviceID": 1
-    },
-    {
-      "historyKey": "/status/sessions/history/816",
-      "userID": 11,
-      "mediaType": "movie",
-      "mediaID": "1102",
-      "viewedAtSecondsAgo": 432000,
-      "deviceID": 1
-    },
-    {
-      "historyKey": "/status/sessions/history/817",
-      "userID": 12,
-      "mediaType": "movie",
-      "mediaID": "1101",
-      "viewedAtSecondsAgo": 691200,
-      "deviceID": 2
-    },
-    {
-      "historyKey": "/status/sessions/history/818",
-      "userID": 15,
-      "mediaType": "movie",
-      "mediaID": "1103",
-      "viewedAtSecondsAgo": 777600,
-      "deviceID": 5
-    }
-  ],
-  "libraries": [
-    {
-      "id": "library-movies",
-      "title": "Movies",
-      "type": "movie",
-      "updatedAtSecondsAgo": 10800,
-      "scannedAtSecondsAgo": 9600,
-      "contentChangedAtSecondsAgo": 7200,
-      "entries": [
+      "avatar" : "/mock/avatars/dana-scully.png",
+      "devices" : [
         {
-          "mediaID": "1101",
-          "addedAtSecondsAgo": 5400
-        },
-        {
-          "mediaID": "1102",
-          "addedAtSecondsAgo": 25200
-        },
-        {
-          "mediaID": "1103",
-          "addedAtSecondsAgo": 43200
-        }
-      ]
-    },
-    {
-      "id": "library-tv-shows",
-      "title": "TV Shows",
-      "type": "show",
-      "updatedAtSecondsAgo": 21600,
-      "scannedAtSecondsAgo": 20400,
-      "contentChangedAtSecondsAgo": 18000,
-      "entries": [
-        {
-          "mediaID": "2103",
-          "addedAtSecondsAgo": 14400
-        },
-        {
-          "mediaID": "2102",
-          "addedAtSecondsAgo": 18000
-        },
-        {
-          "mediaID": "2101",
-          "addedAtSecondsAgo": 21600
+          "connection" : {
+            "address" : "192.168.1.11",
+            "local" : true,
+            "relayed" : false,
+            "remotePublicAddress" : "198.51.100.11",
+            "resolvedLocation" : "Portland, OR",
+            "secure" : true
+          },
+          "id" : 1,
+          "machineIdentifier" : "den-apple-tv",
+          "platform" : "tvOS",
+          "product" : "Plex for Apple TV",
+          "title" : "Apple TV"
         }
       ],
-      "secondarySummary": {
-        "queryType": 3,
-        "count": 19,
-        "label": "seasons"
-      }
+      "id" : 11,
+      "username" : "scully"
     },
     {
-      "id": "library-audiobooks",
-      "title": "Audiobooks",
-      "type": "artist",
-      "updatedAtSecondsAgo": 36000,
-      "scannedAtSecondsAgo": 34200,
-      "contentChangedAtSecondsAgo": 28800,
-      "entries": [
+      "avatar" : "/mock/avatars/elliot-alderson.png",
+      "devices" : [
         {
-          "mediaID": "3101",
-          "addedAtSecondsAgo": 25200
-        },
-        {
-          "mediaID": "3102",
-          "addedAtSecondsAgo": 28800
-        },
-        {
-          "mediaID": "3103",
-          "addedAtSecondsAgo": 36000
+          "connection" : {
+            "address" : "172.16.0.41",
+            "local" : false,
+            "relayed" : false,
+            "remotePublicAddress" : "203.0.113.24",
+            "resolvedLocation" : "Brooklyn, NY",
+            "secure" : true
+          },
+          "id" : 2,
+          "machineIdentifier" : "elliot-iceweasel",
+          "platform" : "Linux",
+          "product" : "Plex Web",
+          "title" : "Iceweasel"
         }
       ],
-      "secondarySummary": {
-        "queryType": 9,
-        "count": 3,
-        "label": "albums"
-      }
+      "email" : "samsepi0l@proton.me",
+      "id" : 12,
+      "username" : "Elliot"
+    },
+    {
+      "avatar" : "/mock/avatars/le-petit-prince.png",
+      "devices" : [
+        {
+          "connection" : {
+            "address" : "10.0.0.18",
+            "local" : true,
+            "relayed" : false,
+            "remotePublicAddress" : "198.51.100.73",
+            "resolvedLocation" : "Lyon, France",
+            "secure" : true
+          },
+          "id" : 3,
+          "machineIdentifier" : "office-safari",
+          "platform" : "macOS",
+          "product" : "Plex Web",
+          "title" : "Safari"
+        }
+      ],
+      "id" : 13,
+      "username" : "petit_prince"
+    },
+    {
+      "avatar" : "/mock/avatars/popeye.png",
+      "devices" : [
+        {
+          "connection" : {
+
+          },
+          "id" : 4,
+          "machineIdentifier" : "mock-device-4",
+          "title" : "popeye23’s device"
+        }
+      ],
+      "id" : 14,
+      "username" : "popeye23"
+    },
+    {
+      "avatar" : "/mock/avatars/tommy-shelby.png",
+      "devices" : [
+        {
+          "connection" : {
+            "address" : "10.20.0.44",
+            "local" : false,
+            "relayed" : false,
+            "remotePublicAddress" : "203.0.113.91",
+            "resolvedLocation" : "Birmingham, UK",
+            "secure" : true
+          },
+          "id" : 5,
+          "machineIdentifier" : "tommy-prologue",
+          "platform" : "iOS",
+          "product" : "Prologue",
+          "title" : "iPhone"
+        }
+      ],
+      "id" : 15,
+      "username" : "TommyS"
+    },
+    {
+      "avatar" : "/mock/avatars/darlene-alderson.png",
+      "devices" : [
+        {
+          "connection" : {
+
+          },
+          "id" : 6,
+          "machineIdentifier" : "mock-device-6",
+          "title" : "D0loresH4ze’s device"
+        }
+      ],
+      "email" : "d0loresh4ze@proton.me",
+      "id" : 16,
+      "username" : "D0loresH4ze"
+    },
+    {
+      "avatar" : "/mock/avatars/scrump-toggins.png",
+      "devices" : [
+        {
+          "connection" : {
+
+          },
+          "id" : 7,
+          "machineIdentifier" : "mock-device-7",
+          "title" : "scrump-toggins’s device"
+        }
+      ],
+      "id" : 17,
+      "username" : "scrump-toggins"
+    },
+    {
+      "avatar" : "/mock/avatars/thebaumer.png",
+      "devices" : [
+        {
+          "connection" : {
+            "address" : "192.168.9.8",
+            "local" : false,
+            "relayed" : false,
+            "remotePublicAddress" : "203.0.113.108",
+            "resolvedLocation" : "New York, NY"
+          },
+          "id" : 8,
+          "machineIdentifier" : "thebaumer-netscape",
+          "platform" : "Mac OS 9",
+          "product" : "Plex Web",
+          "title" : "Netscape Navigator"
+        }
+      ],
+      "id" : 18,
+      "username" : "TheBaumer"
+    },
+    {
+      "avatar" : "/mock/avatars/le0n.png",
+      "devices" : [
+        {
+          "connection" : {
+            "remotePublicAddress" : "203.0.113.109",
+            "resolvedLocation" : "Manhattan, NY"
+          },
+          "id" : 9,
+          "machineIdentifier" : "le0n-sony-watchman",
+          "platform" : "Analog TV",
+          "title" : "Sony Watchman"
+        }
+      ],
+      "id" : 19,
+      "username" : "Le0n"
+    },
+    {
+      "avatar" : "/mock/avatars/joi.png",
+      "devices" : [
+        {
+          "connection" : {
+            "remotePublicAddress" : "203.0.113.110",
+            "resolvedLocation" : "Los Angeles, CA"
+          },
+          "id" : 10,
+          "machineIdentifier" : "joi-wallace-emanator",
+          "platform" : "Wallace OS",
+          "product" : "Plex for Emanator",
+          "title" : "Wallace Emanator"
+        }
+      ],
+      "id" : 20,
+      "username" : "Joi"
     }
   ]
 }

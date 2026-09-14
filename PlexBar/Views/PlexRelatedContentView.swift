@@ -1,3 +1,4 @@
+import PlexModels
 import SwiftUI
 
 struct PlexRelatedContentView: View {

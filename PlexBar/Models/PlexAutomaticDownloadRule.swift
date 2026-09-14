@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 
 enum PlexAutomaticDownloadPolicy: String, Codable, CaseIterable, Identifiable, Sendable {

@@ -29,6 +29,10 @@ final class PlexLibrarySearchStore {
         isSearching
     }
 
+    func selectContentType(path: String?) {
+        selectedOptions = PlexLibraryBrowseOptions(contentTypePath: path)
+    }
+
     func selectSort(_ sort: PlexLibrarySortDefinition?) {
         selectedOptions.sort = sort?.selection()
     }

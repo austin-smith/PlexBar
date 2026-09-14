@@ -1,4 +1,5 @@
-import AppKit
+import PlexModels
+import PlexMockData
 import Foundation
 
 enum PlexDebugMockServer {
@@ -28,7 +29,6 @@ enum PlexDebugMockServer {
 
     static func makeSession() -> URLSession {
         #if DEBUG
-        debugFixture.seedArtworkCache()
         let stateID = PlexDebugMockStateRegistry.shared.register(PlexDebugMockState())
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpAdditionalHeaders = [PlexDebugMockStateRegistry.headerName: stateID]
@@ -72,13 +72,14 @@ private struct PlexDebugMockFixture {
     let activeConnection: PlexResolvedConnection
     let sessions: [PlexSession]
     let streamLevelsByID: [Int: [Double]]
-    let resolvedLocationsBySessionKey: [String: String]
+    let resolvedLocationsByIPAddress: [String: String]
     let historyItems: [PlexHistoryItem]
-    let metadataItems: [PlexMetadataItem]
+    let catalog: PlexMockMediaCatalog
     let accountsByID: [Int: PlexAccount]
+    let historyDevices: [PlexHistoryDevice]
     let librarySections: [PlexDebugMockLibrarySection]
     let snapshotDate: Date
-    let seededArtwork: [DebugSeededArtwork]
+    let artwork: [DebugMockArtwork]
 
     var libraries: [PlexLibrary] {
         librarySections.map(\.library)
@@ -93,10 +94,10 @@ private struct PlexDebugMockFixture {
         let server = payload.server.materialize()
         let serverURL = server.connections[0].uri
         let usersByID = Dictionary(uniqueKeysWithValues: payload.users.map { ($0.id, $0) })
-        let moviesByID = Dictionary(uniqueKeysWithValues: payload.movies.map { ($0.id, $0) })
-        let showsByID = Dictionary(uniqueKeysWithValues: payload.shows.map { ($0.id, $0) })
-        let episodesByID = Dictionary(uniqueKeysWithValues: payload.episodes.map { ($0.id, $0) })
-        let audiobooksByID = Dictionary(uniqueKeysWithValues: payload.audiobooks.map { ($0.id, $0) })
+        let catalog = try! PlexMockMediaCatalog.loadDefault()
+        precondition(payload.libraries.allSatisfy { library in
+            library.entries.allSatisfy { catalog.record(for: $0.mediaID)?.item.type == library.type }
+        }, "Every mock library root must resolve to the declared media type")
 
         let activeConnection = PlexResolvedConnection(
             serverID: server.id,
@@ -104,9 +105,19 @@ private struct PlexDebugMockFixture {
             kind: .local,
             validatedAt: snapshotDate
         )
-        let authenticatedUser = payload.authenticatedUser.materialize(
-            thumbOverride: localAvatarResourceURL(for: payload.authenticatedUser.thumb)?.absoluteString
+        guard let authenticatedProfile = usersByID[payload.authenticatedUserID] else {
+            preconditionFailure("Missing authenticated mock user")
+        }
+        let avatarResource = payload.artwork.first { $0.path == authenticatedProfile.avatar }
+        let authenticatedUser = authenticatedProfile.materializeAuthenticatedUser(
+            thumbOverride: avatarResource.map { PlexMockServerResourceLocator.url(for: $0.resource).absoluteString }
         )
+        let devices = payload.users.flatMap(\.devices)
+        let locationsByIP = devices.reduce(into: [String: String]()) { locations, device in
+            if let ip = device.connection.remotePublicAddress, let location = device.connection.resolvedLocation {
+                locations[ip] = location
+            }
+        }
 
         let accountsByID = Dictionary(
             uniqueKeysWithValues: payload.users.map { userPayload in
@@ -115,33 +126,13 @@ private struct PlexDebugMockFixture {
             }
         )
         let sessions = payload.activeSessions.map {
-            materializeSession(
-                $0,
-                usersByID: usersByID,
-                moviesByID: moviesByID,
-                showsByID: showsByID,
-                episodesByID: episodesByID,
-                audiobooksByID: audiobooksByID
-            )
+            materializeSession($0, usersByID: usersByID, catalog: catalog)
         }
         let historyItems = payload.historyEvents.map {
-            materializeHistoryItem(
-                $0,
-                referenceDate: snapshotDate,
-                moviesByID: moviesByID,
-                showsByID: showsByID,
-                episodesByID: episodesByID
-            )
+            materializeHistoryItem($0, referenceDate: snapshotDate, catalog: catalog)
         }
-        let metadataItems = payload.episodes.map { materializeMetadataItem($0, showsByID: showsByID) }
         let librarySections = payload.libraries.map {
-            materializeLibrarySection(
-                $0,
-                referenceDate: snapshotDate,
-                moviesByID: moviesByID,
-                showsByID: showsByID,
-                audiobooksByID: audiobooksByID
-            )
+            materializeLibrarySection($0, referenceDate: snapshotDate, catalog: catalog)
         }
 
         return PlexDebugMockFixture(
@@ -156,59 +147,17 @@ private struct PlexDebugMockFixture {
                 },
                 uniquingKeysWith: { existing, _ in existing }
             ),
-            resolvedLocationsBySessionKey: payload.resolvedLocationsBySessionKey,
+            resolvedLocationsByIPAddress: locationsByIP,
             historyItems: historyItems,
-            metadataItems: metadataItems,
+            catalog: catalog,
             accountsByID: accountsByID,
+            historyDevices: devices.map { $0.materializeHistoryDevice() }.sorted { $0.id < $1.id },
             librarySections: librarySections,
             snapshotDate: snapshotDate,
-            seededArtwork: [
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/dana-scully.png", sourceFileName: "dana-scully.png"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/darlene-alderson.png", sourceFileName: "darlene-alderson.png"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/elliot-alderson.png", sourceFileName: "elliot-alderson.png"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/le-petit-prince.png", sourceFileName: "le-petit-prince.png"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/popeye.png", sourceFileName: "popeye.png"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/scrump-toggins.png", sourceFileName: "scrump-toggins.png"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/avatars/tommy-shelby.png", sourceFileName: "tommy-shelby.png"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/movies/charade.png", sourceFileName: "charade.png", resourceDirectory: "Resources/MockServer/art/movies"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/movies/night-of-the-living-dead.png", sourceFileName: "night-of-the-living-dead.png", resourceDirectory: "Resources/MockServer/art/movies"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/movies/sherlock-jr.png", sourceFileName: "sherlock-jr.png", resourceDirectory: "Resources/MockServer/art/movies"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/tv/one-step-beyond.png", sourceFileName: "one-step-beyond.png", resourceDirectory: "Resources/MockServer/art/tv"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/tv/adventures-of-ozzie-and-harriet.png", sourceFileName: "adventures-of-ozzie-and-harriet.png", resourceDirectory: "Resources/MockServer/art/tv"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/tv/abbott-and-costello.png", sourceFileName: "abbott-and-costello.png", resourceDirectory: "Resources/MockServer/art/tv"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/audiobooks/dracula.png", sourceFileName: "dracula.png", resourceDirectory: "Resources/MockServer/art/audiobooks"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/audiobooks/the-time-machine.png", sourceFileName: "the-time-machine.png", resourceDirectory: "Resources/MockServer/art/audiobooks"),
-                DebugSeededArtwork.load(serverURL: serverURL, mockPath: "/mock/art/audiobooks/war-of-the-worlds.png", sourceFileName: "war-of-the-worlds.png", resourceDirectory: "Resources/MockServer/art/audiobooks"),
-            ]
+            artwork: payload.artwork.map {
+                DebugMockArtwork.load(serverURL: serverURL, mockPath: $0.path, resource: $0.resource)
+            }
         )
-    }
-
-    func seedArtworkCache() {
-        let cache = PlexImageMemoryCache.shared
-
-        for artwork in seededArtwork {
-            guard let cgImage = artwork.image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-                continue
-            }
-
-            let cacheKey = "\(artwork.url.absoluteString)|\(server.accessToken)"
-            cache.insert(artwork.image, for: cacheKey)
-            cache.insert(cgImage, for: cacheKey)
-
-            if let localURL = Self.localAvatarResourceURL(for: artwork.url.path),
-               localURL.absoluteString == authenticatedUser.thumb {
-                cache.insert(artwork.image, for: localURL.absoluteString)
-                cache.insert(cgImage, for: localURL.absoluteString)
-            }
-        }
-    }
-
-    private static func localAvatarResourceURL(for thumb: String?) -> URL? {
-        guard let thumb = thumb?.nilIfBlank else {
-            return nil
-        }
-
-        return PlexMockServerResourceLocator.url(for: "avatars/\(URL(fileURLWithPath: thumb).lastPathComponent)")
     }
 
     func response(for request: URLRequest, state: PlexDebugMockState) -> PlexDebugMockResponse? {
@@ -235,6 +184,12 @@ private struct PlexDebugMockFixture {
     private func serverResponse(for request: URLRequest, state: PlexDebugMockState) -> PlexDebugMockResponse? {
         guard let url = request.url else {
             return nil
+        }
+
+        let method = request.httpMethod ?? "GET"
+        let isTermination = url.path == "/status/sessions/terminate" && method == "POST"
+        guard (method == "GET" && url.path != "/status/sessions/terminate") || isTermination else {
+            return errorResponse(for: request, status: 405)
         }
 
         if url.path == "/photo/:/transcode" {
@@ -310,29 +265,26 @@ private struct PlexDebugMockFixture {
         }
 
         if url.path == "/status/sessions/history/all" {
-            return jsonResponse(
-                url: url,
-                object: [
-                    "MediaContainer": [
-                        "Metadata": historyItems.map { historyItemObject(from: $0) }
-                    ]
-                ],
-                headers: ["X-Plex-Container-Total-Size": String(historyItems.count)]
+            let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            let id = query.first { $0.name == "metadataItemID" }?.value
+            let cutoff = query.first { $0.name == "viewedAt>" }?.value.flatMap(Double.init)
+            let items = historyItems.compactMap { history -> (item: PlexHistoryItem, date: Date)? in
+                guard let viewedAt = history.viewedAt else { return nil }
+                let media = history.ratingKey.flatMap { catalog.record(for: $0)?.item }
+                let matchesID = id.map {
+                    [media?.ratingKey, media?.parentRatingKey, media?.grandparentRatingKey].contains($0)
+                } ?? true
+                let matchesDate = cutoff.map { viewedAt.timeIntervalSince1970 > $0 } ?? true
+                return matchesID && matchesDate ? (history, viewedAt) : nil
+            }.sorted { $0.date > $1.date }
+            return pagedMetadataResponse(
+                for: request,
+                metadata: items.map { historyItemObject(from: $0.item) }
             )
         }
 
-        if let metadataIDs = metadataIDs(for: url.path) {
-            let metadata = metadataItems
-                .filter { metadataIDs.contains($0.ratingKey) }
-                .map(metadataItemObject(from:))
-            return jsonResponse(
-                url: url,
-                object: [
-                    "MediaContainer": [
-                        "Metadata": metadata
-                    ]
-                ]
-            )
+        if let response = catalogResponse(for: request) {
+            return response
         }
 
         if url.path == "/statistics/media" {
@@ -342,7 +294,9 @@ private struct PlexDebugMockFixture {
                 object: [
                     "MediaContainer": [
                         "Account": accounts,
-                        "Device": []
+                        "Device": historyDevices.map { device in
+                            compactObject(["id": device.id, "name": device.name, "platform": device.platform])
+                        }
                     ]
                 ]
             )
@@ -377,15 +331,12 @@ private struct PlexDebugMockFixture {
                                 ["type": "promoted", "key": "/hubs/promoted"],
                                 ["type": "continuewatching", "key": "/hubs/continueWatching"],
                                 ["type": "search", "key": "/hubs/search"],
+                                ["type": "playlist", "key": "/playlists", "readOnly": true],
                             ],
                         ]]
                     ]
                 ]
             )
-        }
-
-        if url.path == "/hubs/continueWatching" {
-            return jsonResponse(url: url, object: ["MediaContainer": ["Hub": []]])
         }
 
         if url.path == "/hubs/promoted" {
@@ -443,7 +394,7 @@ private struct PlexDebugMockFixture {
            let librarySection = librarySection(forMockPlaylistID: playlistID) {
             return pagedMetadataResponse(
                 for: request,
-                metadata: librarySection.recentItems.enumerated().map { index, item in
+                metadata: playlistRecords(in: librarySection).enumerated().map { index, item in
                     var object = browseItemObject(from: item, in: librarySection)
                     object["playlistItemID"] = "\(playlistID)-\(index + 1)"
                     return object
@@ -476,61 +427,170 @@ private struct PlexDebugMockFixture {
         }
 
         if let libraryID = libraryID(for: url.path),
-           let librarySection = librarySections.first(where: { $0.library.id == libraryID }) {
-            let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
-            let requestedType = queryItems?
-                .first(where: { $0.name == "type" })?
-                .value
-                .flatMap(Int.init)
-            let titleQuery = queryItems?
-                .first(where: { $0.name == "title" })?
-                .value?
-                .nilIfBlank
-            let sort = queryItems?
-                .first(where: { $0.name == "sort" })?
-                .value
-            let containerStart = Int(request.value(forHTTPHeaderField: "X-Plex-Container-Start") ?? "") ?? 0
-            let containerSize = Int(request.value(forHTTPHeaderField: "X-Plex-Container-Size") ?? "") ?? 1
-
-            let matchingItems = librarySection.recentItems.filter { item in
-                guard let titleQuery else {
-                    return true
-                }
-                return item.title.localizedStandardContains(titleQuery)
+           let section = librarySections.first(where: { $0.library.id == libraryID }) {
+            let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            let requestedType = query.first { $0.name == "type" }?.value.flatMap(Int.init)
+            let typeNames = [1: "movie", 2: "show", 3: "season", 4: "episode", 8: "artist", 9: "album", 10: "track"]
+            let type = requestedType.flatMap { typeNames[$0] } ?? section.rawType
+            let title = query.first { $0.name == "title" }?.value?.nilIfBlank
+            let unwatched = query.contains { $0.name == "unwatched" && $0.value == "1" }
+            let inProgress = query.contains { $0.name == "inProgress" && $0.value == "1" }
+            let records = catalog.records.filter { record in
+                let item = record.item
+                return item.librarySectionID == libraryID && item.type == type
+                    && (title.map { item.title.localizedStandardContains($0) } ?? true)
+                    && (!unwatched || !item.isWatched)
+                    && (!inProgress || hasProgress(record))
             }
-            let sortedItems = sortedLibraryItems(matchingItems, sort: sort)
-            let totalSize = if let requestedType {
-                librarySection.countOverrides[requestedType] ?? librarySection.library.itemCount
-            } else if titleQuery != nil {
-                matchingItems.count
-            } else {
-                librarySection.library.itemCount
-            }
-            let metadata = if containerSize != 0 {
-                Array(
-                    sortedItems
-                        .dropFirst(containerStart)
-                        .prefix(containerSize)
-                        .map(libraryRecentItemObject(from:))
-                )
-            } else {
-                []
-            }
-
-            return jsonResponse(
-                url: url,
-                object: [
-                    "MediaContainer": [
-                        "size": metadata.count,
-                        "totalSize": totalSize,
-                        "Metadata": metadata
-                    ]
-                ],
-                headers: ["X-Plex-Container-Total-Size": String(totalSize)]
-            )
+            let sorted = sortedLibraryItems(records, sort: query.first { $0.name == "sort" }?.value)
+            return pagedMetadataResponse(for: request, metadata: sorted.map { $0.object(referenceDate: snapshotDate) })
         }
 
         return nil
+    }
+
+    func errorResponse(for request: URLRequest, status: Int) -> PlexDebugMockResponse {
+        let url = request.url!
+        let message = "Mock data does not support \(request.httpMethod ?? "GET") \(url.path)"
+        return PlexDebugMockResponse(
+            response: HTTPURLResponse(
+                url: url, statusCode: status, httpVersion: nil,
+                headerFields: ["Content-Type": "text/plain; charset=utf-8"]
+            )!,
+            data: Data(message.utf8)
+        )
+    }
+
+    private func hasProgress(_ record: PlexMockMediaCatalog.Record) -> Bool {
+        let items = record.item.hasChildren ? catalog.leaves(of: record.item.ratingKey) : [record]
+        return items.contains { ($0.item.viewOffset ?? 0) > 0 && !$0.item.isWatched }
+    }
+
+    private func playlistRecords(in section: PlexDebugMockLibrarySection) -> [PlexMockMediaCatalog.Record] {
+        section.rawType == "artist"
+            ? section.recentItems.flatMap { catalog.leaves(of: $0.item.ratingKey) }
+            : section.recentItems
+    }
+
+    private func catalogResponse(for request: URLRequest) -> PlexDebugMockResponse? {
+        guard let url = request.url else { return nil }
+        let components = url.path.split(separator: "/").map(String.init)
+        let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let count = max(query.first { $0.name == "count" || $0.name == "limit" }?.value.flatMap(Int.init) ?? 20, 1)
+
+        if let ids = metadataIDs(for: url.path) {
+            let objects = ids.sorted().compactMap { id -> [String: Any]? in
+                if let record = catalog.record(for: id) {
+                    return record.object(referenceDate: snapshotDate)
+                }
+                if let section = librarySection(forMockCollectionID: id) {
+                    return collectionObject(from: section, collectionID: id)
+                }
+                return playlistObjects().first { $0["ratingKey"] as? String == id }
+            }
+            guard objects.count == ids.count else { return errorResponse(for: request, status: 404) }
+            return pagedMetadataResponse(for: request, metadata: objects)
+        }
+
+        if components.count == 4, components[0] == "library", components[1] == "metadata",
+           let record = catalog.record(for: components[2]) {
+            let records: [PlexMockMediaCatalog.Record]
+            switch components[3] {
+            case "children": records = catalog.children(of: record.item.ratingKey)
+            case "grandchildren", "allLeaves": records = catalog.leaves(of: record.item.ratingKey)
+            case "extras": records = record.extraIDs.compactMap { catalog.record(for: $0) }
+            default: return nil
+            }
+            return pagedMetadataResponse(for: request, metadata: records.map { $0.object(referenceDate: snapshotDate) })
+        }
+
+        if url.path == "/hubs/continueWatching" || url.path == "/hubs/home/continueWatching" {
+            let records = catalog.records.filter {
+                ($0.item.type == "movie" || $0.item.type == "episode") && hasProgress($0)
+            }
+            if url.path == "/hubs/home/continueWatching" {
+                return pagedMetadataResponse(for: request, metadata: records.map { $0.object(referenceDate: snapshotDate) })
+            }
+            return jsonResponse(url: url, object: ["MediaContainer": ["Hub": [hubObject(
+                id: "continueWatching", title: "Continue Watching", type: "mixed",
+                key: "/hubs/home/continueWatching", records: records, count: count
+            )]]])
+        }
+
+        if url.path == "/hubs/search" || url.path == "/hubs/search/results" {
+            let text = query.first { $0.name == "query" }?.value?.nilIfBlank ?? ""
+            let type = query.first { $0.name == "type" }?.value
+            let matches = catalog.records.filter { record in
+                let item = record.item
+                guard !text.isEmpty, !["season", "clip"].contains(item.type ?? "") else { return false }
+                return [item.title, item.parentTitle, item.grandparentTitle].compactMap { $0 }
+                    .contains { $0.localizedStandardContains(text) }
+                    || (item.roles + item.directors + item.writers).contains { $0.tag.localizedStandardContains(text) }
+            }
+            if url.path == "/hubs/search/results" {
+                return pagedMetadataResponse(for: request, metadata: matches.filter { $0.item.type == type }
+                    .map { $0.object(referenceDate: snapshotDate) })
+            }
+            let groups = [("movie", "Movies"), ("show", "TV Shows"), ("episode", "Episodes"),
+                          ("artist", "Artists"), ("album", "Albums"), ("track", "Tracks")]
+            let hubs = groups.compactMap { type, title -> [String: Any]? in
+                let items = matches.filter { $0.item.type == type }
+                guard !items.isEmpty else { return nil }
+                var path = URLComponents()
+                path.path = "/hubs/search/results"
+                path.queryItems = [URLQueryItem(name: "query", value: text), URLQueryItem(name: "type", value: type)]
+                return hubObject(id: "search.\(type)", title: title, type: type,
+                                 key: path.string!, records: items, count: count)
+            }
+            return jsonResponse(url: url, object: ["MediaContainer": ["Hub": hubs]])
+        }
+
+        if components.count == 4 || components.count == 5,
+           components[0] == "hubs", components[1] == "metadata", components[3] == "related",
+           let record = catalog.record(for: components[2]) {
+            let related = record.relatedIDs.compactMap { catalog.record(for: $0) }
+            let key = "/hubs/metadata/\(record.item.ratingKey)/related/items"
+            if components.count == 5 {
+                guard components[4] == "items" else { return nil }
+                return pagedMetadataResponse(for: request, metadata: related.map { $0.object(referenceDate: snapshotDate) })
+            }
+            let hubs = related.isEmpty ? [] : [hubObject(
+                id: "related.\(record.item.ratingKey)", title: "More in This Library",
+                type: related.first?.item.type ?? "mixed", key: key, records: related, count: count
+            )]
+            return jsonResponse(url: url, object: ["MediaContainer": ["Hub": hubs]])
+        }
+
+        if (components.count == 3 || components.count == 4),
+           components[0] == "library", components[1] == "people" {
+            let id = components[2]
+            let records = catalog.records.filter { record in
+                let item = record.item
+                return (item.roles + item.directors + item.writers + item.producers).contains { $0.tagKey == id }
+            }
+            guard let item = records.first?.item,
+                  let person = (item.roles + item.directors + item.writers + item.producers).first(where: { $0.tagKey == id }) else {
+                return errorResponse(for: request, status: 404)
+            }
+            if components.count == 4 {
+                guard components[3] == "media" else { return nil }
+                return pagedMetadataResponse(for: request, metadata: records.map { $0.object(referenceDate: snapshotDate) })
+            }
+            return jsonResponse(url: url, object: ["MediaContainer": ["Directory": [compactObject([
+                "id": person.id, "tag": person.tag, "tagKey": person.tagKey, "thumb": person.thumb
+            ])]]])
+        }
+        return nil
+    }
+
+    private func hubObject(
+        id: String, title: String, type: String, key: String,
+        records: [PlexMockMediaCatalog.Record], count: Int
+    ) -> [String: Any] {
+        let items = Array(records.prefix(count))
+        return ["hubIdentifier": id, "key": key, "title": title, "type": type,
+                "size": items.count, "totalSize": records.count, "more": records.count > items.count,
+                "Metadata": items.map { $0.object(referenceDate: snapshotDate) }]
     }
 
     private func remoteResponse(for request: URLRequest) -> PlexDebugMockResponse? {
@@ -617,11 +677,7 @@ private struct PlexDebugMockFixture {
             return nil
         }
 
-        let location = sessions
-            .first(where: { $0.geoLookupIPAddress == ipAddress })
-            .flatMap { session in
-                session.canonicalSessionKey.flatMap { resolvedLocationsBySessionKey[$0] }
-            }
+        let location = resolvedLocationsByIPAddress[ipAddress]
 
         let xml: String
         if let location {
@@ -643,11 +699,11 @@ private struct PlexDebugMockFixture {
     }
 
     private func imageResponse(for url: URL) -> PlexDebugMockResponse? {
-        guard let artwork = seededArtwork.first(where: { $0.url.path == url.path }) else {
+        guard let artwork = artwork.first(where: { $0.url.path == url.path }) else {
             return nil
         }
 
-        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "image/png"])!
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": artwork.contentType])!
         return PlexDebugMockResponse(response: response, data: artwork.data)
     }
 
@@ -708,7 +764,7 @@ private struct PlexDebugMockFixture {
 
     private func libraryID(for path: String) -> String? {
         let components = path.split(separator: "/")
-        guard components.count >= 4,
+        guard components.count == 4,
               components[0] == "library",
               components[1] == "sections",
               components[3] == "all" else {
@@ -773,7 +829,7 @@ private struct PlexDebugMockFixture {
 
     private func metadataIDs(for path: String) -> Set<String>? {
         let components = path.split(separator: "/")
-        guard components.count >= 3,
+        guard components.count == 3,
               components[0] == "library",
               components[1] == "metadata" else {
             return nil
@@ -815,8 +871,8 @@ private struct PlexDebugMockFixture {
         guard let url = request.url else {
             return nil
         }
-        let start = Int(request.value(forHTTPHeaderField: "X-Plex-Container-Start") ?? "") ?? 0
-        let size = Int(request.value(forHTTPHeaderField: "X-Plex-Container-Size") ?? "") ?? metadata.count
+        let start = max(Int(request.value(forHTTPHeaderField: "X-Plex-Container-Start") ?? "") ?? 0, 0)
+        let size = max(Int(request.value(forHTTPHeaderField: "X-Plex-Container-Size") ?? "") ?? metadata.count, 0)
         let page = Array(metadata.dropFirst(start).prefix(size))
         return jsonResponse(
             url: url,
@@ -960,15 +1016,6 @@ private struct PlexDebugMockFixture {
         ])
     }
 
-    private func metadataItemObject(from item: PlexMetadataItem) -> [String: Any] {
-        compactObject([
-            "ratingKey": item.ratingKey,
-            "grandparentRatingKey": item.grandparentRatingKey,
-            "grandparentTitle": item.grandparentTitle,
-            "grandparentThumb": item.grandparentThumb,
-        ])
-    }
-
     private func libraryDirectoryObject(from section: PlexDebugMockLibrarySection) -> [String: Any] {
         let library = section.library
         return compactObject([
@@ -1057,82 +1104,52 @@ private struct PlexDebugMockFixture {
         from section: PlexDebugMockLibrarySection
     ) -> [String: Any] {
         guard let metadataTypeID = section.library.type.metadataTypeID else {
-            return ["MediaContainer": ["Directory": []]]
+            return ["MediaContainer": ["Directory": [], "Type": []]]
         }
+        let browseTypes: [(id: Int, type: String, title: String)] = section.rawType == "artist"
+            ? [(8, "artist", "Artists"), (9, "album", "Albums"), (10, "track", "Tracks")]
+            : [(metadataTypeID, section.rawType, section.library.title)]
+        let filters = (libraryFiltersObject(from: section)["MediaContainer"] as? [String: Any])?["Directory"]
+            as? [[String: Any]] ?? []
+        let sorts = (librarySortsObject(from: section)["MediaContainer"] as? [String: Any])?["Directory"]
+            as? [[String: Any]] ?? []
         return [
             "MediaContainer": [
-                "Directory": [[
-                    "key": "/library/sections/\(section.library.id)/all?type=\(metadataTypeID)",
-                    "title": section.library.title,
-                    "type": String(metadataTypeID),
-                    "Filter": [
-                        [
-                            "filter": "unwatched",
-                            "filterType": "boolean",
-                            "key": "/library/sections/\(section.library.id)/unwatched",
-                            "title": "Unwatched"
-                        ],
-                        [
-                            "filter": "inProgress",
-                            "filterType": "boolean",
-                            "key": "/library/sections/\(section.library.id)/inProgress",
-                            "title": "In Progress"
-                        ]
-                    ],
-                    "Sort": [
-                        [
-                            "default": "asc",
-                            "defaultDirection": "asc",
-                            "descKey": "titleSort:desc",
-                            "key": "titleSort",
-                            "title": "Name"
-                        ],
-                        [
-                            "defaultDirection": "desc",
-                            "descKey": "addedAt:desc",
-                            "key": "addedAt",
-                            "title": "Date Added"
-                        ]
-                    ]
-                ]]
+                "Directory": [["key": "all", "title": "All \(browseTypes[0].title)"]],
+                "Type": browseTypes.map { type in
+                    [
+                        "key": "/library/sections/\(section.library.id)/all?type=\(type.id)",
+                        "type": type.type,
+                        "title": type.title,
+                        "Filter": section.rawType == "artist" ? [] : filters,
+                        "Sort": sorts,
+                    ] as [String: Any]
+                },
             ]
         ]
     }
 
     private func sortedLibraryItems(
-        _ items: [PlexDebugMockLibraryItem],
+        _ items: [PlexMockMediaCatalog.Record],
         sort: String?
-    ) -> [PlexDebugMockLibraryItem] {
+    ) -> [PlexMockMediaCatalog.Record] {
         switch sort {
         case "titleSort:desc":
-            items.sorted { $0.title.localizedStandardCompare($1.title) == .orderedDescending }
+            items.sorted { $0.item.title.localizedStandardCompare($1.item.title) == .orderedDescending }
         case "addedAt":
-            items.sorted { ($0.addedAt ?? .distantPast) < ($1.addedAt ?? .distantPast) }
+            items.sorted { $0.addedAtSecondsAgo > $1.addedAtSecondsAgo }
         case "addedAt:desc":
-            items.sorted { ($0.addedAt ?? .distantPast) > ($1.addedAt ?? .distantPast) }
+            items.sorted { $0.addedAtSecondsAgo < $1.addedAtSecondsAgo }
         default:
-            items.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            items.sorted { $0.item.title.localizedStandardCompare($1.item.title) == .orderedAscending }
         }
     }
 
-    private func libraryRecentItemObject(from item: PlexDebugMockLibraryItem) -> [String: Any] {
-        compactObject([
-            "ratingKey": item.ratingKey,
-            "title": item.title,
-            "addedAt": item.addedAt.map { Int($0.timeIntervalSince1970) },
-            "art": item.art,
-            "thumb": item.thumb,
-        ])
-    }
-
     private func browseItemObject(
-        from item: PlexDebugMockLibraryItem,
+        from item: PlexMockMediaCatalog.Record,
         in section: PlexDebugMockLibrarySection
     ) -> [String: Any] {
-        var object = libraryRecentItemObject(from: item)
-        object["key"] = "/library/metadata/\(item.ratingKey)"
-        object["type"] = section.rawType
-        return object
+        item.object(referenceDate: snapshotDate)
     }
 
     private func promotedHubObjects(itemLimit: Int) -> [[String: Any]] {
@@ -1142,20 +1159,28 @@ private struct PlexDebugMockFixture {
                 return nil
             }
 
-            let items = Array(section.recentItems.prefix(itemLimit))
+            let isAudio = section.rawType == "artist"
+            let recentItems = isAudio
+                ? sortedLibraryItems(catalog.records.filter {
+                    $0.item.librarySectionID == section.library.id && $0.item.type == "album"
+                }, sort: "addedAt:desc")
+                : section.recentItems
+            let items = Array(recentItems.prefix(itemLimit))
             let metadata = items.map { browseItemObject(from: $0, in: section) }
             let hubKey = items
-                .map { "/library/metadata/\($0.ratingKey)" }
+                .map { "/library/metadata/\($0.item.ratingKey)" }
                 .joined(separator: ",")
             return [
-                "hubIdentifier": "home.\(section.library.id).recent",
+                "hubIdentifier": isAudio ? "music.recent.added.\(section.library.id)" : "home.\(section.library.id).recent",
                 "hubKey": hubKey,
-                "key": "/hubs/home/recentlyAdded?type=\(metadataTypeID)",
+                "key": isAudio
+                    ? "/library/sections/\(section.library.id)/all?type=9&sort=addedAt:desc"
+                    : "/hubs/home/recentlyAdded?type=\(metadataTypeID)",
                 "title": "Recently Added \(section.library.title)",
-                "type": section.rawType,
+                "type": isAudio ? "album" : section.rawType,
                 "size": metadata.count,
-                "totalSize": section.recentItems.count,
-                "more": section.recentItems.count > metadata.count,
+                "totalSize": recentItems.count,
+                "more": recentItems.count > metadata.count,
                 "style": "shelf",
                 "promoted": true,
                 "Metadata": metadata
@@ -1199,7 +1224,7 @@ private struct PlexDebugMockFixture {
             "key": "/library/collections/\(collectionID)/items",
             "type": "collection",
             "title": "\(section.library.title) Collection",
-            "composite": section.recentItems.first?.thumb,
+            "composite": section.recentItems.first?.item.thumb,
             "leafCount": section.recentItems.count
         ])
     }
@@ -1218,8 +1243,9 @@ private struct PlexDebugMockFixture {
                 "key": "/playlists/\(definition.id)/items",
                 "type": "playlist",
                 "title": definition.title,
-                "composite": section.recentItems.first?.thumb,
-                "leafCount": section.recentItems.count,
+                "composite": section.recentItems.first?.item.thumb,
+                "leafCount": playlistRecords(in: section).count,
+                "readOnly": true,
                 "playlistType": definition.type,
                 "smart": false
             ])
@@ -1256,20 +1282,13 @@ private struct PlexDebugMockFixture {
     private static func materializeSession(
         _ session: PlexMockServerPayload.ActiveSession,
         usersByID: [Int: PlexMockServerPayload.User],
-        moviesByID: [String: PlexMockServerPayload.Movie],
-        showsByID: [String: PlexMockServerPayload.Show],
-        episodesByID: [String: PlexMockServerPayload.Episode],
-        audiobooksByID: [String: PlexMockServerPayload.Audiobook]
+        catalog: PlexMockMediaCatalog
     ) -> PlexSession {
-        let user = resolvedUser(for: session.userID, usersByID: usersByID)
-        let media = resolvedMedia(
-            type: session.mediaType,
-            id: session.mediaID,
-            moviesByID: moviesByID,
-            showsByID: showsByID,
-            episodesByID: episodesByID,
-            audiobooksByID: audiobooksByID
-        )
+        guard let profile = usersByID[session.userID],
+              let device = profile.devices.first(where: { $0.id == session.deviceID }),
+              let media = catalog.record(for: session.mediaID)?.item else {
+            preconditionFailure("Missing mock session user, device, or media")
+        }
         let mediaParts: [PlexMedia]?
         if session.mediaDecision != nil || session.audioStream != nil {
             let stream = session.audioStream.map {
@@ -1290,8 +1309,8 @@ private struct PlexDebugMockFixture {
 
         return PlexSession(
             sessionKey: session.sessionKey,
-            ratingKey: media.id,
-            key: "/library/metadata/\(media.id)",
+            ratingKey: media.ratingKey,
+            key: "/library/metadata/\(media.ratingKey)",
             type: media.type,
             subtype: nil,
             live: false,
@@ -1304,12 +1323,12 @@ private struct PlexDebugMockFixture {
             parentThumb: media.parentThumb,
             grandparentThumb: media.grandparentThumb,
             art: media.art,
-            duration: session.duration,
+            duration: media.duration,
             viewOffset: session.viewOffset,
             year: media.year,
-            user: user,
-            player: session.player.materialize(),
-            session: session.session?.materialize(),
+            user: profile.materializeUser(),
+            player: device.materializePlayer(state: session.state),
+            session: session.session?.materialize(location: device.connection.sessionLocation),
             transcodeSession: session.transcodeSession,
             media: mediaParts
         )
@@ -1318,23 +1337,16 @@ private struct PlexDebugMockFixture {
     private static func materializeHistoryItem(
         _ event: PlexMockServerPayload.HistoryEvent,
         referenceDate: Date,
-        moviesByID: [String: PlexMockServerPayload.Movie],
-        showsByID: [String: PlexMockServerPayload.Show],
-        episodesByID: [String: PlexMockServerPayload.Episode]
+        catalog: PlexMockMediaCatalog
     ) -> PlexHistoryItem {
-        let media = resolvedMedia(
-            type: event.mediaType,
-            id: event.mediaID,
-            moviesByID: moviesByID,
-            showsByID: showsByID,
-            episodesByID: episodesByID,
-            audiobooksByID: [:]
-        )
+        guard let media = catalog.record(for: event.mediaID)?.item else {
+            preconditionFailure("Missing mock history media \(event.mediaID)")
+        }
 
         return PlexHistoryItem(
             historyKey: event.historyKey,
-            key: "/library/metadata/\(media.id)",
-            ratingKey: media.id,
+            key: "/library/metadata/\(media.ratingKey)",
+            ratingKey: media.ratingKey,
             title: media.title,
             type: media.type,
             thumb: media.thumb,
@@ -1352,258 +1364,57 @@ private struct PlexDebugMockFixture {
         )
     }
 
-    private static func materializeMetadataItem(
-        _ episode: PlexMockServerPayload.Episode,
-        showsByID: [String: PlexMockServerPayload.Show]
-    ) -> PlexMetadataItem {
-        guard let show = showsByID[episode.showID] else {
-            preconditionFailure("Missing mock show \(episode.showID) for episode \(episode.id)")
-        }
-
-        return PlexMetadataItem(
-            ratingKey: episode.id,
-            grandparentRatingKey: show.id,
-            grandparentTitle: show.title,
-            grandparentThumb: show.poster
-        )
-    }
-
     private static func materializeLibrarySection(
         _ library: PlexMockServerPayload.Library,
         referenceDate: Date,
-        moviesByID: [String: PlexMockServerPayload.Movie],
-        showsByID: [String: PlexMockServerPayload.Show],
-        audiobooksByID: [String: PlexMockServerPayload.Audiobook]
+        catalog: PlexMockMediaCatalog
     ) -> PlexDebugMockLibrarySection {
-        let recentItems: [PlexDebugMockLibraryItem]
-        if library.type == "artist" {
-            var latestEntryByArtist: [String: (entry: PlexMockServerPayload.LibraryEntry, audiobook: PlexMockServerPayload.Audiobook)] = [:]
-            var artistOrder: [String] = []
-
-            for entry in library.entries.sorted(by: { $0.addedAtSecondsAgo < $1.addedAtSecondsAgo }) {
-                guard let audiobook = audiobooksByID[entry.mediaID],
-                      let artistTitle = audiobook.artistTitle?.nilIfBlank else {
-                    continue
-                }
-
-                if latestEntryByArtist[artistTitle] == nil {
-                    artistOrder.append(artistTitle)
-                    latestEntryByArtist[artistTitle] = (entry, audiobook)
-                }
-            }
-
-            recentItems = artistOrder.compactMap { artistTitle -> PlexDebugMockLibraryItem? in
-                guard let resolved = latestEntryByArtist[artistTitle] else {
-                    return nil
-                }
-
-                return PlexDebugMockLibraryItem(
-                    ratingKey: resolved.audiobook.id,
-                    title: artistTitle,
-                    addedAt: referenceDate.addingTimeInterval(-TimeInterval(resolved.entry.addedAtSecondsAgo)),
-                    art: resolved.audiobook.art ?? resolved.audiobook.cover,
-                    thumb: resolved.audiobook.cover
-                )
-            }
-        } else {
-            recentItems = library.entries
-                .sorted { $0.addedAtSecondsAgo < $1.addedAtSecondsAgo }
-                .map {
-                    resolvedLibraryItem(
-                        type: library.type,
-                        id: $0.mediaID,
-                        moviesByID: moviesByID,
-                        showsByID: showsByID,
-                        audiobooksByID: audiobooksByID
-                    ).recentItem(addedAt: referenceDate.addingTimeInterval(-TimeInterval($0.addedAtSecondsAgo)))
-                }
+        let recentItems = library.entries.map { catalog.record(for: $0.mediaID)! }
+            .sorted { $0.addedAtSecondsAgo < $1.addedAtSecondsAgo }
+        let latest = recentItems.first
+        let secondaryType: String? = switch library.type {
+        case "show": "season"
+        case "artist": "album"
+        default: nil
         }
-
-        let latestItem = recentItems.first
-        let secondarySummary = library.secondarySummary
-
+        let secondaryCount = secondaryType.map { type in
+            catalog.records.filter { $0.item.librarySectionID == library.id && $0.item.type == type }.count
+        }
         return PlexDebugMockLibrarySection(
             library: PlexLibrary(
                 id: library.id,
                 title: library.title,
                 type: PlexLibraryType(rawValue: library.type),
-                compositePath: latestItem?.thumb,
-                artPath: latestItem?.art,
-                thumbPath: latestItem?.thumb,
+                compositePath: latest?.item.thumb,
+                artPath: latest?.item.art,
+                thumbPath: latest?.item.thumb,
                 itemCount: recentItems.count,
-                secondaryCount: secondarySummary?.count,
-                secondaryCountLabel: secondarySummary?.label,
+                secondaryCount: secondaryCount,
+                secondaryCountLabel: secondaryType.map { $0 == "season" ? "seasons" : "albums" },
                 updatedAt: library.updatedAtSecondsAgo.map { referenceDate.addingTimeInterval(-TimeInterval($0)) },
                 scannedAt: library.scannedAtSecondsAgo.map { referenceDate.addingTimeInterval(-TimeInterval($0)) },
                 contentChangedAt: library.contentChangedAtSecondsAgo.map { referenceDate.addingTimeInterval(-TimeInterval($0)) },
-                latestAddedAt: latestItem?.addedAt,
-                latestItemTitle: latestItem?.title
+                latestAddedAt: latest.map { referenceDate.addingTimeInterval(-TimeInterval($0.addedAtSecondsAgo)) },
+                latestItemTitle: latest?.item.title
             ),
             rawType: library.type,
-            recentItems: recentItems,
-            countOverrides: secondarySummary.map { [$0.queryType: $0.count] } ?? [:]
+            recentItems: recentItems
         )
-    }
-
-    private static func resolvedUser(
-        for userID: Int,
-        usersByID: [Int: PlexMockServerPayload.User]
-    ) -> PlexUser {
-        guard let user = usersByID[userID] else {
-            preconditionFailure("Missing mock user \(userID)")
-        }
-
-        return user.materializeUser()
-    }
-
-    private static func resolvedMedia(
-        type: String,
-        id: String,
-        moviesByID: [String: PlexMockServerPayload.Movie],
-        showsByID: [String: PlexMockServerPayload.Show],
-        episodesByID: [String: PlexMockServerPayload.Episode],
-        audiobooksByID: [String: PlexMockServerPayload.Audiobook]
-    ) -> PlexDebugResolvedMedia {
-        switch type {
-        case "movie":
-            guard let movie = moviesByID[id] else {
-                preconditionFailure("Missing mock movie \(id)")
-            }
-
-            return PlexDebugResolvedMedia(
-                id: movie.id,
-                type: "movie",
-                title: movie.title,
-                year: movie.year,
-                thumb: movie.poster,
-                parentThumb: nil,
-                grandparentThumb: nil,
-                art: movie.art,
-                grandparentTitle: nil,
-                parentTitle: nil,
-                parentIndex: nil,
-                index: nil,
-                originallyAvailableAt: movie.originallyAvailableAt
-            )
-        case "episode":
-            guard let episode = episodesByID[id] else {
-                preconditionFailure("Missing mock episode \(id)")
-            }
-            guard let show = showsByID[episode.showID] else {
-                preconditionFailure("Missing mock show \(episode.showID) for episode \(id)")
-            }
-
-            return PlexDebugResolvedMedia(
-                id: episode.id,
-                type: "episode",
-                title: episode.title,
-                year: nil,
-                thumb: nil,
-                parentThumb: nil,
-                grandparentThumb: show.poster,
-                art: show.art,
-                grandparentTitle: show.title,
-                parentTitle: "Season \(episode.seasonNumber)",
-                parentIndex: episode.seasonNumber,
-                index: episode.episodeNumber,
-                originallyAvailableAt: episode.originallyAvailableAt
-            )
-        case "audiobook":
-            guard let audiobook = audiobooksByID[id] else {
-                preconditionFailure("Missing mock audiobook \(id)")
-            }
-
-            return PlexDebugResolvedMedia(
-                id: audiobook.id,
-                type: "track",
-                title: audiobook.trackTitle ?? audiobook.title,
-                year: audiobook.year,
-                thumb: audiobook.cover,
-                parentThumb: audiobook.cover,
-                grandparentThumb: nil,
-                art: audiobook.art,
-                grandparentTitle: audiobook.artistTitle,
-                parentTitle: audiobook.albumTitle ?? audiobook.title,
-                parentIndex: nil,
-                index: nil,
-                originallyAvailableAt: nil
-            )
-        default:
-            preconditionFailure("Unsupported mock media type \(type)")
-        }
-    }
-
-    private static func resolvedLibraryItem(
-        type: String,
-        id: String,
-        moviesByID: [String: PlexMockServerPayload.Movie],
-        showsByID: [String: PlexMockServerPayload.Show],
-        audiobooksByID: [String: PlexMockServerPayload.Audiobook]
-    ) -> PlexDebugResolvedLibraryItem {
-        switch type {
-        case "movie":
-            guard let movie = moviesByID[id] else {
-                preconditionFailure("Missing mock movie \(id)")
-            }
-
-            return PlexDebugResolvedLibraryItem(
-                ratingKey: movie.id,
-                title: movie.title,
-                thumb: movie.poster,
-                art: movie.art
-            )
-        case "show":
-            guard let show = showsByID[id] else {
-                preconditionFailure("Missing mock show \(id)")
-            }
-
-            return PlexDebugResolvedLibraryItem(
-                ratingKey: show.id,
-                title: show.title,
-                thumb: show.poster,
-                art: show.art
-            )
-        case "audiobook", "artist":
-            guard let audiobook = audiobooksByID[id] else {
-                preconditionFailure("Missing mock audiobook \(id)")
-            }
-
-            return PlexDebugResolvedLibraryItem(
-                ratingKey: audiobook.id,
-                title: audiobook.title,
-                thumb: audiobook.cover,
-                art: audiobook.art ?? audiobook.cover
-            )
-        default:
-            preconditionFailure("Unsupported mock library type \(type)")
-        }
     }
 }
 
-private struct DebugSeededArtwork {
+private struct DebugMockArtwork {
     let url: URL
     let data: Data
-    let image: NSImage
+    let contentType: String
 
-    static func load(
-        serverURL: URL,
-        mockPath: String,
-        sourceFileName: String,
-        resourceDirectory: String = "Resources/MockServer/avatars"
-    ) -> DebugSeededArtwork {
-        let mockServerPrefix = "Resources/MockServer/"
-        let relativeDirectory = resourceDirectory.replacingOccurrences(of: mockServerPrefix, with: "")
-        let sourceURL = PlexMockServerResourceLocator.url(for: "\(relativeDirectory)/\(sourceFileName)")
-
+    static func load(serverURL: URL, mockPath: String, resource: String) -> DebugMockArtwork {
+        let sourceURL = PlexMockServerResourceLocator.url(for: resource)
         let data = try! Data(contentsOf: sourceURL)
-        guard let image = NSImage(contentsOf: sourceURL) else {
-            preconditionFailure("Missing mock avatar image at \(sourceURL.path)")
-        }
-
-        return DebugSeededArtwork(
+        return DebugMockArtwork(
             url: PlexURLBuilder.mediaURL(serverURL: serverURL, path: mockPath)!,
             data: data,
-            image: image
+            contentType: sourceURL.pathExtension == "png" ? "image/png" : "image/jpeg"
         )
     }
 }
@@ -1611,49 +1422,7 @@ private struct DebugSeededArtwork {
 private struct PlexDebugMockLibrarySection {
     let library: PlexLibrary
     let rawType: String
-    let recentItems: [PlexDebugMockLibraryItem]
-    let countOverrides: [Int: Int]
-}
-
-private struct PlexDebugMockLibraryItem {
-    let ratingKey: String
-    let title: String
-    let addedAt: Date?
-    let art: String?
-    let thumb: String?
-}
-
-private struct PlexDebugResolvedMedia {
-    let id: String
-    let type: String
-    let title: String
-    let year: Int?
-    let thumb: String?
-    let parentThumb: String?
-    let grandparentThumb: String?
-    let art: String?
-    let grandparentTitle: String?
-    let parentTitle: String?
-    let parentIndex: Int?
-    let index: Int?
-    let originallyAvailableAt: String?
-}
-
-private struct PlexDebugResolvedLibraryItem {
-    let ratingKey: String
-    let title: String
-    let thumb: String?
-    let art: String?
-
-    func recentItem(addedAt: Date) -> PlexDebugMockLibraryItem {
-        PlexDebugMockLibraryItem(
-            ratingKey: ratingKey,
-            title: title,
-            addedAt: addedAt,
-            art: art,
-            thumb: thumb
-        )
-    }
+    let recentItems: [PlexMockMediaCatalog.Record]
 }
 
 private final class PlexDebugMockState: @unchecked Sendable {
@@ -1712,13 +1481,6 @@ private final class PlexDebugMockStateRegistry: @unchecked Sendable {
 }
 
 private final class PlexDebugMockURLProtocol: URLProtocol, @unchecked Sendable {
-    private static let forwardingSession: URLSession = {
-        let configuration = URLSessionConfiguration.ephemeral
-        return URLSession(configuration: configuration)
-    }()
-
-    private var forwardingTask: URLSessionDataTask?
-
     override class func canInit(with request: URLRequest) -> Bool {
         true
     }
@@ -1728,41 +1490,19 @@ private final class PlexDebugMockURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func startLoading() {
-        if let state = PlexDebugMockStateRegistry.shared.state(for: request),
-           let response = debugFixture.response(for: request, state: state) {
-            client?.urlProtocol(self, didReceive: response.response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: response.data)
-            client?.urlProtocolDidFinishLoading(self)
+        guard let state = PlexDebugMockStateRegistry.shared.state(for: request) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
             return
         }
-
-        forwardingTask = Self.forwardingSession.dataTask(with: request) { [weak self] data, response, error in
-            guard let self else {
-                return
-            }
-
-            if let error {
-                client?.urlProtocol(self, didFailWithError: error)
-                return
-            }
-
-            if let response {
-                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            }
-
-            if let data {
-                client?.urlProtocol(self, didLoad: data)
-            }
-
-            client?.urlProtocolDidFinishLoading(self)
-        }
-        forwardingTask?.resume()
+        let response = debugFixture.response(for: request, state: state)
+            ?? debugFixture.errorResponse(for: request, status: 404)
+        client?.urlProtocol(self, didReceive: response.response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: response.data)
+        client?.urlProtocolDidFinishLoading(self)
     }
 
-    override func stopLoading() {
-        forwardingTask?.cancel()
-        forwardingTask = nil
-    }
+    override func stopLoading() {}
+
 }
 
 private struct PlexDebugMockResponse {

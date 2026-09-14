@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 
 enum PlexLibrarySortDirection: String, Equatable, Hashable, Sendable {
@@ -130,15 +131,18 @@ struct PlexLibrarySortSelection: Equatable, Hashable, Sendable {
 struct PlexLibraryBrowseOptions: Equatable, Hashable, Sendable {
     static let `default` = PlexLibraryBrowseOptions()
 
+    var contentTypePath: String?
     var sort: PlexLibrarySortSelection?
     var enabledBooleanFilterIDs: Set<String>
     var valueFilterSelections: [PlexLibraryFilterValue]
 
     init(
+        contentTypePath: String? = nil,
         sort: PlexLibrarySortSelection? = nil,
         enabledBooleanFilterIDs: Set<String> = [],
         valueFilterSelections: [PlexLibraryFilterValue] = []
     ) {
+        self.contentTypePath = contentTypePath
         self.sort = sort
         self.enabledBooleanFilterIDs = enabledBooleanFilterIDs
         self.valueFilterSelections = valueFilterSelections.sorted(by: Self.selectionOrder)
@@ -201,6 +205,17 @@ struct PlexLibraryBrowseDefinition: Equatable, Sendable {
     let contentPath: String
     let filters: [PlexLibraryFilterDefinition]
     let sorts: [PlexLibrarySortDefinition]
+    var types: [PlexLibraryBrowseType] = []
+
+    func selecting(_ path: String?) throws -> PlexLibraryBrowseDefinition {
+        guard let path else { return self }
+        guard let type = types.first(where: { $0.key == path }) else {
+            throw PlexAPIError.invalidResponse
+        }
+        return PlexLibraryBrowseDefinition(
+            contentPath: type.key, filters: type.filters, sorts: type.sorts, types: types
+        )
+    }
 
     var booleanFilters: [PlexLibraryFilterDefinition] {
         filters.filter { $0.valueType == .boolean }
@@ -308,15 +323,34 @@ struct PlexLibraryBrowseEnvelope: Decodable, Sendable {
     }
 }
 
+struct PlexLibraryBrowseType: Decodable, Equatable, Identifiable, Sendable {
+    let key: String
+    let type: String
+    let title: String
+    let filters: [PlexLibraryFilterDefinition]
+    let sorts: [PlexLibrarySortDefinition]
+
+    var id: String { key }
+
+    private enum CodingKeys: String, CodingKey {
+        case key, type, title
+        case filters = "Filter"
+        case sorts = "Sort"
+    }
+}
+
 struct PlexLibraryBrowseContainer: Decodable, Sendable {
     let directories: [PlexLibraryBrowseDirectory]
+    let types: [PlexLibraryBrowseType]
 
     private enum CodingKeys: String, CodingKey {
         case directories = "Directory"
+        case types = "Type"
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
+        types = try values.decodeIfPresent([PlexLibraryBrowseType].self, forKey: .types) ?? []
         directories = try values.decodeIfPresent(
             [PlexLibraryBrowseDirectory].self,
             forKey: .directories

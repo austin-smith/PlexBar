@@ -1,3 +1,4 @@
+import PlexModels
 import SwiftUI
 
 /// Keep the season picker available when an episode is opened directly from Home.

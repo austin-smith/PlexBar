@@ -1,32 +1,5 @@
+import PlexModels
 import Foundation
-
-struct PlexMediaChapter: Decodable, Equatable, Hashable, Sendable {
-    let id: String?
-    let index: Int?
-    let startTimeOffset: Int?
-    let endTimeOffset: Int?
-    let title: String?
-    let thumb: String?
-
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case index
-        case startTimeOffset
-        case endTimeOffset
-        case title
-        case thumb
-    }
-
-    init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        id = values.decodePlexStringIfPresent(forKey: .id)
-        index = values.decodePlexIntIfPresent(forKey: .index)
-        startTimeOffset = values.decodePlexIntIfPresent(forKey: .startTimeOffset)
-        endTimeOffset = values.decodePlexIntIfPresent(forKey: .endTimeOffset)
-        title = try values.decodeIfPresent(String.self, forKey: .title)
-        thumb = try values.decodeIfPresent(String.self, forKey: .thumb)
-    }
-}
 
 struct PlexPlaybackChapter: Equatable, Identifiable, Sendable {
     let id: String

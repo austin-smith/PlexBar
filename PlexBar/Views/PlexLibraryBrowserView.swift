@@ -1,3 +1,4 @@
+import PlexModels
 import SwiftUI
 
 struct PlexLibraryBrowserView: View {
@@ -141,6 +142,7 @@ struct PlexLibraryBrowserView: View {
         }
         .toolbar {
             ToolbarItemGroup {
+                contentTypeMenu
                 sortMenu
                 filterMenu
                 Button("Refresh \(library.title)", systemImage: "arrow.clockwise", action: refresh)
@@ -165,7 +167,28 @@ struct PlexLibraryBrowserView: View {
     }
 
     private var browseDefinition: PlexLibraryBrowseDefinition? {
-        browserStore.browseDefinition(for: library)
+        try? browserStore.browseDefinition(for: library)?
+            .selecting(searchStore.selectedOptions.contentTypePath)
+    }
+
+    @ViewBuilder
+    private var contentTypeMenu: some View {
+        if let definition = browserStore.browseDefinition(for: library), definition.types.count > 1 {
+            let selectedPath = searchStore.selectedOptions.contentTypePath ?? definition.contentPath
+            let title = definition.types.first { $0.key == selectedPath }?.title ?? "Browse"
+            Menu(title) {
+                ForEach(definition.types) { type in
+                    Button {
+                        searchStore.selectContentType(
+                            path: type.key == definition.contentPath ? nil : type.key
+                        )
+                    } label: {
+                        menuLabel(type.title, isSelected: type.key == selectedPath)
+                    }
+                }
+            }
+            .help("Choose the type of items to browse")
+        }
     }
 
     private var selectedSortDefinition: PlexLibrarySortDefinition? {

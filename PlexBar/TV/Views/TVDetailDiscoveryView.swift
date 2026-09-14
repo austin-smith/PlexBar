@@ -1,3 +1,4 @@
+import PlexModels
 import SwiftUI
 
 /// Keeps the macOS detail order: credits, details, extras, then Plex's related hubs.

@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 
 struct PlexPlaybackBandwidthRecord: Codable, Equatable, Identifiable, Sendable {

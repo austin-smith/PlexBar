@@ -1,3 +1,4 @@
+import PlexModels
 import AppKit
 import CoreGraphics
 import Foundation
@@ -566,6 +567,36 @@ struct PlexRequestTests {
         #expect(components.queryItems?.contains(where: { $0.name == "ip_address" && $0.value == "73.115.85.232" }) == true)
         #expect(request.value(forHTTPHeaderField: "Accept") == "application/xml")
         #expect(request.value(forHTTPHeaderField: "X-Plex-Token") == "user-token")
+    }
+
+    @Test(arguments: [false, true])
+    func imageClientRejectsMissingAndInvalidLocalFiles(fileExists: Bool) async throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "plex-image-\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: url) }
+        if fileExists { try Data("not an image".utf8).write(to: url) }
+        let session = makeMockSession { _ in
+            Issue.record("Local image reads must not use the HTTP transport")
+            throw URLError(.unsupportedURL)
+        }
+        let client = PlexImageClient(session: session, cache: PlexImageMemoryCache(), requestCoordinator: PlexImageRequestCoordinator())
+
+        #expect(await client.fetchCGImageResult(
+            from: [url], token: "", clientContext: PlexClientContext(clientIdentifier: "tests")
+        ) == nil)
+    }
+
+    @Test func imageClientRejectsHTTPFailureWithValidImageBody() async throws {
+        let imageData = try #require(makeArtworkData(width: 40, height: 40))
+        let session = makeMockSession { request in
+            let response = try #require(HTTPURLResponse(url: request.url!, statusCode: 403, httpVersion: nil, headerFields: nil))
+            return (response, imageData)
+        }
+        let client = PlexImageClient(session: session, cache: PlexImageMemoryCache(), requestCoordinator: PlexImageRequestCoordinator())
+        let url = try #require(URL(string: "https://plex.local/forbidden-image"))
+
+        #expect(await client.fetchCGImageResult(
+            from: [url], token: "", clientContext: PlexClientContext(clientIdentifier: "tests")
+        ) == nil)
     }
 
     @Test func imageClientUsesHeaderTokenInsteadOfQueryToken() async throws {

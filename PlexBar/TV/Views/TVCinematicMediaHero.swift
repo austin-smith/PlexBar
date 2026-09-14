@@ -1,3 +1,4 @@
+import PlexModels
 import SwiftUI
 
 /// A single reading column leaves the right side of the artwork unobstructed.

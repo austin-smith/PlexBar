@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 
 enum PlexSubtitleBurnMode: String, CaseIterable, Identifiable, Sendable {

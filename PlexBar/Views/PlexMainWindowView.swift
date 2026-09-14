@@ -1,3 +1,4 @@
+import PlexModels
 import SwiftUI
 
 struct PlexMainWindowView: View {
@@ -51,11 +52,12 @@ struct PlexMainWindowView: View {
                         }
 
                         Section("Server") {
-                            navigationRow(.activity)
+                            navigationRow(.activity, badge: sessionStore.activeStreamCount)
                             navigationRow(.history)
                             navigationRow(.users)
                         }
                     }
+                    .modifier(PlexActivityVisibility(store: sessionStore))
                     .navigationTitle("PlexBar")
                     .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
                     .searchable(
@@ -142,8 +144,9 @@ struct PlexMainWindowView: View {
         }
     }
 
-    private func navigationRow(_ section: PlexMainSection) -> some View {
+    private func navigationRow(_ section: PlexMainSection, badge: Int = 0) -> some View {
         Label(section.title, systemImage: section.systemImage)
+            .badge(badge)
             .tag(section)
     }
 

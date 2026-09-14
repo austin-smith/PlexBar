@@ -1,3 +1,4 @@
+import PlexModels
 import AppKit
 import CoreGraphics
 import Foundation
@@ -164,17 +165,22 @@ struct PlexImageClient: Sendable {
 
             guard let image = await requestCoordinator.image(for: cacheKey, operation: {
                 let data: Data
-                let response: URLResponse
-
                 do {
-                    (data, response) = try await session.data(for: request)
+                    if url.isFileURL {
+                        data = try await Self.localImageData(at: url)
+                    } else {
+                        let (responseData, response) = try await session.data(for: request)
+                        guard let httpResponse = response as? HTTPURLResponse,
+                              (200..<300).contains(httpResponse.statusCode) else {
+                            return nil
+                        }
+                        data = responseData
+                    }
                 } catch {
                     return nil
                 }
 
-                guard let httpResponse = response as? HTTPURLResponse,
-                      (200..<300).contains(httpResponse.statusCode),
-                      let imageBox = await PlexImageDecoder.decodeCGImage(
+                guard let imageBox = await PlexImageDecoder.decodeCGImage(
                         from: data,
                         maximumPixelSize: maximumPixelSize
                       ) else {
@@ -191,6 +197,11 @@ struct PlexImageClient: Sendable {
         }
 
         return nil
+    }
+
+    @concurrent
+    private static func localImageData(at url: URL) async throws -> Data {
+        try Data(contentsOf: url)
     }
 
     private func cacheKey(

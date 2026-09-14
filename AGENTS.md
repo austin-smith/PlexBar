@@ -18,10 +18,13 @@ This file defines project constraints for coding agents working in this reposito
 
 ## Project Boundaries
 
-- App sources live in `PlexBar/`.
-- Tests live in `PlexBarTests/`.
+- PlexBar app sources live in `PlexBar/`; its integration tests live in `PlexBarTests/`.
+- Studio is a separate macOS app target, `PlexBarStudio`, with sources in `Studio/`, tests in `StudioTests/`, and its own README in `Studio/README.md`.
+- Shared Plex models and mock-data contracts live in the local `Packages/PlexData` package. Apps import its products; do not add cross-app source-file membership or duplicate shared types.
+- Package tests live in `Packages/PlexData/Tests/` and run with `swift test --package-path Packages/PlexData`.
+- Keep package code independent of app UI, stores, authentication, playback orchestration, and resource locations. Each app owns its resource loading.
 - Keep view code in `Views/`, stateful app logic in `Stores/`, API/auth code in `Services/`, and shared helpers in `Support/`.
-- Keep playback orchestration in `Playback/` and decoded Plex media contracts in `Models/`.
+- Keep playback orchestration in `Playback/`, app-specific models in `Models/`, and shared decoded Plex contracts in the package's `Sources/PlexModels/`.
 
 ## Code Expectations
 

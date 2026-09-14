@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 
 enum PlexDownloadVideoQuality: String, CaseIterable, Identifiable, Sendable {

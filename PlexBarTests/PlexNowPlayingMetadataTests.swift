@@ -1,3 +1,4 @@
+import PlexModels
 import AppKit
 import CoreGraphics
 import Foundation

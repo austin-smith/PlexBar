@@ -25,6 +25,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Test shared data contracts
+        run: swift test --package-path Packages/PlexData
+
       - name: Build
         run: |
           xcodebuild \
@@ -46,6 +49,19 @@ jobs:
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Build and test Studio
+        run: |
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBarStudio \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/StudioDerivedData \
             -clonedSourcePackagesDirPath .build/SourcePackages \
             -onlyUsePackageVersionsFromResolvedFile \
             CODE_SIGNING_ALLOWED=NO \

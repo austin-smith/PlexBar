@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 
 struct PlexPlaybackSelection: Equatable, Sendable {

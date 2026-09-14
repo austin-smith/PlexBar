@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 
 enum PlexEpisodeSpoilerPolicy: String, CaseIterable, Identifiable, Sendable {

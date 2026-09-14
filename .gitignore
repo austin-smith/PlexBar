@@ -2,7 +2,8 @@
 /.build
 /build
 /dist
-/Packages
+/Packages/**/.build/
+/Packages/**/.swiftpm/
 xcuserdata/
 DerivedData/
 *.xcresult
@@ -18,3 +19,6 @@ Icon[^a-zA-Z]
 
 # docs
 /docs/plans
+
+# Studio keeps unaccepted generations and local history out of version control.
+/PlexBar/Resources/MockServer/.studio/

@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 import Testing
 @testable import PlexBar
@@ -74,6 +75,8 @@ struct PlexMediaBrowseRequestTests {
                 headerFields: nil
             ))
             switch request.url?.path {
+            case "/provider/sections/2":
+                return (response, Data(#"{"MediaContainer":{"Type":[]}}"#.utf8))
             case "/provider/sections/2/filters":
                 return (response, libraryFiltersData())
             case "/provider/sections/2/sorts":
@@ -96,6 +99,7 @@ struct PlexMediaBrowseRequestTests {
         #expect(definition.sorts.first?.defaultSelectionDirection == .ascending)
         #expect(definition.sorts.last?.selection()?.queryValue == "addedAt:desc")
         #expect(Set(capture.requests.compactMap(\.url?.path)) == [
+            "/provider/sections/2",
             "/provider/sections/2/filters",
             "/provider/sections/2/sorts",
         ])
@@ -113,6 +117,13 @@ struct PlexMediaBrowseRequestTests {
             ))
 
             switch request.url?.path {
+            case "/provider/sections/7":
+                return (response, Data(#"""
+                {"MediaContainer":{"Type":[
+                    {"key":"/provider/sections/7/all?type=8&source=library","type":"artist","title":"Artists","Filter":[],"Sort":[]},
+                    {"key":"/provider/sections/7/all?type=9&source=library","type":"album","title":"Albums","Filter":[],"Sort":[]}
+                ]}}
+                """#.utf8))
             case "/provider/sections/7/filters":
                 return (response, libraryFiltersData())
             case "/provider/sections/7/sorts":
@@ -133,10 +144,20 @@ struct PlexMediaBrowseRequestTests {
         #expect(definition.filters.map(\.id) == ["genre", "unwatched"])
         #expect(definition.sorts.map(\.id) == ["titleSort", "addedAt"])
         #expect(capture.requests.allSatisfy { request in
-            URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems == [
-                URLQueryItem(name: "source", value: "library")
-            ]
+            let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
+            let expected = [URLQueryItem(name: "source", value: "library")]
+                + (request.url?.path == "/provider/sections/7"
+                    ? [URLQueryItem(name: "includeDetails", value: "1")] : [])
+            return query == expected
         })
+        let albums = try definition.selecting("/provider/sections/7/all?type=9&source=library")
+        #expect(definition.types.map(\.title) == ["Artists", "Albums"])
+        #expect(albums.contentPath == "/provider/sections/7/all?type=9&source=library")
+        #expect(albums.filters.isEmpty)
+        #expect(albums.sorts.isEmpty)
+        #expect(throws: PlexAPIError.self) {
+            try definition.selecting("/unadvertised/path")
+        }
     }
 
     @Test func filterValuesUseAdvertisedEndpointAndPreserveServerQueryPairs() async throws {

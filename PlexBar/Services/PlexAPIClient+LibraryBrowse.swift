@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 
 extension PlexAPIClient {
@@ -34,6 +35,10 @@ extension PlexAPIClient {
         contentPath: String,
         using configuration: PlexConnectionConfiguration
     ) async throws -> PlexLibraryBrowseDefinition {
+        async let types = fetchLibraryBrowseTypes(
+            sectionPath: sectionPath,
+            using: configuration
+        )
         async let filters = fetchLibraryFilters(
             sectionPath: sectionPath,
             using: configuration
@@ -46,7 +51,8 @@ extension PlexAPIClient {
         return try await PlexLibraryBrowseDefinition(
             contentPath: contentPath,
             filters: filters,
-            sorts: sorts
+            sorts: sorts,
+            types: types
         )
     }
 
@@ -76,6 +82,27 @@ extension PlexAPIClient {
 }
 
 private extension PlexAPIClient {
+    func fetchLibraryBrowseTypes(
+        sectionPath: String,
+        using configuration: PlexConnectionConfiguration
+    ) async throws -> [PlexLibraryBrowseType] {
+        guard var components = URLComponents(string: sectionPath) else {
+            throw PlexAPIError.invalidServerURL
+        }
+        components.queryItems = (components.queryItems ?? [])
+            + [URLQueryItem(name: "includeDetails", value: "1")]
+        guard let path = components.string else {
+            throw PlexAPIError.invalidServerURL
+        }
+        let data = try await fetchLibraryDescriptorData(path: path, using: configuration)
+        do {
+            return try JSONDecoder().decode(PlexLibraryBrowseEnvelope.self, from: data)
+                .mediaContainer.types
+        } catch {
+            throw PlexAPIError.decodingFailed(error)
+        }
+    }
+
     func fetchLibraryFilters(
         sectionPath: String,
         using configuration: PlexConnectionConfiguration

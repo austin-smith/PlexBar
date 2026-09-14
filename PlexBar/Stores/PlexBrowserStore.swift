@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 import Observation
 
@@ -1668,9 +1669,10 @@ private extension PlexBrowserStore {
         definition: PlexLibraryBrowseDefinition,
         start: Int
     ) async throws -> PlexMediaPage {
-        try await connectionStore.perform { configuration in
+        let selectedDefinition = try definition.selecting(request.browseOptions.contentTypePath)
+        return try await connectionStore.perform { configuration in
             try await client.fetchMediaPage(
-                contentPath: definition.contentPath,
+                contentPath: selectedDefinition.contentPath,
                 using: configuration,
                 start: start,
                 size: pageSize,

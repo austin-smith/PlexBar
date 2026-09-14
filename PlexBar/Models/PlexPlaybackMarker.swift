@@ -1,29 +1,5 @@
+import PlexModels
 import Foundation
-
-struct PlexMediaMarker: Decodable, Equatable, Hashable, Sendable {
-    let id: String?
-    let type: String
-    let startTimeOffset: Int?
-    let endTimeOffset: Int?
-    let isFinal: Bool?
-
-    private enum CodingKeys: String, CodingKey {
-        case id
-        case type
-        case startTimeOffset
-        case endTimeOffset
-        case isFinal = "final"
-    }
-
-    init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        id = values.decodePlexStringIfPresent(forKey: .id)
-        type = try values.decode(String.self, forKey: .type)
-        startTimeOffset = values.decodePlexIntIfPresent(forKey: .startTimeOffset)
-        endTimeOffset = values.decodePlexIntIfPresent(forKey: .endTimeOffset)
-        isFinal = values.decodePlexBoolIfPresent(forKey: .isFinal)
-    }
-}
 
 enum PlexPlaybackMarkerKind: String, CaseIterable, Equatable, Hashable, Identifiable, Sendable {
     case intro

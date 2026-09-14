@@ -1,3 +1,4 @@
+import PlexModels
 #if os(macOS)
 import Foundation
 import Synchronization

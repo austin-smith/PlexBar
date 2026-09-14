@@ -1,3 +1,4 @@
+import PlexModels
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import SwiftUI

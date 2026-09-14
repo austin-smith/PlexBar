@@ -1,3 +1,4 @@
+import PlexModels
 import Foundation
 
 enum PlexURLBuilder {
@@ -137,11 +138,6 @@ enum PlexURLBuilder {
 }
 
 extension String {
-    var nilIfBlank: String? {
-        let trimmedValue = trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedValue.isEmpty ? nil : trimmedValue
-    }
-
     fileprivate func trimmingSlashes() -> String {
         trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     }
