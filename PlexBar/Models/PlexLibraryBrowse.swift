@@ -337,6 +337,16 @@ struct PlexLibraryBrowseType: Decodable, Equatable, Identifiable, Sendable {
         case filters = "Filter"
         case sorts = "Sort"
     }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        key = try values.decode(String.self, forKey: .key)
+        type = try values.decode(String.self, forKey: .type)
+        title = try values.decode(String.self, forKey: .title)
+        // Plex omits Filter for browse types without filters, such as seasons.
+        filters = try values.decodeIfPresent([PlexLibraryFilterDefinition].self, forKey: .filters) ?? []
+        sorts = try values.decode([PlexLibrarySortDefinition].self, forKey: .sorts)
+    }
 }
 
 struct PlexLibraryBrowseContainer: Decodable, Sendable {

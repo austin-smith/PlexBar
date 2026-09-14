@@ -5,6 +5,45 @@ import Testing
 
 @Suite(.serialized)
 struct PlexMediaBrowseRequestTests {
+    @Test func tvBrowseDefinitionAcceptsSeasonsWithoutFilters() async throws {
+        let session = makeBrowseMediaMockSession { request in
+            let response = try #require(HTTPURLResponse(
+                url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil
+            ))
+            switch request.url?.path {
+            case "/library/sections/4":
+                return (response, Data(#"""
+                {"MediaContainer":{"Type":[
+                    {"key":"/library/sections/4/all?type=2","type":"show","title":"TV Shows","Filter":[],"Sort":[]},
+                    {"key":"/library/sections/4/all?type=3","type":"season","title":"Seasons","Sort":[
+                        {"default":"asc","defaultDirection":"asc","descKey":"show.titleSort:desc,index","key":"show.titleSort,index","title":"Show"}
+                    ]},
+                    {"key":"/library/sections/4/all?type=4","type":"episode","title":"Episodes","Filter":[],"Sort":[]}
+                ]}}
+                """#.utf8))
+            case "/library/sections/4/filters":
+                return (response, libraryFiltersData())
+            case "/library/sections/4/sorts":
+                return (response, librarySortsData())
+            default:
+                Issue.record("Unexpected browse-definition request: \(request)")
+                throw URLError(.unsupportedURL)
+            }
+        }
+
+        let definition = try await PlexAPIClient(session: session).fetchLibraryBrowseDefinition(
+            sectionPath: "/library/sections/4",
+            contentPath: "/library/sections/4/all",
+            using: try configuration
+        )
+
+        #expect(definition.types.map(\.type) == ["show", "season", "episode"])
+        #expect(definition.booleanFilters.map(\.id) == ["unwatched"])
+        let seasons = try definition.selecting("/library/sections/4/all?type=3")
+        #expect(seasons.filters.isEmpty)
+        #expect(seasons.sorts.map(\.id) == ["show.titleSort,index"])
+    }
+
     @Test func episodeIdentifierIsLimitedToEpisodeMetadata() throws {
         let show = try JSONDecoder().decode(
             PlexMediaItem.self,
