@@ -542,6 +542,7 @@ struct PlexMediaOverview: View {
             cinematicOverview
         } else {
             compactOverview
+                .scenePadding([.horizontal, .top])
         }
     }
 
