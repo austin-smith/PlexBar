@@ -43,12 +43,14 @@ jobs:
 
       - name: Test
         run: |
+          mkdir -p build/TestResults
           xcodebuild \
             -project PlexBar.xcodeproj \
             -scheme PlexBar \
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath build/DerivedData \
+            -resultBundlePath build/TestResults/PlexBar.xcresult \
             -clonedSourcePackagesDirPath .build/SourcePackages \
             -onlyUsePackageVersionsFromResolvedFile \
             CODE_SIGNING_ALLOWED=NO \
@@ -62,7 +64,16 @@ jobs:
             -configuration Debug \
             -destination 'platform=macOS' \
             -derivedDataPath build/StudioDerivedData \
+            -resultBundlePath build/TestResults/PlexBarStudio.xcresult \
             -clonedSourcePackagesDirPath .build/SourcePackages \
             -onlyUsePackageVersionsFromResolvedFile \
             CODE_SIGNING_ALLOWED=NO \
             test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-test-results
+          path: build/TestResults/
+          retention-days: 7
