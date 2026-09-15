@@ -25,13 +25,55 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Swift 6.3.1
-        uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: "6.3.1"
+      - name: Test shared data contracts
+        run: swift test --package-path Packages/PlexData
 
       - name: Build
-        run: swift build
+        run: |
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBar \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
       - name: Test
-        run: swift test
+        run: |
+          mkdir -p build/TestResults
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBar \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/TestResults/PlexBar.xcresult \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Build and test Studio
+        run: |
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBarStudio \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/StudioDerivedData \
+            -resultBundlePath build/TestResults/PlexBarStudio.xcresult \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-test-results
+          path: build/TestResults/
+          retention-days: 7

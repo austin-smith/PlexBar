@@ -1,0 +1,1557 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		21776749D52636039276396B /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 02F89628F9045FAD68D161C4 /* Sparkle */; };
+		28BE6D5FA2FBCE656F77EC7C /* PlexMockData in Frameworks */ = {isa = PBXBuildFile; productRef = 74B9F2D4927FF133174DBF62 /* PlexMockData */; };
+		4A9100010000000000000010 /* PlexURLBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000014 /* PlexURLBuilder.swift */; };
+		4A9100010000000000000011 /* PlexPlaybackMarker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000015 /* PlexPlaybackMarker.swift */; };
+		4A9100010000000000000013 /* PlexHub.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000017 /* PlexHub.swift */; };
+		4A9100010000000000000019 /* AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000001D /* AppConstants.swift */; };
+		4A910001000000000000001A /* PlexRemoteService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000001E /* PlexRemoteService.swift */; };
+		4A910001000000000000001B /* PlexClientContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000001F /* PlexClientContext.swift */; };
+		4A910001000000000000001C /* PlexRequestBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000020 /* PlexRequestBuilder.swift */; };
+		4A9100010000000000000021 /* PlexJWT.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000028 /* PlexJWT.swift */; };
+		4A9100010000000000000022 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000029 /* KeychainStore.swift */; };
+		4A9100010000000000000026 /* PlexAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000002D /* PlexAuthClient.swift */; };
+		4A9100010000000000000027 /* PlexDeviceIdentityStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000002E /* PlexDeviceIdentityStore.swift */; };
+		4A910001000000000000002F /* PlexBarTVAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000003C /* PlexBarTVAssets.xcassets */; };
+		4A9100010000000000000030 /* ribbon-balloon.png in Resources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000031 /* ribbon-balloon.png */; };
+		4A9100010000000000000032 /* NativePlaybackCapabilityProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000037 /* NativePlaybackCapabilityProbe.swift */; };
+		4A9100010000000000000033 /* PlexAutoplayPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000038 /* PlexAutoplayPreferences.swift */; };
+		4A9100010000000000000034 /* PlexPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000039 /* PlexPlayback.swift */; };
+		4A9100010000000000000035 /* PlexPlaybackStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000003A /* PlexPlaybackStatus.swift */; };
+		4A9100010000000000000036 /* PlexPlaybackRequestParameters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000003B /* PlexPlaybackRequestParameters.swift */; };
+		4A910001000000000000003D /* PlexEpisodeContinuity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000003E /* PlexEpisodeContinuity.swift */; };
+		4A910001000000000000003F /* PlexTimelineReportCadence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000040 /* PlexTimelineReportCadence.swift */; };
+		4A9100010000000000000041 /* PlexTimelineRequestParameters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000042 /* PlexTimelineRequestParameters.swift */; };
+		4A9100010000000000000044 /* PlexPlaybackDecisionResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000043 /* PlexPlaybackDecisionResolver.swift */; };
+		4A9100010000000000000046 /* PlexAccountJWTManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000045 /* PlexAccountJWTManager.swift */; };
+		4A9100010000000000000048 /* PlexPlaybackChapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000047 /* PlexPlaybackChapter.swift */; };
+		4A910001000000000000004A /* PlexMediaSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000049 /* PlexMediaSelection.swift */; };
+		4A910001000000000000004C /* PlexNativeMediaFacts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000004B /* PlexNativeMediaFacts.swift */; };
+		4A910001000000000000004E /* PlexPlaybackInfoPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000004D /* PlexPlaybackInfoPresentation.swift */; };
+		4A9100010000000000000050 /* PlexNativePlaybackSpeedConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000004F /* PlexNativePlaybackSpeedConfiguration.swift */; };
+		4A9100010000000000000052 /* PlexNativeVideoScalingConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000051 /* PlexNativeVideoScalingConfiguration.swift */; };
+		4A9100010000000000000054 /* PlexPlaybackMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000053 /* PlexPlaybackMetrics.swift */; };
+		4A9100010000000000000056 /* PlexPlaybackQualitySuggestions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000055 /* PlexPlaybackQualitySuggestions.swift */; };
+		4A9100010000000000000057 /* PlexAPIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000058 /* PlexAPIError.swift */; };
+		4A9100010000000000000059 /* PlexPlayQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000005A /* PlexPlayQueue.swift */; };
+		4A910001000000000000005B /* PlexMediaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000005C /* PlexMediaProvider.swift */; };
+		4A910001000000000000005D /* PlexMediaSourceURI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000005E /* PlexMediaSourceURI.swift */; };
+		4A910001000000000000005F /* PlexContinuousPlayQueueRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000060 /* PlexContinuousPlayQueueRequest.swift */; };
+		4A9100010000000000000061 /* PlexNowPlayingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000062 /* PlexNowPlayingController.swift */; };
+		4A9100010000000000000063 /* PlexRewindOnResume.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000064 /* PlexRewindOnResume.swift */; };
+		4A9100010000000000000065 /* PlexPlaybackSleepTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000066 /* PlexPlaybackSleepTimer.swift */; };
+		4A9100010000000000000068 /* PlexMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000067 /* PlexMotion.swift */; };
+		4A9100010000000000000069 /* PlexImageDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000006A /* PlexImageDecoder.swift */; };
+		4A910001000000000000006B /* PlexBoundedConcurrentMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000006C /* PlexBoundedConcurrentMap.swift */; };
+		4A910001000000000000006D /* PlexMediaRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000006E /* PlexMediaRoute.swift */; };
+		4A910001000000000000006F /* PlexCastAndCrewPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000070 /* PlexCastAndCrewPresentation.swift */; };
+		4A9100010000000000000071 /* PlexCinematicBackdrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000072 /* PlexCinematicBackdrop.swift */; };
+		4A9100010000000000000073 /* PlexExternalRatingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000074 /* PlexExternalRatingsView.swift */; };
+		4A9100010000000000000075 /* PlexExternalRatingsPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000076 /* PlexExternalRatingsPresentation.swift */; };
+		4A9100010000000000000077 /* PlexSeasonPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000078 /* PlexSeasonPicker.swift */; };
+		4A9100010000000000000079 /* PlexMediaArtworkPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000007A /* PlexMediaArtworkPresentation.swift */; };
+		4A910001000000000000007B /* PlexMediaWatchStateIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000007C /* PlexMediaWatchStateIndicator.swift */; };
+		4A910001000000000000007D /* PlexMediaMetadataPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A910001000000000000007E /* PlexMediaMetadataPresentation.swift */; };
+		4A910001000000000000007F /* PlexPhotoPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000080 /* PlexPhotoPresentation.swift */; };
+		4A9100010000000000000081 /* PlexMediaMetadataView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000082 /* PlexMediaMetadataView.swift */; };
+		4A9100010000000000000083 /* PlexMediaSummaryPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000084 /* PlexMediaSummaryPresentation.swift */; };
+		4A9100010000000000000085 /* PlexLibraryBrowse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A9100010000000000000086 /* PlexLibraryBrowse.swift */; };
+		4A9100040000000000000001 /* PlexBarTopShelf.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 4A9100040000000000000002 /* PlexBarTopShelf.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		616319DB60A240FC1D3A903C /* Studio/Resources/StudioAppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 4AC74A1E45840705ADB71373 /* Studio/Resources/StudioAppIcon.icon */; };
+		82B6635D2C318F88250A909A /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 7CDC00102320A7D463E2E701 /* AppIcon.icon */; };
+		A0662DAB4AAD3B509E41A120 /* PlexModels in Frameworks */ = {isa = PBXBuildFile; productRef = CD7B401562F37D35DB570D70 /* PlexModels */; };
+		F8906F1A8CD993966F8B8432 /* PlexModels in Frameworks */ = {isa = PBXBuildFile; productRef = 363F28FF569E5DF67D40D117 /* PlexModels */; };
+		FDCE46DEE599FE682434E418 /* PlexMockData in Frameworks */ = {isa = PBXBuildFile; productRef = A2B76E2EB8524D2385A991DF /* PlexMockData */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		34A9BCBEE81F75550B5DEC3A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 99D12365F8058E74529B496C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 04D69605D17997F2671F5859;
+			remoteInfo = PlexBar;
+		};
+		451658F772C1A2F824B1C5D9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 99D12365F8058E74529B496C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8BCF4B6C1803661DC52399CD;
+			remoteInfo = PlexBarStudio;
+		};
+		4A910002000000000000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 99D12365F8058E74529B496C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4A9100010000000000000005;
+			remoteInfo = PlexBarTV;
+		};
+		4A910003000000000000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 99D12365F8058E74529B496C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4A9100010000000000000005;
+			remoteInfo = PlexBarTV;
+		};
+		4A9100040000000000000006 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 99D12365F8058E74529B496C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4A9100040000000000000008;
+			remoteInfo = PlexBarTopShelf;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		4A9100040000000000000005 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4A9100040000000000000001 /* PlexBarTopShelf.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		285B312F1F94E0B792064D1B /* PlexBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PlexBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3D3723B83A95EE51D1089ED0 /* Studio/README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Studio/README.md; sourceTree = SOURCE_ROOT; };
+		474F60C985C4E8F172664AF3 /* PlexBar Studio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = "PlexBar Studio.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A9100010000000000000001 /* PlexBarTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PlexBarTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A9100010000000000000002 /* PlexBarTV-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PlexBarTV-Info.plist"; sourceTree = "<group>"; };
+		4A9100010000000000000014 /* PlexURLBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexURLBuilder.swift; path = PlexBar/Support/PlexURLBuilder.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000015 /* PlexPlaybackMarker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlaybackMarker.swift; path = PlexBar/Models/PlexPlaybackMarker.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000017 /* PlexHub.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexHub.swift; path = PlexBar/Models/PlexHub.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000001D /* AppConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppConstants.swift; path = PlexBar/Support/AppConstants.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000001E /* PlexRemoteService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexRemoteService.swift; path = PlexBar/Support/PlexRemoteService.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000001F /* PlexClientContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexClientContext.swift; path = PlexBar/Support/PlexClientContext.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000020 /* PlexRequestBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexRequestBuilder.swift; path = PlexBar/Support/PlexRequestBuilder.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000028 /* PlexJWT.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexJWT.swift; path = PlexBar/Support/PlexJWT.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000029 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = KeychainStore.swift; path = PlexBar/Support/KeychainStore.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000002D /* PlexAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexAuthClient.swift; path = PlexBar/Services/PlexAuthClient.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000002E /* PlexDeviceIdentityStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexDeviceIdentityStore.swift; path = PlexBar/Services/PlexDeviceIdentityStore.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000031 /* ribbon-balloon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "ribbon-balloon.png"; path = "PlexBar/Resources/AppIcon.icon/Assets/ribbon-balloon.png"; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000037 /* NativePlaybackCapabilityProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = NativePlaybackCapabilityProbe.swift; path = PlexBar/Support/NativePlaybackCapabilityProbe.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000038 /* PlexAutoplayPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexAutoplayPreferences.swift; path = PlexBar/Support/PlexAutoplayPreferences.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000039 /* PlexPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlayback.swift; path = PlexBar/Models/PlexPlayback.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000003A /* PlexPlaybackStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlaybackStatus.swift; path = PlexBar/Models/PlexPlaybackStatus.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000003B /* PlexPlaybackRequestParameters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlaybackRequestParameters.swift; path = PlexBar/Playback/PlexPlaybackRequestParameters.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000003C /* PlexBarTVAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = PlexBarTVAssets.xcassets; path = PlexBar/Resources/PlexBarTVAssets.xcassets; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000003E /* PlexEpisodeContinuity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexEpisodeContinuity.swift; path = PlexBar/Models/PlexEpisodeContinuity.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000040 /* PlexTimelineReportCadence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexTimelineReportCadence.swift; path = PlexBar/Playback/PlexTimelineReportCadence.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000042 /* PlexTimelineRequestParameters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexTimelineRequestParameters.swift; path = PlexBar/Playback/PlexTimelineRequestParameters.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000043 /* PlexPlaybackDecisionResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlaybackDecisionResolver.swift; path = PlexBar/Playback/PlexPlaybackDecisionResolver.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000045 /* PlexAccountJWTManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexAccountJWTManager.swift; path = PlexBar/Stores/PlexAccountJWTManager.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000047 /* PlexPlaybackChapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlaybackChapter.swift; path = PlexBar/Models/PlexPlaybackChapter.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000049 /* PlexMediaSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexMediaSelection.swift; path = PlexBar/Models/PlexMediaSelection.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000004B /* PlexNativeMediaFacts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexNativeMediaFacts.swift; path = PlexBar/Playback/PlexNativeMediaFacts.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000004D /* PlexPlaybackInfoPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlaybackInfoPresentation.swift; path = PlexBar/Playback/PlexPlaybackInfoPresentation.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000004F /* PlexNativePlaybackSpeedConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexNativePlaybackSpeedConfiguration.swift; path = PlexBar/Playback/PlexNativePlaybackSpeedConfiguration.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000051 /* PlexNativeVideoScalingConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexNativeVideoScalingConfiguration.swift; path = PlexBar/Playback/PlexNativeVideoScalingConfiguration.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000053 /* PlexPlaybackMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlaybackMetrics.swift; path = PlexBar/Playback/PlexPlaybackMetrics.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000055 /* PlexPlaybackQualitySuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlaybackQualitySuggestions.swift; path = PlexBar/Playback/PlexPlaybackQualitySuggestions.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000058 /* PlexAPIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexAPIError.swift; path = PlexBar/Support/PlexAPIError.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000005A /* PlexPlayQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlayQueue.swift; path = PlexBar/Models/PlexPlayQueue.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000005C /* PlexMediaProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexMediaProvider.swift; path = PlexBar/Models/PlexMediaProvider.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000005E /* PlexMediaSourceURI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexMediaSourceURI.swift; path = PlexBar/Support/PlexMediaSourceURI.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000060 /* PlexContinuousPlayQueueRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexContinuousPlayQueueRequest.swift; path = PlexBar/Playback/PlexContinuousPlayQueueRequest.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000062 /* PlexNowPlayingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexNowPlayingController.swift; path = PlexBar/Playback/PlexNowPlayingController.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000064 /* PlexRewindOnResume.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexRewindOnResume.swift; path = PlexBar/Support/PlexRewindOnResume.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000066 /* PlexPlaybackSleepTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPlaybackSleepTimer.swift; path = PlexBar/Support/PlexPlaybackSleepTimer.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000067 /* PlexMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexMotion.swift; path = PlexBar/Support/PlexMotion.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000006A /* PlexImageDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexImageDecoder.swift; path = PlexBar/Support/PlexImageDecoder.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000006C /* PlexBoundedConcurrentMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexBoundedConcurrentMap.swift; path = PlexBar/Support/PlexBoundedConcurrentMap.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000006E /* PlexMediaRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexMediaRoute.swift; path = PlexBar/Models/PlexMediaRoute.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000070 /* PlexCastAndCrewPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexCastAndCrewPresentation.swift; path = PlexBar/Support/PlexCastAndCrewPresentation.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000072 /* PlexCinematicBackdrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexCinematicBackdrop.swift; path = PlexBar/Views/PlexCinematicBackdrop.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000074 /* PlexExternalRatingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexExternalRatingsView.swift; path = PlexBar/Views/PlexExternalRatingsView.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000076 /* PlexExternalRatingsPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexExternalRatingsPresentation.swift; path = PlexBar/Support/PlexExternalRatingsPresentation.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000078 /* PlexSeasonPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexSeasonPicker.swift; path = PlexBar/Views/PlexSeasonPicker.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000007A /* PlexMediaArtworkPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexMediaArtworkPresentation.swift; path = PlexBar/Support/PlexMediaArtworkPresentation.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000007C /* PlexMediaWatchStateIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexMediaWatchStateIndicator.swift; path = PlexBar/Views/PlexMediaWatchStateIndicator.swift; sourceTree = SOURCE_ROOT; };
+		4A910001000000000000007E /* PlexMediaMetadataPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexMediaMetadataPresentation.swift; path = PlexBar/Support/PlexMediaMetadataPresentation.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000080 /* PlexPhotoPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexPhotoPresentation.swift; path = PlexBar/Support/PlexPhotoPresentation.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000082 /* PlexMediaMetadataView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexMediaMetadataView.swift; path = PlexBar/Views/PlexMediaMetadataView.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000084 /* PlexMediaSummaryPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexMediaSummaryPresentation.swift; path = PlexBar/Support/PlexMediaSummaryPresentation.swift; sourceTree = SOURCE_ROOT; };
+		4A9100010000000000000086 /* PlexLibraryBrowse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlexLibraryBrowse.swift; path = PlexBar/Models/PlexLibraryBrowse.swift; sourceTree = SOURCE_ROOT; };
+		4A9100020000000000000001 /* PlexBarTVTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PlexBarTVTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A9100030000000000000001 /* PlexBarTVLiveUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PlexBarTVLiveUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A9100040000000000000002 /* PlexBarTopShelf.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PlexBarTopShelf.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A9100040000000000000010 /* PlexBarTopShelf-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PlexBarTopShelf-Info.plist"; sourceTree = "<group>"; };
+		4A9100040000000000000011 /* PlexBarTopShelf.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PlexBarTopShelf.entitlements; sourceTree = "<group>"; };
+		4AC74A1E45840705ADB71373 /* Studio/Resources/StudioAppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Studio/Resources/StudioAppIcon.icon; sourceTree = SOURCE_ROOT; };
+		55582C8CE850F9EB45BFD8EF /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		61A2A1FA3B9E45FEAA010001 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		61A2A1FA3B9E45FEAA010002 /* PlexBar-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "PlexBar-Info.plist"; sourceTree = "<group>"; };
+		63DF1D3DAEA28FEB5EF88D3B /* PlexBarStudioTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = PlexBarStudioTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6C1BD9EA5C3A412C2DFB43F4 /* Studio/Config/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Studio/Config/Info.plist; sourceTree = SOURCE_ROOT; };
+		7CDC00102320A7D463E2E701 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		AC67D9C1228E77749C552642 /* PlexBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PlexBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC0A13F0916C323FADBD3D6A /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		03ED93ACE00F5908CC02E1A0 /* PlexBarTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = PlexBarTests;
+			sourceTree = "<group>";
+		};
+		0405E452E98457920E52A56E /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = App;
+			path = Studio/App;
+			sourceTree = SOURCE_ROOT;
+		};
+		0DCFEF7F4F154A9050FD8944 /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = App;
+			sourceTree = "<group>";
+		};
+		26F20AD55CF3A593CDB96BF7 /* Support */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Support;
+			sourceTree = "<group>";
+		};
+		4A9100010000000000000003 /* TV */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TV;
+			sourceTree = "<group>";
+		};
+		4A910002000000000000000B /* TV Tests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = "TV Tests";
+			path = PlexBarTests/TV;
+			sourceTree = SOURCE_ROOT;
+		};
+		4A910003000000000000000B /* TV UI Tests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = "TV UI Tests";
+			path = PlexBarTests/TVUI;
+			sourceTree = SOURCE_ROOT;
+		};
+		4A9100040000000000000003 /* Top Shelf Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = "Top Shelf Shared";
+			path = PlexBar/TopShelf/Shared;
+			sourceTree = SOURCE_ROOT;
+		};
+		4A9100040000000000000004 /* Top Shelf Extension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = "Top Shelf Extension";
+			path = PlexBar/TopShelf/Extension;
+			sourceTree = SOURCE_ROOT;
+		};
+		4C720AFCEB5F3C6543BA76AE /* Playback */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Playback;
+			sourceTree = "<group>";
+		};
+		4F1077371C8139CB9F36CC7E /* Models */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = Models;
+			path = Studio/Models;
+			sourceTree = SOURCE_ROOT;
+		};
+		51FA3FC2E47C52796D98B3F7 /* StudioTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = StudioTests;
+			sourceTree = SOURCE_ROOT;
+		};
+		6334903BBA050907FD560B95 /* Views */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = Views;
+			path = Studio/Views;
+			sourceTree = SOURCE_ROOT;
+		};
+		6985C422E58A088B3C3CA4E6 /* MenuBarIcon */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MenuBarIcon;
+			sourceTree = "<group>";
+		};
+		776F209A9CD0D5CE7FF72F42 /* Services */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = Services;
+			path = Studio/Services;
+			sourceTree = SOURCE_ROOT;
+		};
+		8A7FD63E6AB58FC5F129B7BA /* Views */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Views;
+			sourceTree = "<group>";
+		};
+		A03BF67138E06E878C1B8961 /* Models */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		B520D56C55BEA750908D98F7 /* Stores */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Stores;
+			sourceTree = "<group>";
+		};
+		BD0E158892A4498270836F39 /* Stores */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = Stores;
+			path = Studio/Stores;
+			sourceTree = SOURCE_ROOT;
+		};
+		E74C05AC8D13F749E011FC13 /* Services */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Services;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		4A9100010000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F8906F1A8CD993966F8B8432 /* PlexModels in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A9100020000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A9100030000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A910004000000000000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4C2504C9A514499A22B11DC1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				21776749D52636039276396B /* Sparkle in Frameworks */,
+				A0662DAB4AAD3B509E41A120 /* PlexModels in Frameworks */,
+				28BE6D5FA2FBCE656F77EC7C /* PlexMockData in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		628CF362A6A779F92AE8AF4B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FDCE46DEE599FE682434E418 /* PlexMockData in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C119DF02BF15674572190585 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		114C8CB3B607B12646F0A6DA /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				7CDC00102320A7D463E2E701 /* AppIcon.icon */,
+				4A910001000000000000003C /* PlexBarTVAssets.xcassets */,
+				4A9100010000000000000031 /* ribbon-balloon.png */,
+				6985C422E58A088B3C3CA4E6 /* MenuBarIcon */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		239B6D1C7630E8AA6BF93A96 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				6C1BD9EA5C3A412C2DFB43F4 /* Studio/Config/Info.plist */,
+			);
+			name = Config;
+			sourceTree = "<group>";
+		};
+		4A9100010000000000000018 /* TV Shared Core */ = {
+			isa = PBXGroup;
+			children = (
+				4A910001000000000000001D /* AppConstants.swift */,
+				4A9100010000000000000045 /* PlexAccountJWTManager.swift */,
+				4A9100010000000000000058 /* PlexAPIError.swift */,
+				4A9100010000000000000060 /* PlexContinuousPlayQueueRequest.swift */,
+				4A910001000000000000003E /* PlexEpisodeContinuity.swift */,
+				4A9100010000000000000070 /* PlexCastAndCrewPresentation.swift */,
+				4A9100010000000000000072 /* PlexCinematicBackdrop.swift */,
+				4A9100010000000000000076 /* PlexExternalRatingsPresentation.swift */,
+				4A9100010000000000000074 /* PlexExternalRatingsView.swift */,
+				4A9100010000000000000078 /* PlexSeasonPicker.swift */,
+				4A910001000000000000007C /* PlexMediaWatchStateIndicator.swift */,
+				4A9100010000000000000082 /* PlexMediaMetadataView.swift */,
+				4A9100010000000000000080 /* PlexPhotoPresentation.swift */,
+				4A910001000000000000007E /* PlexMediaMetadataPresentation.swift */,
+				4A9100010000000000000084 /* PlexMediaSummaryPresentation.swift */,
+				4A9100010000000000000086 /* PlexLibraryBrowse.swift */,
+				4A910001000000000000007A /* PlexMediaArtworkPresentation.swift */,
+				4A910001000000000000006E /* PlexMediaRoute.swift */,
+				4A9100010000000000000049 /* PlexMediaSelection.swift */,
+				4A910001000000000000005C /* PlexMediaProvider.swift */,
+				4A910001000000000000005E /* PlexMediaSourceURI.swift */,
+				4A910001000000000000004B /* PlexNativeMediaFacts.swift */,
+				4A910001000000000000005A /* PlexPlayQueue.swift */,
+				4A910001000000000000004D /* PlexPlaybackInfoPresentation.swift */,
+				4A910001000000000000004F /* PlexNativePlaybackSpeedConfiguration.swift */,
+				4A9100010000000000000051 /* PlexNativeVideoScalingConfiguration.swift */,
+				4A9100010000000000000062 /* PlexNowPlayingController.swift */,
+				4A9100010000000000000064 /* PlexRewindOnResume.swift */,
+				4A9100010000000000000066 /* PlexPlaybackSleepTimer.swift */,
+				4A9100010000000000000067 /* PlexMotion.swift */,
+				4A9100010000000000000053 /* PlexPlaybackMetrics.swift */,
+				4A9100010000000000000055 /* PlexPlaybackQualitySuggestions.swift */,
+				4A9100010000000000000017 /* PlexHub.swift */,
+				4A9100010000000000000015 /* PlexPlaybackMarker.swift */,
+				4A9100010000000000000047 /* PlexPlaybackChapter.swift */,
+				4A9100010000000000000039 /* PlexPlayback.swift */,
+				4A9100010000000000000043 /* PlexPlaybackDecisionResolver.swift */,
+				4A910001000000000000003B /* PlexPlaybackRequestParameters.swift */,
+				4A910001000000000000003A /* PlexPlaybackStatus.swift */,
+				4A9100010000000000000040 /* PlexTimelineReportCadence.swift */,
+				4A9100010000000000000042 /* PlexTimelineRequestParameters.swift */,
+				4A910001000000000000002D /* PlexAuthClient.swift */,
+				4A910001000000000000001F /* PlexClientContext.swift */,
+				4A910001000000000000002E /* PlexDeviceIdentityStore.swift */,
+				4A9100010000000000000029 /* KeychainStore.swift */,
+				4A9100010000000000000037 /* NativePlaybackCapabilityProbe.swift */,
+				4A910001000000000000006A /* PlexImageDecoder.swift */,
+				4A910001000000000000006C /* PlexBoundedConcurrentMap.swift */,
+				4A9100010000000000000038 /* PlexAutoplayPreferences.swift */,
+				4A9100010000000000000028 /* PlexJWT.swift */,
+				4A9100010000000000000020 /* PlexRequestBuilder.swift */,
+				4A910001000000000000001E /* PlexRemoteService.swift */,
+				4A9100010000000000000014 /* PlexURLBuilder.swift */,
+			);
+			name = "TV Shared Core";
+			sourceTree = "<group>";
+		};
+		5C03A363087C558EB8A2C558 /* Studio */ = {
+			isa = PBXGroup;
+			children = (
+				239B6D1C7630E8AA6BF93A96 /* Config */,
+				0405E452E98457920E52A56E /* App */,
+				4F1077371C8139CB9F36CC7E /* Models */,
+				776F209A9CD0D5CE7FF72F42 /* Services */,
+				BD0E158892A4498270836F39 /* Stores */,
+				6334903BBA050907FD560B95 /* Views */,
+				4AC74A1E45840705ADB71373 /* Studio/Resources/StudioAppIcon.icon */,
+				3D3723B83A95EE51D1089ED0 /* Studio/README.md */,
+			);
+			name = Studio;
+			sourceTree = "<group>";
+		};
+		7A97BF8BBC5CBA40A384FF4D = {
+			isa = PBXGroup;
+			children = (
+				51FA3FC2E47C52796D98B3F7 /* StudioTests */,
+				5C03A363087C558EB8A2C558 /* Studio */,
+				9E099BCA65079B9FBC2E7CB4 /* Config */,
+				800DB8D882F265AC68298805 /* PlexBar */,
+				03ED93ACE00F5908CC02E1A0 /* PlexBarTests */,
+				4A910002000000000000000B /* TV Tests */,
+				4A910003000000000000000B /* TV UI Tests */,
+				F5232B90F32853C03738C047 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		800DB8D882F265AC68298805 /* PlexBar */ = {
+			isa = PBXGroup;
+			children = (
+				4A9100010000000000000003 /* TV */,
+				4A9100010000000000000018 /* TV Shared Core */,
+				4A9100040000000000000003 /* Top Shelf Shared */,
+				4A9100040000000000000004 /* Top Shelf Extension */,
+				0DCFEF7F4F154A9050FD8944 /* App */,
+				A03BF67138E06E878C1B8961 /* Models */,
+				4C720AFCEB5F3C6543BA76AE /* Playback */,
+				114C8CB3B607B12646F0A6DA /* Resources */,
+				E74C05AC8D13F749E011FC13 /* Services */,
+				B520D56C55BEA750908D98F7 /* Stores */,
+				26F20AD55CF3A593CDB96BF7 /* Support */,
+				8A7FD63E6AB58FC5F129B7BA /* Views */,
+			);
+			path = PlexBar;
+			sourceTree = "<group>";
+		};
+		9E099BCA65079B9FBC2E7CB4 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				61A2A1FA3B9E45FEAA010002 /* PlexBar-Info.plist */,
+				4A9100010000000000000002 /* PlexBarTV-Info.plist */,
+				4A9100040000000000000010 /* PlexBarTopShelf-Info.plist */,
+				4A9100040000000000000011 /* PlexBarTopShelf.entitlements */,
+				61A2A1FA3B9E45FEAA010001 /* Shared.xcconfig */,
+				55582C8CE850F9EB45BFD8EF /* Debug.xcconfig */,
+				CC0A13F0916C323FADBD3D6A /* Release.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		F5232B90F32853C03738C047 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				63DF1D3DAEA28FEB5EF88D3B /* PlexBarStudioTests.xctest */,
+				474F60C985C4E8F172664AF3 /* PlexBar Studio.app */,
+				285B312F1F94E0B792064D1B /* PlexBar.app */,
+				4A9100010000000000000001 /* PlexBarTV.app */,
+				4A9100040000000000000002 /* PlexBarTopShelf.appex */,
+				AC67D9C1228E77749C552642 /* PlexBarTests.xctest */,
+				4A9100020000000000000001 /* PlexBarTVTests.xctest */,
+				4A9100030000000000000001 /* PlexBarTVLiveUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		04D69605D17997F2671F5859 /* PlexBar */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3713CB05E0E2A52573054DE0 /* Build configuration list for PBXNativeTarget "PlexBar" */;
+			buildPhases = (
+				DED0D4FA87F9A7FC16F3F216 /* Sources */,
+				9CBAE774AA5967A3D87EA836 /* Resources */,
+				4C2504C9A514499A22B11DC1 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0DCFEF7F4F154A9050FD8944 /* App */,
+				26F20AD55CF3A593CDB96BF7 /* Support */,
+				4C720AFCEB5F3C6543BA76AE /* Playback */,
+				6985C422E58A088B3C3CA4E6 /* MenuBarIcon */,
+				8A7FD63E6AB58FC5F129B7BA /* Views */,
+				A03BF67138E06E878C1B8961 /* Models */,
+				B520D56C55BEA750908D98F7 /* Stores */,
+				E74C05AC8D13F749E011FC13 /* Services */,
+			);
+			name = PlexBar;
+			packageProductDependencies = (
+				02F89628F9045FAD68D161C4 /* Sparkle */,
+				CD7B401562F37D35DB570D70 /* PlexModels */,
+				74B9F2D4927FF133174DBF62 /* PlexMockData */,
+			);
+			productName = PlexBar;
+			productReference = 285B312F1F94E0B792064D1B /* PlexBar.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4A9100010000000000000005 /* PlexBarTV */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4A9100010000000000000009 /* Build configuration list for PBXNativeTarget "PlexBarTV" */;
+			buildPhases = (
+				4A9100010000000000000006 /* Sources */,
+				4A9100010000000000000007 /* Resources */,
+				4A9100010000000000000004 /* Frameworks */,
+				4A9100040000000000000005 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4A9100040000000000000007 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4A9100010000000000000003 /* TV */,
+				4A9100040000000000000003 /* Top Shelf Shared */,
+			);
+			name = PlexBarTV;
+			packageProductDependencies = (
+				363F28FF569E5DF67D40D117 /* PlexModels */,
+			);
+			productName = PlexBarTV;
+			productReference = 4A9100010000000000000001 /* PlexBarTV.app */;
+			productType = "com.apple.product-type.application";
+		};
+		4A9100020000000000000002 /* PlexBarTVTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4A9100020000000000000006 /* Build configuration list for PBXNativeTarget "PlexBarTVTests" */;
+			buildPhases = (
+				4A9100020000000000000003 /* Sources */,
+				4A9100020000000000000004 /* Resources */,
+				4A9100020000000000000005 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4A9100020000000000000009 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4A910002000000000000000B /* TV Tests */,
+			);
+			name = PlexBarTVTests;
+			productName = PlexBarTVTests;
+			productReference = 4A9100020000000000000001 /* PlexBarTVTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		4A9100030000000000000002 /* PlexBarTVLiveUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4A9100030000000000000006 /* Build configuration list for PBXNativeTarget "PlexBarTVLiveUITests" */;
+			buildPhases = (
+				4A9100030000000000000003 /* Sources */,
+				4A9100030000000000000004 /* Resources */,
+				4A9100030000000000000005 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4A9100030000000000000009 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4A910003000000000000000B /* TV UI Tests */,
+			);
+			name = PlexBarTVLiveUITests;
+			productName = PlexBarTVLiveUITests;
+			productReference = 4A9100030000000000000001 /* PlexBarTVLiveUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		4A9100040000000000000008 /* PlexBarTopShelf */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4A910004000000000000000C /* Build configuration list for PBXNativeTarget "PlexBarTopShelf" */;
+			buildPhases = (
+				4A9100040000000000000009 /* Sources */,
+				4A910004000000000000000A /* Frameworks */,
+				4A910004000000000000000B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4A9100040000000000000003 /* Top Shelf Shared */,
+				4A9100040000000000000004 /* Top Shelf Extension */,
+			);
+			name = PlexBarTopShelf;
+			productName = PlexBarTopShelf;
+			productReference = 4A9100040000000000000002 /* PlexBarTopShelf.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		8BCF4B6C1803661DC52399CD /* PlexBarStudio */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A2AB9A27D8D6D3B5C715EB8B /* Build configuration list for PBXNativeTarget "PlexBarStudio" */;
+			buildPhases = (
+				D2C952E15BB932D091F337D2 /* Sources */,
+				6C721D7AFD19F01EE52C4131 /* Resources */,
+				628CF362A6A779F92AE8AF4B /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				0405E452E98457920E52A56E /* App */,
+				4F1077371C8139CB9F36CC7E /* Models */,
+				6334903BBA050907FD560B95 /* Views */,
+				776F209A9CD0D5CE7FF72F42 /* Services */,
+				BD0E158892A4498270836F39 /* Stores */,
+			);
+			name = PlexBarStudio;
+			packageProductDependencies = (
+				A2B76E2EB8524D2385A991DF /* PlexMockData */,
+			);
+			productName = "PlexBar Studio";
+			productReference = 474F60C985C4E8F172664AF3 /* PlexBar Studio.app */;
+			productType = "com.apple.product-type.application";
+		};
+		9D84969CABB037494AEFBCB7 /* PlexBarTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8CF747782D1AEE7DBD7683E2 /* Build configuration list for PBXNativeTarget "PlexBarTests" */;
+			buildPhases = (
+				55BD447D6F8C229A4C70FBB9 /* Sources */,
+				F71E088AD1F6D70F5178CFE2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B3E0B3D15C7A70CBB2AFB066 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				03ED93ACE00F5908CC02E1A0 /* PlexBarTests */,
+			);
+			name = PlexBarTests;
+			packageProductDependencies = (
+			);
+			productName = PlexBarTests;
+			productReference = AC67D9C1228E77749C552642 /* PlexBarTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		F6DC3F201BBC0C43C7EF4669 /* PlexBarStudioTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1D99DA20A5D95864D7306286 /* Build configuration list for PBXNativeTarget "PlexBarStudioTests" */;
+			buildPhases = (
+				AFE2B0D3D3BF80EBAB7CD71B /* Sources */,
+				3AAC2A9D10A7637D9DDB23F7 /* Resources */,
+				C119DF02BF15674572190585 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C8022F33EE399E59EA30543C /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				51FA3FC2E47C52796D98B3F7 /* StudioTests */,
+			);
+			name = PlexBarStudioTests;
+			productName = PlexBarStudioTests;
+			productReference = 63DF1D3DAEA28FEB5EF88D3B /* PlexBarStudioTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		99D12365F8058E74529B496C /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					04D69605D17997F2671F5859 = {
+						ProvisioningStyle = Automatic;
+					};
+					4A9100010000000000000005 = {
+						ProvisioningStyle = Automatic;
+					};
+					9D84969CABB037494AEFBCB7 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 00142C26111F8B0B5754534D /* Build configuration list for PBXProject "PlexBar" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 7A97BF8BBC5CBA40A384FF4D;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				7F550155B4988B4FB8D4CE93 /* XCRemoteSwiftPackageReference "Sparkle" */,
+				CEFCCC9487832BBAE1978FB3 /* XCLocalSwiftPackageReference "Packages/PlexData" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = F5232B90F32853C03738C047 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8BCF4B6C1803661DC52399CD /* PlexBarStudio */,
+				F6DC3F201BBC0C43C7EF4669 /* PlexBarStudioTests */,
+				4A9100040000000000000008 /* PlexBarTopShelf */,
+				4A9100020000000000000002 /* PlexBarTVTests */,
+				4A9100030000000000000002 /* PlexBarTVLiveUITests */,
+				04D69605D17997F2671F5859 /* PlexBar */,
+				4A9100010000000000000005 /* PlexBarTV */,
+				9D84969CABB037494AEFBCB7 /* PlexBarTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		3AAC2A9D10A7637D9DDB23F7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A9100010000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4A910001000000000000002F /* PlexBarTVAssets.xcassets in Resources */,
+				4A9100010000000000000030 /* ribbon-balloon.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A9100020000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A9100030000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A910004000000000000000B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6C721D7AFD19F01EE52C4131 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				616319DB60A240FC1D3A903C /* Studio/Resources/StudioAppIcon.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9CBAE774AA5967A3D87EA836 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				82B6635D2C318F88250A909A /* AppIcon.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F71E088AD1F6D70F5178CFE2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4A9100010000000000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4A9100010000000000000019 /* AppConstants.swift in Sources */,
+				4A9100010000000000000026 /* PlexAuthClient.swift in Sources */,
+				4A9100010000000000000010 /* PlexURLBuilder.swift in Sources */,
+				4A9100010000000000000027 /* PlexDeviceIdentityStore.swift in Sources */,
+				4A9100010000000000000022 /* KeychainStore.swift in Sources */,
+				4A9100010000000000000021 /* PlexJWT.swift in Sources */,
+				4A9100010000000000000032 /* NativePlaybackCapabilityProbe.swift in Sources */,
+				4A9100010000000000000033 /* PlexAutoplayPreferences.swift in Sources */,
+				4A9100010000000000000034 /* PlexPlayback.swift in Sources */,
+				4A9100010000000000000044 /* PlexPlaybackDecisionResolver.swift in Sources */,
+				4A9100010000000000000046 /* PlexAccountJWTManager.swift in Sources */,
+				4A9100010000000000000057 /* PlexAPIError.swift in Sources */,
+				4A9100010000000000000036 /* PlexPlaybackRequestParameters.swift in Sources */,
+				4A910001000000000000005F /* PlexContinuousPlayQueueRequest.swift in Sources */,
+				4A910001000000000000003D /* PlexEpisodeContinuity.swift in Sources */,
+				4A9100010000000000000035 /* PlexPlaybackStatus.swift in Sources */,
+				4A910001000000000000003F /* PlexTimelineReportCadence.swift in Sources */,
+				4A9100010000000000000041 /* PlexTimelineRequestParameters.swift in Sources */,
+				4A9100010000000000000048 /* PlexPlaybackChapter.swift in Sources */,
+				4A910001000000000000004A /* PlexMediaSelection.swift in Sources */,
+				4A910001000000000000005B /* PlexMediaProvider.swift in Sources */,
+				4A910001000000000000005D /* PlexMediaSourceURI.swift in Sources */,
+				4A910001000000000000004C /* PlexNativeMediaFacts.swift in Sources */,
+				4A9100010000000000000059 /* PlexPlayQueue.swift in Sources */,
+				4A910001000000000000004E /* PlexPlaybackInfoPresentation.swift in Sources */,
+				4A9100010000000000000050 /* PlexNativePlaybackSpeedConfiguration.swift in Sources */,
+				4A9100010000000000000052 /* PlexNativeVideoScalingConfiguration.swift in Sources */,
+				4A9100010000000000000061 /* PlexNowPlayingController.swift in Sources */,
+				4A9100010000000000000063 /* PlexRewindOnResume.swift in Sources */,
+				4A9100010000000000000065 /* PlexPlaybackSleepTimer.swift in Sources */,
+				4A9100010000000000000068 /* PlexMotion.swift in Sources */,
+				4A9100010000000000000069 /* PlexImageDecoder.swift in Sources */,
+				4A910001000000000000006B /* PlexBoundedConcurrentMap.swift in Sources */,
+				4A9100010000000000000054 /* PlexPlaybackMetrics.swift in Sources */,
+				4A9100010000000000000056 /* PlexPlaybackQualitySuggestions.swift in Sources */,
+				4A9100010000000000000011 /* PlexPlaybackMarker.swift in Sources */,
+				4A910001000000000000006D /* PlexMediaRoute.swift in Sources */,
+				4A910001000000000000006F /* PlexCastAndCrewPresentation.swift in Sources */,
+				4A9100010000000000000071 /* PlexCinematicBackdrop.swift in Sources */,
+				4A9100010000000000000075 /* PlexExternalRatingsPresentation.swift in Sources */,
+				4A9100010000000000000073 /* PlexExternalRatingsView.swift in Sources */,
+				4A9100010000000000000077 /* PlexSeasonPicker.swift in Sources */,
+				4A910001000000000000007B /* PlexMediaWatchStateIndicator.swift in Sources */,
+				4A9100010000000000000081 /* PlexMediaMetadataView.swift in Sources */,
+				4A910001000000000000007F /* PlexPhotoPresentation.swift in Sources */,
+				4A910001000000000000007D /* PlexMediaMetadataPresentation.swift in Sources */,
+				4A9100010000000000000083 /* PlexMediaSummaryPresentation.swift in Sources */,
+				4A9100010000000000000085 /* PlexLibraryBrowse.swift in Sources */,
+				4A9100010000000000000079 /* PlexMediaArtworkPresentation.swift in Sources */,
+				4A9100010000000000000013 /* PlexHub.swift in Sources */,
+				4A910001000000000000001A /* PlexRemoteService.swift in Sources */,
+				4A910001000000000000001B /* PlexClientContext.swift in Sources */,
+				4A910001000000000000001C /* PlexRequestBuilder.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A9100020000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A9100030000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4A9100040000000000000009 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		55BD447D6F8C229A4C70FBB9 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AFE2B0D3D3BF80EBAB7CD71B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D2C952E15BB932D091F337D2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DED0D4FA87F9A7FC16F3F216 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4A9100020000000000000009 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4A9100010000000000000005 /* PlexBarTV */;
+			targetProxy = 4A910002000000000000000A /* PBXContainerItemProxy */;
+		};
+		4A9100030000000000000009 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4A9100010000000000000005 /* PlexBarTV */;
+			targetProxy = 4A910003000000000000000A /* PBXContainerItemProxy */;
+		};
+		4A9100040000000000000007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4A9100040000000000000008 /* PlexBarTopShelf */;
+			targetProxy = 4A9100040000000000000006 /* PBXContainerItemProxy */;
+		};
+		B3E0B3D15C7A70CBB2AFB066 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 04D69605D17997F2671F5859 /* PlexBar */;
+			targetProxy = 34A9BCBEE81F75550B5DEC3A /* PBXContainerItemProxy */;
+		};
+		C8022F33EE399E59EA30543C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8BCF4B6C1803661DC52399CD /* PlexBarStudio */;
+			targetProxy = 451658F772C1A2F824B1C5D9 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0197C65E32738B635F535D97 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBarTests;
+				PRODUCT_NAME = PlexBarTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PlexBar.app/Contents/MacOS/PlexBar";
+			};
+			name = Debug;
+		};
+		33F0DF2CB98550AD274E8064 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_NAME = PlexBar;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		3768C17D702A9DC18FF3B1B6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = StudioAppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Studio/Config/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "PlexBar Studio";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBarStudio;
+				PRODUCT_MODULE_NAME = PlexBarStudio;
+				PRODUCT_NAME = "PlexBar Studio";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		4A910001000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Config/PlexBarTV.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Config/PlexBarTV-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBar.tv;
+				PRODUCT_NAME = PlexBarTV;
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		4A910001000000000000000B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Config/PlexBarTV.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Config/PlexBarTV-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBar.tv;
+				PRODUCT_NAME = PlexBarTV;
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		4A9100020000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = T778QMSML9;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBar.tv.tests;
+				PRODUCT_NAME = PlexBarTVTests;
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PlexBarTV.app/PlexBarTV";
+				TVOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		4A9100020000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				DEVELOPMENT_TEAM = T778QMSML9;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBar.tv.tests;
+				PRODUCT_NAME = PlexBarTVTests;
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PlexBarTV.app/PlexBarTV";
+				TVOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		4A9100030000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEVELOPMENT_TEAM = T778QMSML9;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBar.tv.uitests;
+				PRODUCT_NAME = PlexBarTVLiveUITests;
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_TARGET_NAME = PlexBarTV;
+				TVOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		4A9100030000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				DEVELOPMENT_TEAM = T778QMSML9;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBar.tv.uitests;
+				PRODUCT_NAME = PlexBarTVLiveUITests;
+				SDKROOT = appletvos;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_TARGET_NAME = PlexBarTV;
+				TVOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		4A910004000000000000000D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/PlexBarTopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Config/PlexBarTopShelf-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBar.tv.topshelf;
+				PRODUCT_NAME = PlexBarTopShelf;
+				SDKROOT = appletvos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		4A910004000000000000000E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Config/PlexBarTopShelf.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Config/PlexBarTopShelf-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBar.tv.topshelf;
+				PRODUCT_NAME = PlexBarTopShelf;
+				SDKROOT = appletvos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "appletvos appletvsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		4CDEF4B7DA4A50B05F1AEBF8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = CC0A13F0916C323FADBD3D6A /* Release.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		98E9CD57E7762B32012F1B11 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				MARKETING_VERSION = 0.9.0;
+				PRODUCT_NAME = PlexBar;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+		BB2A5D8F9D38A73FA994460F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBarStudioTests;
+				PRODUCT_MODULE_NAME = PlexBarStudioTests;
+				PRODUCT_NAME = PlexBarStudioTests;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PlexBar Studio.app/Contents/MacOS/PlexBar Studio";
+			};
+			name = Release;
+		};
+		C842FD5E7808F39B6A55D99C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBarTests;
+				PRODUCT_NAME = PlexBarTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PlexBar.app/Contents/MacOS/PlexBar";
+			};
+			name = Release;
+		};
+		CBE68FF918B98EC5C411BDD5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = StudioAppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Studio/Config/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "PlexBar Studio";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBarStudio;
+				PRODUCT_MODULE_NAME = PlexBarStudio;
+				PRODUCT_NAME = "PlexBar Studio";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		F1B72FE58B78E9783744C883 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 55582C8CE850F9EB45BFD8EF /* Debug.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		FE72D8565FB85960CE1CA6CD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T778QMSML9;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.crapshack.PlexBarStudioTests;
+				PRODUCT_MODULE_NAME = PlexBarStudioTests;
+				PRODUCT_NAME = PlexBarStudioTests;
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PlexBar Studio.app/Contents/MacOS/PlexBar Studio";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		00142C26111F8B0B5754534D /* Build configuration list for PBXProject "PlexBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F1B72FE58B78E9783744C883 /* Debug */,
+				4CDEF4B7DA4A50B05F1AEBF8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		1D99DA20A5D95864D7306286 /* Build configuration list for PBXNativeTarget "PlexBarStudioTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FE72D8565FB85960CE1CA6CD /* Debug */,
+				BB2A5D8F9D38A73FA994460F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3713CB05E0E2A52573054DE0 /* Build configuration list for PBXNativeTarget "PlexBar" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				33F0DF2CB98550AD274E8064 /* Debug */,
+				98E9CD57E7762B32012F1B11 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4A9100010000000000000009 /* Build configuration list for PBXNativeTarget "PlexBarTV" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4A910001000000000000000A /* Debug */,
+				4A910001000000000000000B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4A9100020000000000000006 /* Build configuration list for PBXNativeTarget "PlexBarTVTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4A9100020000000000000007 /* Debug */,
+				4A9100020000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4A9100030000000000000006 /* Build configuration list for PBXNativeTarget "PlexBarTVLiveUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4A9100030000000000000007 /* Debug */,
+				4A9100030000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		4A910004000000000000000C /* Build configuration list for PBXNativeTarget "PlexBarTopShelf" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4A910004000000000000000D /* Debug */,
+				4A910004000000000000000E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8CF747782D1AEE7DBD7683E2 /* Build configuration list for PBXNativeTarget "PlexBarTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0197C65E32738B635F535D97 /* Debug */,
+				C842FD5E7808F39B6A55D99C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A2AB9A27D8D6D3B5C715EB8B /* Build configuration list for PBXNativeTarget "PlexBarStudio" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3768C17D702A9DC18FF3B1B6 /* Debug */,
+				CBE68FF918B98EC5C411BDD5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		CEFCCC9487832BBAE1978FB3 /* XCLocalSwiftPackageReference "Packages/PlexData" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/PlexData;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7F550155B4988B4FB8D4CE93 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		02F89628F9045FAD68D161C4 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7F550155B4988B4FB8D4CE93 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+		363F28FF569E5DF67D40D117 /* PlexModels */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PlexModels;
+		};
+		74B9F2D4927FF133174DBF62 /* PlexMockData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PlexMockData;
+		};
+		A2B76E2EB8524D2385A991DF /* PlexMockData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PlexMockData;
+		};
+		CD7B401562F37D35DB570D70 /* PlexModels */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PlexModels;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 99D12365F8058E74529B496C /* Project object */;
+}
