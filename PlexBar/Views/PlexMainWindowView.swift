@@ -687,17 +687,44 @@ private struct PlexActivityView: View {
     @Bindable var sessionStore: PlexSessionStore
 
     var body: some View {
+        Group {
+            if sessionStore.lastHydratedAt == nil || sessionStore.sessions.isEmpty {
+                if let message = sessionStore.activityErrorMessage {
+                    ContentUnavailableView {
+                        Label("Activity Unavailable", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(message)
+                    } actions: {
+                        Button("Try Again") { sessionStore.refreshNow() }
+                            .disabled(sessionStore.isLoading)
+                    }
+                } else if sessionStore.lastHydratedAt == nil {
+                    ProgressView("Loading activity…")
+                } else {
+                    ContentUnavailableView(
+                        "No Active Streams",
+                        systemImage: "play.rectangle"
+                    )
+                }
+            } else {
+                activeStreams
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationTitle("Activity")
+        .modifier(PlexActivityVisibility(store: sessionStore))
+    }
+
+    private var activeStreams: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                if sessionStore.lastHydratedAt != nil {
-                    HStack(alignment: .top) {
-                        PlexActivitySummaryView(
-                            summary: sessionStore.activitySummary,
-                            isStale: sessionStore.activityErrorMessage != nil
-                        )
-                        if sessionStore.isLoading {
-                            ProgressView().controlSize(.small)
-                        }
+                HStack(alignment: .top) {
+                    PlexActivitySummaryView(
+                        summary: sessionStore.activitySummary,
+                        isStale: sessionStore.activityErrorMessage != nil
+                    )
+                    if sessionStore.isLoading {
+                        ProgressView().controlSize(.small)
                     }
                 }
 
@@ -705,48 +732,31 @@ private struct PlexActivityView: View {
                     InlineWarningBanner(message: message)
                 }
 
-                if sessionStore.lastHydratedAt == nil {
-                    if sessionStore.activityErrorMessage != nil {
-                        ContentUnavailableView {
-                            Label("Activity Unavailable", systemImage: "exclamationmark.triangle")
-                        } actions: {
-                            Button("Refresh") { sessionStore.refreshNow() }
-                        }
-                    } else {
-                        ProgressView("Loading activity…")
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 360), spacing: 16, alignment: .top)],
+                    alignment: .leading,
+                    spacing: 16
+                ) {
+                    ForEach(sessionStore.sessions) { session in
+                        StreamCardView(
+                            session: session,
+                            sessionStore: sessionStore,
+                            onRequestTerminate: { _ in },
+                            isShowingTerminatePrompt: false,
+                            terminateMessage: .constant(""),
+                            onCancelTerminate: {},
+                            onConfirmTerminate: { _ in },
+                            serverURL: connectionStore.resolvedServerURL,
+                            settingsStore: settingsStore,
+                            snapshotDate: sessionStore.lastUpdated,
+                            resolvedLocation: sessionStore.resolvedLocation(for: session)
+                        )
                     }
-                } else if sessionStore.sessions.isEmpty {
-                    ContentUnavailableView("No Active Streams", systemImage: "play.slash")
-                } else {
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 360), spacing: 16, alignment: .top)],
-                        alignment: .leading,
-                        spacing: 16
-                    ) {
-                        ForEach(sessionStore.sessions) { session in
-                            StreamCardView(
-                                session: session,
-                                sessionStore: sessionStore,
-                                onRequestTerminate: { _ in },
-                                isShowingTerminatePrompt: false,
-                                terminateMessage: .constant(""),
-                                onCancelTerminate: {},
-                                onConfirmTerminate: { _ in },
-                                serverURL: connectionStore.resolvedServerURL,
-                                settingsStore: settingsStore,
-                                snapshotDate: sessionStore.lastUpdated,
-                                resolvedLocation: sessionStore.resolvedLocation(for: session)
-                            )
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scenePadding()
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .navigationTitle("Activity")
-        .modifier(PlexActivityVisibility(store: sessionStore))
     }
 }
