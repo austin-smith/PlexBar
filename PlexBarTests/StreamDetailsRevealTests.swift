@@ -7,13 +7,6 @@ import Testing
 private final class RevealTestState {
     var expanded = true
     var heights: [CGFloat] = []
-    @ObservationIgnored private let traceStart = ProcessInfo.processInfo.systemUptime
-    @ObservationIgnored private(set) var trace: [String] = []
-
-    func record(_ event: String) {
-        let elapsed = ProcessInfo.processInfo.systemUptime - traceStart
-        trace.append(String(format: "%.6fs %@", elapsed, event))
-    }
 }
 
 private struct RevealHeightPreference: PreferenceKey {
@@ -52,7 +45,6 @@ private struct RevealTestMenu: View {
         }
         .frame(width: 388, height: min(max(height, 132), maximumHeight))
         .onPreferenceChange(RevealHeightPreference.self) { size in
-            state.record("content expanded=\(state.expanded) previous=\(height) measured=\(size)")
             guard abs(height - size) > 0.5 else { return }
             height = size
             state.heights.append(size)
@@ -74,10 +66,6 @@ struct StreamDetailsRevealTests {
 
     private func verifyReveal(cardCount: Int, maximumHeight: CGFloat, animated: Bool) async throws {
         let state = RevealTestState()
-        defer {
-            print("REVEAL TRACE animated=\(animated) cards=\(cardCount) maximumHeight=\(maximumHeight)\n"
-                + state.trace.joined(separator: "\n"))
-        }
         let host = NSHostingView(rootView: RevealTestMenu(
             state: state, cardCount: cardCount, maximumHeight: maximumHeight
         ))
@@ -99,21 +87,17 @@ struct StreamDetailsRevealTests {
 
         for expanded in [false, true] {
             state.heights = []
-            state.record("toggle from=\(state.expanded) to=\(expanded)")
             withAnimation(animated ? .easeInOut(duration: 0.3) : nil) {
                 state.expanded = expanded
             }
             var panelHeights: [CGFloat] = []
             for _ in 0..<25 {
                 host.layoutSubtreeIfNeeded()
-                let panelHeight = host.fittingSize.height
-                panelHeights.append(panelHeight)
-                state.record("panel expanded=\(state.expanded) measured=\(panelHeight)")
+                panelHeights.append(host.fittingSize.height)
                 try await Task.sleep(for: .milliseconds(20))
             }
 
             let target = expanded ? expandedHeight : collapsedHeight
-            state.record("expected content=\(target) panel=\(min(target, maximumHeight)) contentSamples=\(state.heights)")
             #expect(abs((state.heights.last ?? 0) - target) < 1)
             #expect(abs(host.fittingSize.height - min(target, maximumHeight)) < 1)
             if animated {
