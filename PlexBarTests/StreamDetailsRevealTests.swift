@@ -124,7 +124,9 @@ struct StreamDetailsRevealTests {
                     })
                 }
             } else {
-                #expect(state.heights.allSatisfy { abs($0 - target) < 1 })
+                // Lazy stack preferences can change within a layout pass. Check
+                // the panel after layout completes, as in the animated case above.
+                #expect(panelHeights.allSatisfy { abs($0 - min(target, maximumHeight)) < 1 })
             }
         }
     }
