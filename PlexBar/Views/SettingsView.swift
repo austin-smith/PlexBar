@@ -12,7 +12,6 @@ struct SettingsView: View {
     let updateService: PlexUpdateService
     @State private var isShowingServerList = false
     @State private var selectedTab = SettingsTab.general
-    @State private var presentedTooltip: SettingsTooltip?
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -20,14 +19,28 @@ struct SettingsView: View {
                 generalView
             }
 
+            Tab("Playback", systemImage: "play.circle", value: .playback) {
+                PlexPlaybackSettingsView(settingsStore: settingsStore)
+            }
+
             Tab("Downloads", systemImage: "arrow.down.circle", value: .downloads) {
                 PlexDownloadSettingsView(settingsStore: settingsStore)
+            }
+
+            Tab("Advanced", systemImage: "slider.horizontal.3", value: .advanced) {
+                PlexAdvancedSettingsView(
+                    settingsStore: settingsStore,
+                    connectionRecheckInterval: connectionRecheckIntervalBinding,
+                    historyPollInterval: historyPollIntervalBinding
+                )
             }
 
             Tab("About", systemImage: "info.circle", value: .about) {
                 aboutView
             }
         }
+        .frame(width: 520)
+        .frame(minHeight: 520)
         .task(id: availableServerIDsKey) {
             previewStore.reconcileServers(authStore.availableServers)
 
@@ -72,42 +85,111 @@ struct SettingsView: View {
 
     private enum SettingsTab: Hashable {
         case general
+        case playback
         case downloads
+        case advanced
         case about
     }
 
-    private enum SettingsTooltip: Hashable {
-        case connectionRecheck
-        case historyRefresh
-    }
-
     private var generalView: some View {
-        Group {
-            if !settingsStore.hasLoadedCredentials {
-                if let errorMessage = settingsStore.credentialLoadingErrorMessage,
-                   !settingsStore.isLoadingCredentials {
-                    ContentUnavailableView {
-                        Label("Couldn’t Access Keychain", systemImage: "key.slash")
-                    } description: {
-                        Text(errorMessage)
-                    } actions: {
-                        Button("Try Again") {
-                            Task {
-                                await settingsStore.loadCredentials()
-                                await authStore.credentialsDidLoad()
-                            }
-                        }
+        Form {
+            Section("Account") {
+                accountControls
+            }
+
+            if settingsStore.hasLoadedCredentials && settingsStore.hasAuthenticatedAccount {
+                Section("Server") {
+                    serverMenu
+
+                    if let serverStatusMessage {
+                        serverStatusBanner(message: serverStatusMessage)
                     }
-                } else {
-                    ProgressView("Loading Account…")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            } else if settingsStore.hasAuthenticatedAccount {
-                authenticatedView
-            } else {
-                unauthenticatedView
+            }
+
+            Section("App") {
+                openAtLoginControls
+            }
+
+            Section("Library") {
+                Picker("Hide Episode Spoilers", selection: $settingsStore.episodeSpoilerPolicy) {
+                    ForEach(PlexEpisodeSpoilerPolicy.allCases) { policy in
+                        Text(policy.label).tag(policy)
+                    }
+                }
             }
         }
+        .formStyle(.grouped)
+    }
+
+    @ViewBuilder
+    private var accountControls: some View {
+        if !settingsStore.hasLoadedCredentials {
+            if let errorMessage = settingsStore.credentialLoadingErrorMessage,
+               !settingsStore.isLoadingCredentials {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label("Couldn’t Access Keychain", systemImage: "key.slash")
+                        .font(.headline)
+                    serverStatusBanner(message: errorMessage)
+                    Button("Try Again") {
+                        Task {
+                            await settingsStore.loadCredentials()
+                            await authStore.credentialsDidLoad()
+                        }
+                    }
+                }
+            } else {
+                ProgressView("Loading Account…")
+                    .controlSize(.small)
+            }
+        } else if settingsStore.hasAuthenticatedAccount {
+            if let credentialErrorMessage = settingsStore.credentialPersistenceErrorMessage {
+                serverStatusBanner(message: credentialErrorMessage)
+            }
+            accountSummary
+                .padding(.vertical, 2)
+        } else {
+            signInControls
+        }
+    }
+
+    private var signInControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 16) {
+                SettingsControlLabel(
+                    title: "Connect to Plex",
+                    detail: "Sign in to browse your libraries and stream media."
+                )
+                Spacer(minLength: 0)
+
+                if authStore.canCancelSignIn {
+                    Button("Cancel", role: .cancel) {
+                        authStore.cancelSignIn()
+                    }
+                } else if !authStore.isAuthenticating {
+                    Button("Sign In") {
+                        authStore.startSignIn()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+
+            if let progressMessage = authStore.signInProgressMessage {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text(progressMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let errorMessage = authStore.errorMessage
+                ?? settingsStore.credentialPersistenceErrorMessage {
+                serverStatusBanner(message: errorMessage)
+            }
+        }
+        .padding(.vertical, 2)
     }
 
     private var aboutView: some View {
@@ -115,269 +197,6 @@ struct SettingsView: View {
             SettingsAboutView(updateService: updateService)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    // MARK: - Authenticated
-
-    private var authenticatedView: some View {
-        VStack(spacing: 0) {
-            Form {
-                if let credentialErrorMessage = settingsStore.credentialPersistenceErrorMessage {
-                    Section {
-                        serverStatusBanner(message: credentialErrorMessage)
-                    }
-                }
-
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Account")
-                            .font(.subheadline.weight(.semibold))
-
-                        accountSummary
-                    }
-                    .padding(.vertical, 2)
-                }
-
-                Section {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Server")
-                            .font(.subheadline.weight(.semibold))
-
-                        serverMenu
-
-                        if let serverStatusMessage {
-                            serverStatusBanner(message: serverStatusMessage)
-                        }
-                    }
-                    .padding(.vertical, 2)
-                }
-
-                Section {
-                    LabeledContent {
-                        Picker("Connection Recheck", selection: connectionRecheckIntervalBinding) {
-                            Text("Off").tag(0)
-                            Text("5 minutes").tag(300)
-                            Text("15 minutes").tag(900)
-                            Text("30 minutes").tag(1_800)
-                            Text("1 hour").tag(3_600)
-                        }
-                        .labelsHidden()
-                    } label: {
-                        settingsTooltipLabel(
-                            "Connection Recheck",
-                            tooltip: "How often to reevaluate which connection to use for the selected server. A local is preferred over remote or relay when available.",
-                            kind: .connectionRecheck
-                        )
-                    }
-
-                    LabeledContent {
-                        Picker("History Refresh", selection: historyPollIntervalBinding) {
-                            Text("15 minutes").tag(900)
-                            Text("1 hour").tag(3_600)
-                            Text("24 hours").tag(86_400)
-                        }
-                        .labelsHidden()
-                    } label: {
-                        settingsTooltipLabel(
-                            "History Refresh",
-                            tooltip: "How often to refresh watch history and library data.",
-                            kind: .historyRefresh
-                        )
-                    }
-
-                    LabeledContent("Local Video Quality") {
-                        videoQualityPicker(selection: $settingsStore.localVideoQuality)
-                    }
-
-                    Toggle(
-                        "Quality Suggestions",
-                        isOn: $settingsStore.qualitySuggestionsEnabled
-                    )
-
-                    LabeledContent(
-                        settingsStore.qualitySuggestionsEnabled
-                            ? "Maximum Remote Quality"
-                            : "Remote Video Quality"
-                    ) {
-                        videoQualityPicker(selection: $settingsStore.remoteVideoQuality)
-                    }
-
-                    Toggle("Allow Direct Play", isOn: $settingsStore.allowsDirectPlay)
-
-                    Toggle("Allow Direct Stream", isOn: $settingsStore.allowsDirectStream)
-
-                    Toggle("Force Direct Play", isOn: $settingsStore.forceDirectPlay)
-                        .disabled(!settingsStore.allowsDirectPlay)
-                        .help("Try supported media directly before asking Plex to convert it.")
-
-                    LabeledContent("Video Dynamic Range") {
-                        Picker("Video Dynamic Range", selection: $settingsStore.videoDynamicRange) {
-                            ForEach(PlexVideoDisplayDynamicRange.allCases) { dynamicRange in
-                                Text(dynamicRange.label)
-                                    .tag(dynamicRange)
-                            }
-                        }
-                        .labelsHidden()
-                    }
-
-                    LabeledContent("Video Scaling") {
-                        Picker("Video Scaling", selection: $settingsStore.videoScalingMode) {
-                            ForEach(PlexVideoScalingMode.allCases) { scalingMode in
-                                Text(scalingMode.label)
-                                    .tag(scalingMode)
-                            }
-                        }
-                        .labelsHidden()
-                    }
-
-                    LabeledContent("Hide Episode Spoilers") {
-                        Picker("Hide Episode Spoilers", selection: $settingsStore.episodeSpoilerPolicy) {
-                            ForEach(PlexEpisodeSpoilerPolicy.allCases) { policy in
-                                Text(policy.label)
-                                    .tag(policy)
-                            }
-                        }
-                        .labelsHidden()
-                    }
-
-                    LabeledContent("Cinema Trailers") {
-                        Picker(
-                            "Cinema Trailers",
-                            selection: $settingsStore.cinemaPreplayPreference
-                        ) {
-                            ForEach(PlexCinemaPreplayPreference.allCases) { preference in
-                                Text(preference.label)
-                                    .tag(preference)
-                            }
-                        }
-                        .labelsHidden()
-                    }
-
-                    Toggle("Auto Play Up Next", isOn: $settingsStore.autoplayUpNext)
-
-                    LabeledContent("Auto Play Countdown") {
-                        Picker("Auto Play Countdown", selection: $settingsStore.autoplayCountdown) {
-                            ForEach(PlexAutoplayCountdown.allCases) { countdown in
-                                Text(countdown.label)
-                                    .tag(countdown)
-                            }
-                        }
-                        .labelsHidden()
-                    }
-                    .disabled(!settingsStore.autoplayUpNext)
-
-                    LabeledContent("Passout Protection") {
-                        Picker("Passout Protection", selection: $settingsStore.passoutProtection) {
-                            ForEach(PlexPassoutProtection.allCases) { protection in
-                                Text(protection.label)
-                                    .tag(protection)
-                            }
-                        }
-                        .labelsHidden()
-                    }
-                    .disabled(!settingsStore.autoplayUpNext)
-
-                    LabeledContent("Rewind on Resume") {
-                        Stepper(
-                            value: Binding(
-                                get: { settingsStore.rewindOnResume.seconds },
-                                set: { settingsStore.rewindOnResume = PlexRewindOnResume(seconds: $0) }
-                            ),
-                            in: PlexRewindOnResume.secondsRange
-                        ) {
-                            Text(settingsStore.rewindOnResume.label)
-                                .monospacedDigit()
-                        }
-                        .accessibilityLabel("Rewind on Resume")
-                        .accessibilityValue(settingsStore.rewindOnResume.label)
-                    }
-
-                    LabeledContent("Skip Intro") {
-                        playbackMarkerBehaviorPicker(
-                            "Skip Intro",
-                            selection: $settingsStore.skipIntroBehavior
-                        )
-                    }
-
-                    LabeledContent("Skip Ads in Recorded Content") {
-                        playbackMarkerBehaviorPicker(
-                            "Skip Ads in Recorded Content",
-                            selection: $settingsStore.skipAdsBehavior
-                        )
-                    }
-
-                    LabeledContent("Skip Credits") {
-                        playbackMarkerBehaviorPicker(
-                            "Skip Credits",
-                            selection: $settingsStore.skipCreditsBehavior
-                        )
-                    }
-                }
-
-                Section {
-                    openAtLoginControls
-                        .padding(.vertical, 2)
-                }
-            }
-            .formStyle(.grouped)
-        }
-    }
-
-    // MARK: - Unauthenticated
-
-    private var unauthenticatedView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            VStack(spacing: 20) {
-                Image(systemName: "popcorn.fill")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.secondary)
-
-                VStack(spacing: 6) {
-                    Text("Connect Plex")
-                        .font(.title2.weight(.semibold))
-
-                    Text("Sign in with your Plex account to connect PlexBar.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-
-                if authStore.canCancelSignIn {
-                    Button("Cancel", role: .cancel) {
-                        authStore.cancelSignIn()
-                    }
-                } else if !authStore.isAuthenticating {
-                    Button("Sign In With Plex") {
-                        authStore.startSignIn()
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-
-                if let progressMessage = authStore.signInProgressMessage {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(progressMessage)
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                }
-
-                if let errorMessage = authStore.errorMessage
-                    ?? settingsStore.credentialPersistenceErrorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 40)
-
-            Spacer()
-        }
     }
 
     // MARK: - Helpers
@@ -415,29 +234,6 @@ struct SettingsView: View {
                 sessionStore.restartConnectionRecheckTask()
             }
         )
-    }
-
-    private func videoQualityPicker(selection: Binding<PlexVideoQuality>) -> some View {
-        Picker("Video Quality", selection: selection) {
-            ForEach(PlexVideoQuality.allCases) { quality in
-                Text(quality.label)
-                    .tag(quality)
-            }
-        }
-        .labelsHidden()
-    }
-
-    private func playbackMarkerBehaviorPicker(
-        _ title: String,
-        selection: Binding<PlexPlaybackMarkerBehavior>
-    ) -> some View {
-        Picker(title, selection: selection) {
-            ForEach(PlexPlaybackMarkerBehavior.allCases) { behavior in
-                Text(behavior.label)
-                    .tag(behavior)
-            }
-        }
-        .labelsHidden()
     }
 
     private var openAtLoginBinding: Binding<Bool> {
@@ -784,52 +580,6 @@ struct SettingsView: View {
 
     private var availableServerIDsKey: String {
         authStore.availableServers.map(\.id).sorted().joined(separator: "|")
-    }
-
-    private func settingsTooltipLabel(
-        _ title: String,
-        tooltip: String,
-        kind: SettingsTooltip
-    ) -> some View {
-        HStack(spacing: 6) {
-            Text(title)
-
-            Button {
-                presentedTooltip = presentedTooltip == kind ? nil : kind
-            } label: {
-                Image(systemName: "questionmark.circle")
-                    .font(.footnote)
-                    .foregroundStyle(.tertiary)
-            }
-            .buttonStyle(.plain)
-            .popover(
-                isPresented: Binding(
-                    get: { presentedTooltip == kind },
-                    set: { isPresented in
-                        if isPresented {
-                            presentedTooltip = kind
-                        } else if presentedTooltip == kind {
-                            presentedTooltip = nil
-                        }
-                    }
-                ),
-                attachmentAnchor: .rect(.bounds),
-                arrowEdge: .top
-            ) {
-                settingsTooltipPopover(text: tooltip)
-            }
-            .accessibilityLabel("\(title) help")
-            .accessibilityHint("Shows more information about \(title.lowercased()).")
-        }
-    }
-
-    private func settingsTooltipPopover(text: String) -> some View {
-        Text(text)
-            .font(.footnote)
-            .foregroundStyle(.primary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(width: 220, alignment: .leading)
-            .padding(12)
     }
 
     private func serverSubtitle(for server: PlexServerResource) -> String {

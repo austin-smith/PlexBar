@@ -133,7 +133,7 @@ struct PlexBarApp: App {
                 updateService: updateService
             )
         }
-        .defaultSize(width: 480, height: 520)
+        .defaultSize(width: 520, height: 620)
         .windowResizability(.contentSize)
 
         MenuBarExtra {

@@ -30,14 +30,14 @@ struct SettingsAboutView: View {
                         .font(.system(size: 22, weight: .bold, design: .monospaced))
                         .foregroundStyle(.primary)
 
-                    Text("Native Plex Client")
+                    Text("Telemetry for Plex")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
             }
 
             VStack(spacing: 16) {
-                Text("Browse and play your Plex library in a fully native macOS app.")
+                Text("A lightweight macOS menu bar app for Plex server telemetry.")
                     .font(.system(size: 11))
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)

@@ -6,48 +6,38 @@ struct PlexDownloadSettingsView: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Video") {
-                    Picker("Download Video Quality", selection: $settingsStore.downloadVideoQuality) {
-                        ForEach(PlexDownloadVideoQuality.allCases) { quality in
-                            Text(quality.label)
-                                .tag(quality)
-                        }
+                Picker("Video Quality", selection: $settingsStore.downloadVideoQuality) {
+                    ForEach(PlexDownloadVideoQuality.allCases) { quality in
+                        Text(quality.label)
+                            .tag(quality)
                     }
-                    .labelsHidden()
                 }
 
-                LabeledContent("Music") {
-                    Picker("Download Music Quality", selection: $settingsStore.downloadMusicQuality) {
-                        ForEach(PlexMusicQuality.allCases) { quality in
-                            Text(quality.label)
-                                .tag(quality)
-                        }
+                Picker("Music Quality", selection: $settingsStore.downloadMusicQuality) {
+                    ForEach(PlexMusicQuality.allCases) { quality in
+                        Text(quality.label)
+                            .tag(quality)
                     }
-                    .labelsHidden()
                 }
             } header: {
                 Text("Quality")
             } footer: {
-                Text("These settings apply only to downloads created after they change.")
+                Text("Applies to new downloads. Existing downloads and streaming quality stay unchanged.")
             }
 
             Section {
-                LabeledContent("Selected Subtitles") {
-                    Picker(
-                        "Downloaded Subtitles",
-                        selection: $settingsStore.downloadSubtitlePreference
-                    ) {
-                        ForEach(PlexDownloadSubtitlePreference.allCases) { preference in
-                            Text(preference.label)
-                                .tag(preference)
-                        }
+                Picker(selection: $settingsStore.downloadSubtitlePreference) {
+                    ForEach(PlexDownloadSubtitlePreference.allCases) { preference in
+                        Text(preference.label)
+                            .tag(preference)
                     }
-                    .labelsHidden()
+                } label: {
+                    SettingsControlLabel(title: "Selected Subtitles", detail: subtitleExplanation)
                 }
             } header: {
                 Text("Subtitles")
             } footer: {
-                Text(subtitleExplanation)
+                Text("Applies to subtitles selected for new downloads.")
             }
         }
         .formStyle(.grouped)
