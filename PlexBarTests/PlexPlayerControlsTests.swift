@@ -11,9 +11,12 @@ struct PlexPlayerControlsTests {
         #expect(state.isVisible(status: .paused, voiceOverEnabled: false))
         #expect(state.isVisible(status: .buffering, voiceOverEnabled: false))
         #expect(state.isVisible(status: .playing, voiceOverEnabled: true))
-        state.isScrubbing = true
+        state.scrub.begin(at: 10)
         #expect(state.isVisible(status: .playing, voiceOverEnabled: false))
-        state.isScrubbing = false
+        state.scrub.reset()
+        state.isTimelineFocused = true
+        #expect(state.isVisible(status: .playing, voiceOverEnabled: false))
+        state.isTimelineFocused = false
         state.hasKeyboardFocus = true
         #expect(state.isVisible(status: .playing, voiceOverEnabled: false))
         state.hasKeyboardFocus = false

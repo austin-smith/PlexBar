@@ -9,18 +9,19 @@ struct PlexPlayerControls: View {
     let mediaOptions: PlexPlayerMediaOptions
     let state: PlexPlayerControlsState
     let lifecycle: PlexPlayerPresentationLifecycle
+    let isInteractionEnabled: Bool
     let showQueue: () -> Void
     let showInfo: () -> Void
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var draftPosition: Double?
     @State private var volume: Double = 1
     @State private var isMuted = false
     @State private var showsVolume = false
+    @State private var preview = PlexPlaybackPreviewStore()
     @FocusState private var focusedControl: Control?
 
     private enum Control: Hashable {
-        case timeline, previous, backward, playPause, forward, next
+        case previous, backward, playPause, forward, next
         case volumePopover, mute, volume, queue, options, pictureInPicture, fullScreen
     }
 
@@ -31,10 +32,16 @@ struct PlexPlayerControls: View {
     }
 
     private var isVisible: Bool {
-        state.isVisible(status: session.engine.status, voiceOverEnabled: voiceOverEnabled)
+        isInteractionEnabled && state.isVisible(status: session.engine.status, voiceOverEnabled: voiceOverEnabled)
     }
 
     var body: some View {
+        GlassEffectContainer(spacing: 0) {
+            controlPanel
+        }
+    }
+
+    private var controlPanel: some View {
         VStack(spacing: 6) {
             contentHeader
                 .padding(.horizontal, 8)
@@ -57,6 +64,24 @@ struct PlexPlayerControls: View {
         .padding(.vertical, 12)
         .frame(maxWidth: 560)
         .glassEffect(.regular, in: .rect(cornerRadius: 20))
+        .overlayPreferenceValue(PlexPlayerTimelineAnchorKey.self) { anchor in
+            if let anchor, let position = preview.position, isVisible {
+                GeometryReader { geometry in
+                    let bounds = geometry[anchor]
+                    let track = PlexPlayerTimelineGeometry(width: bounds.width, duration: duration ?? 0)
+                    let x = bounds.minX + PlexPlayerTimelineGeometry.inset + track.x(for: position)
+                    let halfWidth = PlexPlayerTimelinePreview.width / 2
+                    let center = min(max(x, halfWidth + 8), geometry.size.width - halfWidth - 8)
+                    Color.clear.frame(height: 0)
+                        .overlay(alignment: .bottomLeading) {
+                            PlexPlayerTimelinePreview(store: preview)
+                                .fixedSize()
+                                .offset(x: center - halfWidth, y: -12)
+                        }
+                }
+                .allowsHitTesting(false)
+            }
+        }
         .environment(\.colorScheme, .dark)
         .labelStyle(.iconOnly)
         .buttonStyle(PlexPlayerControlButtonStyle())
@@ -70,9 +95,10 @@ struct PlexPlayerControls: View {
             state.reveal()
         }
         .onChange(of: focusedControl) { state.hasKeyboardFocus = focusedControl != nil }
+        .onChange(of: session.playbackPreviewSource) { preview.configure(session.playbackPreviewSource) }
+        .onChange(of: isVisible) { if !isVisible { preview.hide() } }
         .onChange(of: session.presentation.id) {
-            draftPosition = nil
-            state.isScrubbing = false
+            state.scrub.reset()
             state.reveal()
         }
         .onChange(of: ObjectIdentifier(session.engine.player), initial: true) {
@@ -80,9 +106,11 @@ struct PlexPlayerControls: View {
             isMuted = session.engine.player.isMuted
         }
         .onDisappear {
+            preview.hide()
             state.hasKeyboardFocus = false
             state.isHoveringControls = false
-            state.isScrubbing = false
+            state.scrub.reset()
+            state.isTimelineFocused = false
             state.isPopoverPresented = false
         }
         .opacity(isVisible ? 1 : 0)
@@ -119,33 +147,26 @@ struct PlexPlayerControls: View {
             Text(PlexPlayerTimeDisplay.string(displayPosition))
                 .fixedSize()
                 .accessibilityLabel("Elapsed time")
-            Slider(
-                value: Binding(
-                    get: { min(max(displayPosition, 0), duration ?? 1) },
-                    set: { value in
-                        if state.isScrubbing { draftPosition = value }
-                        else { session.seek(to: value) }
-                    }
-                ),
-                in: 0...(duration ?? 1),
-                onEditingChanged: { editing in
-                    if editing {
-                        draftPosition = session.engine.position
-                        state.isScrubbing = true
+            PlexPlayerTimeline(
+                position: min(max(displayPosition, 0), duration ?? 1),
+                duration: duration ?? 0,
+                scrub: state.scrub,
+                onCommit: { value in
+                    session.seek(to: value)
+                    state.reveal()
+                },
+                onPreview: { position in
+                    guard session.presentation.plan.mediaKind == .video else { return }
+                    if let position {
+                        preview.show(at: position, source: session.playbackPreviewSource)
                     } else {
-                        if let draftPosition { session.seek(to: draftPosition) }
-                        draftPosition = nil
-                        state.isScrubbing = false
-                        state.reveal()
+                        preview.hide()
                     }
-                }
+                },
+                onFocusChanged: { state.isTimelineFocused = $0 }
             )
-            .tint(.white)
-            .controlSize(.small)
             .disabled(!coordinator.canSeek || duration == nil)
-            .focused($focusedControl, equals: .timeline)
-            .accessibilityLabel("Playback position")
-            .accessibilityValue("\(PlexPlayerTimeDisplay.string(displayPosition)) of \(PlexPlayerTimeDisplay.string(duration ?? .nan))")
+            .anchorPreference(key: PlexPlayerTimelineAnchorKey.self, value: .bounds) { $0 }
             Text(duration.map { "−" + PlexPlayerTimeDisplay.string(max(0, $0 - displayPosition)) } ?? "--:--")
                 .fixedSize()
                 .accessibilityLabel("Remaining time")
@@ -156,7 +177,7 @@ struct PlexPlayerControls: View {
     }
 
     private var displayPosition: Double {
-        draftPosition ?? session.engine.position
+        state.scrub.position ?? session.engine.position
     }
 
     private var transportControls: some View {

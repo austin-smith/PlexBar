@@ -7,7 +7,9 @@ final class PlexPlayerControlsState {
     var isPointerActive = true
     var isHoveringControls = false
     var hasKeyboardFocus = false
-    var isScrubbing = false
+    var isTimelineFocused = false
+    let scrub = PlexPlayerScrubState()
+    var isScrubbing: Bool { scrub.isActive }
     var isMenuTracking = false
     var isPopoverPresented = false
     @ObservationIgnored private var hideTask: Task<Void, Never>?
@@ -28,7 +30,7 @@ final class PlexPlayerControlsState {
     }
 
     func isVisible(status: PlexPlaybackStatus, voiceOverEnabled: Bool) -> Bool {
-        isPointerActive || isHoveringControls || hasKeyboardFocus || isScrubbing || isMenuTracking || isPopoverPresented
+        isPointerActive || isHoveringControls || hasKeyboardFocus || isTimelineFocused || isScrubbing || isMenuTracking || isPopoverPresented
             || status != .playing || voiceOverEnabled
     }
 }

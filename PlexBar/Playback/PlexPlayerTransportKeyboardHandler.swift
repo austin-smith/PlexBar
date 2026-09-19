@@ -6,7 +6,7 @@ import AVKit
 final class PlexPlayerTransportKeyboardHandler {
     enum Action: Equatable {
         case togglePlayback, skipBackward, skipForward, previous, next
-        case enterFullScreen, exitFullScreen
+        case enterFullScreen, exitFullScreen, cancelScrub
     }
 
     private weak var playerView: NSView?
@@ -79,13 +79,18 @@ final class PlexPlayerTransportKeyboardHandler {
         guard let action = Self.action(
             for: event,
             hasFocusedControl: controlsState.hasKeyboardFocus || Self.hasFocusedControl(window.firstResponder),
-            isFullScreenActive: lifecycle.isFullScreenActive
+            isFullScreenActive: lifecycle.isFullScreenActive,
+            isScrubbing: controlsState.isScrubbing,
+            isTimelineFocused: controlsState.isTimelineFocused,
+            isEditingText: window.firstResponder is NSTextView
         ) else { return false }
 
         // Holding an arrow accumulates seeks. Holding Next or Space must not
         // skip multiple episodes or repeatedly toggle playback.
         controlsState.reveal()
         switch action {
+        case .cancelScrub:
+            controlsState.scrub.cancel()
         case .togglePlayback:
             if !event.isARepeat { coordinator.togglePlayback() }
         case .skipBackward:
@@ -113,11 +118,20 @@ final class PlexPlayerTransportKeyboardHandler {
     static func action(
         for event: NSEvent,
         hasFocusedControl: Bool,
-        isFullScreenActive: Bool = false
+        isFullScreenActive: Bool = false,
+        isScrubbing: Bool = false,
+        isTimelineFocused: Bool = false,
+        isEditingText: Bool = false
     ) -> Action? {
-        guard !hasFocusedControl else { return nil }
         let fullScreenModifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             .subtracting(.capsLock)
+        // Cancellation belongs to the active gesture, independent of focus.
+        if event.keyCode == 53, fullScreenModifiers.isEmpty, isScrubbing, !isEditingText {
+            return .cancelScrub
+        }
+        // The timeline uses the player transport keys, including Space and F.
+        // Other controls and text editors retain their normal key handling.
+        guard !isEditingText, !hasFocusedControl || isTimelineFocused else { return nil }
         if fullScreenModifiers.isEmpty {
             if event.charactersIgnoringModifiers?.lowercased() == "f" {
                 return isFullScreenActive ? .exitFullScreen : .enterFullScreen

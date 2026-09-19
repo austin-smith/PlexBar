@@ -508,6 +508,7 @@ public struct PlexMediaPart: Decodable, Equatable, Hashable, Sendable {
     public let size: Int64?
     public let decision: String?
     public let selected: Bool?
+    public let indexes: String?
     public let streams: [PlexMediaStream]
 
     private enum CodingKeys: String, CodingKey {
@@ -518,6 +519,7 @@ public struct PlexMediaPart: Decodable, Equatable, Hashable, Sendable {
         case size
         case decision
         case selected
+        case indexes
         case streams = "Stream"
     }
 
@@ -530,6 +532,7 @@ public struct PlexMediaPart: Decodable, Equatable, Hashable, Sendable {
         size = values.decodePlexInt64IfPresent(forKey: .size)
         decision = try values.decodeIfPresent(String.self, forKey: .decision)
         selected = values.decodePlexBoolIfPresent(forKey: .selected)
+        indexes = try values.decodeIfPresent(String.self, forKey: .indexes)
         streams = try values.decodeIfPresent([PlexMediaStream].self, forKey: .streams) ?? []
     }
 }

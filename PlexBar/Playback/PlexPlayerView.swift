@@ -186,6 +186,9 @@ struct PlexPlayerView: View {
                         mediaOptions: mediaOptions,
                         state: controlsState,
                         lifecycle: presentationLifecycle,
+                        isInteractionEnabled: !overlaySelection.isPresented && !showsPostPlay
+                            && session.qualitySuggestion == nil
+                            && !presentationLifecycle.isPictureInPictureActive,
                         showQueue: toggleUpNextOverlay,
                         showInfo: togglePlaybackInfoOverlay
                     )
@@ -571,6 +574,7 @@ final class PlexPlayerSessionModel {
     private(set) var postPlayCountdownRemainingSeconds: Int?
 
     @ObservationIgnored private let browserStore: PlexBrowserStore
+    @ObservationIgnored private let previewAccountScope: String
     @ObservationIgnored private let settingsStore: PlexSettingsStore
     @ObservationIgnored private let userInteractionStore: PlexUserInteractionStore
     @ObservationIgnored private let coordinator: PlexPlayerCoordinator
@@ -607,6 +611,7 @@ final class PlexPlayerSessionModel {
     ) {
         self.presentation = presentation
         self.browserStore = browserStore
+        previewAccountScope = browserStore.connectionStore.accountCacheScope
         self.settingsStore = settingsStore
         self.userInteractionStore = userInteractionStore
         self.coordinator = coordinator
@@ -878,6 +883,37 @@ final class PlexPlayerSessionModel {
 
     var artworkServerURL: URL? {
         browserStore.connectionStore.resolvedServerURL
+    }
+
+    var playbackPreviewSource: PlexPlaybackPreviewSource {
+        guard !isOfflinePlayback else { return .unavailable("Video previews are unavailable offline") }
+        let connection = browserStore.connectionStore
+        guard let serverID = presentation.serverIdentifier,
+              serverID == connection.settings.selectedServerIdentifier,
+              connection.accountCacheScope == previewAccountScope,
+              let serverURL = connection.resolvedServerURL else {
+            return .unavailable("The playback server is unavailable")
+        }
+        let source = presentation.plan.source
+        guard presentation.item.media.indices.contains(source.mediaIndex) else {
+            return .unavailable("Preview media is unavailable")
+        }
+        let parts = presentation.item.media[source.mediaIndex].parts
+        let selectedParts: [PlexMediaPart]
+        if source.partIndex == -1 {
+            selectedParts = parts
+        } else if parts.indices.contains(source.partIndex) {
+            selectedParts = [parts[source.partIndex]]
+        } else {
+            return .unavailable("Preview media is unavailable")
+        }
+        return .server(PlexServerPlaybackPreviewSource(
+            serverURL: serverURL,
+            token: connection.settings.trimmedServerToken,
+            clientContext: artworkClientContext,
+            sessionIdentifier: presentation.id,
+            parts: selectedParts
+        ))
     }
 
     var artworkToken: String {

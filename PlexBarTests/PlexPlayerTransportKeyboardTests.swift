@@ -64,6 +64,62 @@ struct PlexPlayerTransportKeyboardTests {
         #expect(nextCount == 1)
     }
 
+    @Test func scrubbingPreservesTransportKeysAndEscapeCancelsWithoutFocus() {
+        let view = PlexPlayerVideoNSView(frame: NSRect(x: 0, y: 0, width: 640, height: 360))
+        let window = PlaybackTestWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = view
+        window.makeFirstResponder(view)
+        let coordinator = PlexPlayerCoordinator()
+        let state = PlexPlayerControlsState()
+        var toggles = 0
+        var fullscreen = 0
+        coordinator.installTransport(status: .playing, toggle: { toggles += 1 }, stop: {})
+        let handler = PlexPlayerTransportKeyboardHandler(
+            playerView: view, lifecycle: PlexPlayerPresentationLifecycle(), coordinator: coordinator,
+            controlsState: state, toggleFullScreen: { fullscreen += 1 }
+        )
+        defer { handler.stop(); state.stop(); window.orderOut(nil) }
+        func event(_ key: UInt16, repeating: Bool = false) -> NSEvent {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "",
+                isARepeat: repeating, keyCode: key)!
+        }
+        state.scrub.begin(at: 30)
+        #expect(handler.handleKeyDown(event(49)))
+        #expect(handler.handleKeyDown(event(49, repeating: true)))
+        #expect(toggles == 1)
+        #expect(handler.handleKeyDown(event(53)))
+        state.scrub.update(to: 60)
+        #expect(state.scrub.position == nil)
+        #expect(handler.handleKeyDown(event(53, repeating: true)))
+        #expect(state.scrub.finish(at: 60) == nil)
+        #expect(fullscreen == 0)
+        #expect(handler.handleKeyDown(event(49)))
+        #expect(toggles == 2)
+        state.scrub.begin(at: 90)
+        #expect(state.scrub.finish(at: 100) == 100)
+        #expect(handler.handleKeyDown(event(49)))
+        #expect(toggles == 3)
+    }
+
+    @Test func keyboardFocusedTimelineKeepsPlayerShortcutsButEditorsKeepTheirKeys() {
+        for (key, characters, modifiers, expected): (UInt16, String, NSEvent.ModifierFlags, PlexPlayerTransportKeyboardHandler.Action) in [
+            (49, " ", [], .togglePlayback), (123, "", [], .skipBackward),
+            (124, "", [], .skipForward), (123, "", .command, .previous),
+            (124, "", .command, .next), (3, "f", [], .enterFullScreen)
+        ] {
+            let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
+                timestamp: 0, windowNumber: 0, context: nil, characters: characters,
+                charactersIgnoringModifiers: characters, isARepeat: false, keyCode: key)!
+            #expect(PlexPlayerTransportKeyboardHandler.action(
+                for: event, hasFocusedControl: true, isTimelineFocused: true
+            ) == expected)
+            #expect(PlexPlayerTransportKeyboardHandler.action(
+                for: event, hasFocusedControl: true, isTimelineFocused: true, isEditingText: true
+            ) == nil)
+        }
+    }
+
     @Test func arrowsSeekAndCommandArrowsNavigateTheQueue() {
         #expect(action(123) == .skipBackward)
         #expect(action(124) == .skipForward)
