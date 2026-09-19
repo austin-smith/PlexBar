@@ -122,6 +122,9 @@ struct PlexPlayerView: View {
     @Environment(\.openWindow) private var openWindow
     @State private var session: PlexPlayerSessionModel
     @State private var presentationLifecycle: PlexPlayerPresentationLifecycle
+    @State private var controlsState = PlexPlayerControlsState()
+    @State private var playerPresentation = PlexPlayerPresentationController()
+    @State private var mediaOptions = PlexPlayerMediaOptions()
     @State private var overlaySelection = PlexPlayerOverlaySelection()
     @State private var isPlaybackEndedOverlayDismissed = false
     private let coordinator: PlexPlayerCoordinator
@@ -148,28 +151,49 @@ struct PlexPlayerView: View {
     var body: some View {
         PlexPlayerStage {
             ZStack {
-                PlexAVPlayerView(
+                PlexPlayerVideoSurface(
                     player: session.engine.player,
-                    playbackRate: session.engine.playbackRate,
-                    audioOverlay: audioOverlay,
-                    mediaSelection: session.mediaSelection,
-                    videoQualitySelection: session.videoQualitySelection,
+                    presentation: playerPresentation,
+                    controls: controlsState,
+                    coordinator: coordinator,
+                    lifecycle: presentationLifecycle,
                     videoDynamicRange: settingsStore.videoDynamicRange,
                     videoScalingMode: settingsStore.videoScalingMode,
-                    canChangeMediaSelection: session.canChangeMediaSelection,
-                    nativeMediaSelectionGeneration: session.nativeMediaSelectionGeneration,
-                    markerAction: session.activeMarkerAction,
-                    presentationLifecycle: presentationLifecycle,
-                    restorePlayerInterface: restorePlayerInterface,
-                    onSelectPlaybackRate: session.selectPlaybackRate,
-                    onSelectAudioStream: session.selectAudioStream,
-                    onSelectSubtitleStream: session.selectSubtitleStream,
-                    onSelectVideoQuality: session.selectVideoQuality,
-                    onSelectVideoDynamicRange: selectVideoDynamicRange,
-                    onSelectVideoScalingMode: selectVideoScalingMode,
-                    onUpdateNativeMediaSelectionAvailability: session.updateNativeMediaSelectionAvailability,
-                    onSkipMarker: session.skipActiveMarker
+                    isVideo: session.presentation.plan.mediaKind == .video,
+                    isInteractionBlocked: overlaySelection.isPresented
+                        || session.qualitySuggestion != nil
+                        || showsPostPlay,
+                    restorePlayerInterface: restorePlayerInterface
                 )
+
+                if let audioOverlay {
+                    PlexAudioPlayerStageContainer(overlay: audioOverlay)
+                }
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        PlexSkipMarkerControl(action: session.activeMarkerAction, perform: session.skipActiveMarker)
+                    }
+                    .padding(.horizontal, 24)
+
+                    PlexPlayerControls(
+                        session: session,
+                        coordinator: coordinator,
+                        settingsStore: settingsStore,
+                        presentation: playerPresentation,
+                        mediaOptions: mediaOptions,
+                        state: controlsState,
+                        lifecycle: presentationLifecycle,
+                        showQueue: toggleUpNextOverlay,
+                        showInfo: togglePlaybackInfoOverlay
+                    )
+                }
+                .padding(20)
+                .opacity(overlaySelection.isPresented || showsPostPlay ? 0 : 1)
+                .allowsHitTesting(!overlaySelection.isPresented && !showsPostPlay)
+                .accessibilityHidden(overlaySelection.isPresented || showsPostPlay)
 
                 if session.showsVideoPreparationStage {
                     PlexVideoPreparationStage(
@@ -251,7 +275,6 @@ struct PlexPlayerView: View {
         }
         .frame(minWidth: 760, minHeight: 500)
         .navigationTitle(PlexPlayerNavigationTitle.resolve(session.presentation.item.title))
-        .focusedSceneValue(\.plexPlayerSurfaceIsFocused, true)
         .focusedSceneValue(
             \.plexPlayerInfoCommand,
             PlexFocusedCommandAction(
@@ -270,48 +293,34 @@ struct PlexPlayerView: View {
             ToolbarItem(placement: .navigation) {
                 Button("Back to Library", systemImage: "chevron.backward", action: closePlayer)
                     .help("Stop Playback and Return to Library")
-                    .keyboardShortcut(presentationLifecycle.isFullScreenActive ? nil : .cancelAction)
             }
 
-            ToolbarItem(placement: .automatic) {
-                PlexPlaybackOptionsMenu(
-                    session: session,
-                    settingsStore: settingsStore
-                )
-            }
-
-            ToolbarItem(placement: .automatic) {
-                PlexPlaybackRoutePicker(player: session.engine.player)
-                    .frame(width: 28, height: 28)
-                    .help("Choose Playback Destination")
-            }
-
-            ToolbarItem(placement: .automatic) {
-                Button("Playback Info", systemImage: "info.circle", action: togglePlaybackInfoOverlay)
-                    .help(
-                        overlaySelection.selected == .info
-                            ? "Hide Playback Info"
-                            : "Show Playback Info"
-                    )
-                    .accessibilityValue(
-                        overlaySelection.selected == .info ? "Shown" : "Hidden"
-                    )
-            }
-
-            ToolbarItem(placement: .automatic) {
-                Button("Up Next", systemImage: "list.bullet", action: toggleUpNextOverlay)
-                    .help(
-                        overlaySelection.selected == .upNext
-                            ? "Hide Up Next"
-                            : "Show Up Next"
-                    )
-                    .accessibilityValue(
-                        overlaySelection.selected == .upNext ? "Shown" : "Hidden"
-                    )
-            }
         }
+        .toolbar(presentationLifecycle.isFullScreenActive ? .hidden : .automatic, for: .windowToolbar)
         .task {
+            controlsState.reveal()
             await session.start()
+        }
+        .task(id: PlexPlayerMediaOptions.Request(
+            item: session.engine.player.currentItem,
+            generation: session.nativeMediaSelectionGeneration
+        )) {
+            await mediaOptions.load(
+                item: session.engine.player.currentItem,
+                generation: session.nativeMediaSelectionGeneration,
+                reportAvailability: session.updateNativeMediaSelectionAvailability
+            )
+        }
+        .alert("Player Error", isPresented: Binding(
+            get: { playerPresentation.errorMessage != nil || mediaOptions.errorMessage != nil },
+            set: { if !$0 { playerPresentation.errorMessage = nil; mediaOptions.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {
+                playerPresentation.errorMessage = nil
+                mediaOptions.errorMessage = nil
+            }
+        } message: {
+            Text(playerPresentation.errorMessage ?? mediaOptions.errorMessage ?? "")
         }
         .onChange(of: session.engine.status, initial: true) {
             session.playbackStatusDidChange()
@@ -339,6 +348,7 @@ struct PlexPlayerView: View {
         .onChange(of: session.presentation.item.ratingKey) {
             overlaySelection.dismiss()
             isPlaybackEndedOverlayDismissed = false
+            controlsState.reveal()
         }
         .onDisappear {
             handleViewDisappearance()
@@ -365,25 +375,13 @@ struct PlexPlayerView: View {
         }
     }
 
-    private func selectVideoDynamicRange(_ dynamicRange: PlexVideoDisplayDynamicRange) {
-        guard settingsStore.videoDynamicRange != dynamicRange else {
-            return
-        }
-        settingsStore.videoDynamicRange = dynamicRange
-    }
-
-    private func selectVideoScalingMode(_ scalingMode: PlexVideoScalingMode) {
-        guard settingsStore.videoScalingMode != scalingMode else {
-            return
-        }
-        settingsStore.videoScalingMode = scalingMode
-    }
-
     private func togglePlaybackInfoOverlay() {
+        controlsState.reveal()
         overlaySelection.toggle(.info)
     }
 
     private func toggleUpNextOverlay() {
+        controlsState.reveal()
         overlaySelection.toggle(.upNext)
     }
 
@@ -403,7 +401,13 @@ struct PlexPlayerView: View {
         )
     }
 
+    private var showsPostPlay: Bool {
+        session.hasPostPlayPresentation && session.engine.status == .ended
+            && !isPlaybackEndedOverlayDismissed
+    }
+
     private func closePlayer() {
+        playerPresentation.stopPictureInPicture()
         coordinator.close(session)
     }
 
@@ -520,898 +524,6 @@ enum PlexPlaybackRoutePickerConfiguration {
     ) {
         if routePickerView.player !== player {
             routePickerView.player = player
-        }
-    }
-}
-
-private struct PlexPlaybackOptionsMenu: View {
-    let session: PlexPlayerSessionModel
-    let settingsStore: PlexSettingsStore
-
-    var body: some View {
-        Menu {
-            if session.videoQualitySelection.isVideo {
-                videoQualityMenu
-                videoDynamicRangeMenu
-                videoScalingMenu
-                Divider()
-            }
-
-            playbackSpeedMenu
-
-            if session.serverManagedMediaSelection.hasChoices {
-                Divider()
-                serverManagedMediaSelectionMenus
-            }
-        } label: {
-            Label("Playback Options", systemImage: "gearshape")
-        }
-        .menuStyle(.button)
-        .fixedSize()
-        .help("Choose Playback Options")
-        .accessibilityLabel("Playback Options")
-    }
-
-    private var videoQualityMenu: some View {
-        Menu("Video Quality") {
-            ForEach(PlexVideoQuality.allCases) { quality in
-                Button {
-                    session.selectVideoQuality(quality)
-                } label: {
-                    if session.videoQualitySelection.selectedQuality == quality {
-                        Label(quality.label, systemImage: "checkmark")
-                    } else {
-                        Text(quality.label)
-                    }
-                }
-                .disabled(!session.videoQualitySelection.canSelect(quality))
-            }
-        }
-    }
-
-    private var videoDynamicRangeMenu: some View {
-        Menu("Video Dynamic Range") {
-            ForEach(PlexVideoDisplayDynamicRange.allCases) { dynamicRange in
-                Button {
-                    settingsStore.videoDynamicRange = dynamicRange
-                } label: {
-                    if settingsStore.videoDynamicRange == dynamicRange {
-                        Label(dynamicRange.label, systemImage: "checkmark")
-                    } else {
-                        Text(dynamicRange.label)
-                    }
-                }
-            }
-        }
-    }
-
-    private var videoScalingMenu: some View {
-        Menu("Video Scaling") {
-            ForEach(PlexVideoScalingMode.allCases) { scalingMode in
-                Button {
-                    settingsStore.videoScalingMode = scalingMode
-                } label: {
-                    if settingsStore.videoScalingMode == scalingMode {
-                        Label(scalingMode.label, systemImage: "checkmark")
-                    } else {
-                        Text(scalingMode.label)
-                    }
-                }
-            }
-        }
-    }
-
-    private var playbackSpeedMenu: some View {
-        Menu("Playback Speed") {
-            ForEach(PlexPlaybackRate.allCases) { playbackRate in
-                Button {
-                    session.selectPlaybackRate(playbackRate)
-                } label: {
-                    if session.engine.playbackRate == playbackRate {
-                        Label(playbackRate.label, systemImage: "checkmark")
-                    } else {
-                        Text(playbackRate.label)
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var serverManagedMediaSelectionMenus: some View {
-        let selection = session.serverManagedMediaSelection
-
-        if !selection.audioOptions.isEmpty {
-            Menu("Audio Track") {
-                ForEach(selection.audioOptions) { option in
-                    Button {
-                        session.selectAudioStream(option.id)
-                    } label: {
-                        if option.isSelected {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
-                    }
-                }
-            }
-            .disabled(!session.canChangeMediaSelection)
-        }
-
-        if !selection.subtitleOptions.isEmpty {
-            Menu("Subtitles") {
-                Button {
-                    session.selectSubtitleStream(nil)
-                } label: {
-                    if selection.subtitleOptions.contains(where: \.isSelected) {
-                        Text("Off")
-                    } else {
-                        Label("Off", systemImage: "checkmark")
-                    }
-                }
-
-                ForEach(selection.subtitleOptions) { option in
-                    Button {
-                        session.selectSubtitleStream(option.id)
-                    } label: {
-                        if option.isSelected {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
-                            Text(option.title)
-                        }
-                    }
-                }
-            }
-            .disabled(!session.canChangeMediaSelection)
-        }
-    }
-}
-
-private struct PlexPlaybackRoutePicker: NSViewRepresentable {
-    let player: AVPlayer
-
-    func makeNSView(context: Context) -> AVRoutePickerView {
-        let routePickerView = AVRoutePickerView()
-        PlexPlaybackRoutePickerConfiguration.apply(
-            to: routePickerView,
-            player: player
-        )
-        return routePickerView
-    }
-
-    func updateNSView(_ routePickerView: AVRoutePickerView, context: Context) {
-        PlexPlaybackRoutePickerConfiguration.apply(
-            to: routePickerView,
-            player: player
-        )
-    }
-}
-
-private struct PlexAVPlayerView: NSViewRepresentable {
-    let player: AVPlayer
-    let playbackRate: PlexPlaybackRate
-    let audioOverlay: PlexAudioPlayerOverlay?
-    let mediaSelection: PlexPlaybackMediaSelection
-    let videoQualitySelection: PlexVideoQualitySelection
-    let videoDynamicRange: PlexVideoDisplayDynamicRange
-    let videoScalingMode: PlexVideoScalingMode
-    let canChangeMediaSelection: Bool
-    let nativeMediaSelectionGeneration: UInt
-    let markerAction: PlexPlaybackMarkerAction?
-    let presentationLifecycle: PlexPlayerPresentationLifecycle
-    let restorePlayerInterface: (@escaping (Bool) -> Void) -> Void
-    let onSelectPlaybackRate: (PlexPlaybackRate) -> Void
-    let onSelectAudioStream: (Int) -> Void
-    let onSelectSubtitleStream: (Int?) -> Void
-    let onSelectVideoQuality: (PlexVideoQuality) -> Void
-    let onSelectVideoDynamicRange: (PlexVideoDisplayDynamicRange) -> Void
-    let onSelectVideoScalingMode: (PlexVideoScalingMode) -> Void
-    let onUpdateNativeMediaSelectionAvailability: (
-        PlexNativeMediaSelectionAvailability,
-        UInt
-    ) -> Void
-    let onSkipMarker: () -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(
-            presentationLifecycle: presentationLifecycle,
-            nativeMediaSelectionGeneration: nativeMediaSelectionGeneration,
-            restorePlayerInterface: restorePlayerInterface,
-            onSelectPlaybackRate: onSelectPlaybackRate,
-            onSelectAudioStream: onSelectAudioStream,
-            onSelectSubtitleStream: onSelectSubtitleStream,
-            onSelectVideoQuality: onSelectVideoQuality,
-            onSelectVideoDynamicRange: onSelectVideoDynamicRange,
-            onSelectVideoScalingMode: onSelectVideoScalingMode,
-            onUpdateNativeMediaSelectionAvailability: onUpdateNativeMediaSelectionAvailability,
-            onSkipMarker: onSkipMarker
-        )
-    }
-
-    func makeNSView(context: Context) -> AVPlayerView {
-        let playerView = AVPlayerView()
-        playerView.player = player
-        context.coordinator.updatePlaybackSpeeds(
-            in: playerView,
-            playbackRate: playbackRate,
-            onSelectPlaybackRate: onSelectPlaybackRate
-        )
-        updatePresentationStyle(of: playerView)
-        PlexNativeVideoScalingConfiguration.apply(
-            to: playerView,
-            scalingMode: videoScalingMode
-        )
-        playerView.preferredDisplayDynamicRange = videoDynamicRange.avDisplayDynamicRange
-        playerView.updatesNowPlayingInfoCenter = false
-        playerView.delegate = context.coordinator
-        context.coordinator.installFullScreenKeyboardHandler(on: playerView)
-        playerView.pictureInPictureDelegate = context.coordinator
-        context.coordinator.updateAudioStage(in: playerView, overlay: audioOverlay)
-        context.coordinator.installMarkerOverlay(in: playerView)
-        context.coordinator.update(
-            mediaSelection: mediaSelection,
-            videoQualitySelection: videoQualitySelection,
-            videoDynamicRange: videoDynamicRange,
-            videoScalingMode: videoScalingMode,
-            canChangeMediaSelection: canChangeMediaSelection,
-            nativeMediaSelectionGeneration: nativeMediaSelectionGeneration,
-            markerAction: markerAction,
-            playerView: playerView,
-            restorePlayerInterface: restorePlayerInterface,
-            onSelectAudioStream: onSelectAudioStream,
-            onSelectSubtitleStream: onSelectSubtitleStream,
-            onSelectVideoQuality: onSelectVideoQuality,
-            onSelectVideoDynamicRange: onSelectVideoDynamicRange,
-            onSelectVideoScalingMode: onSelectVideoScalingMode,
-            onUpdateNativeMediaSelectionAvailability: onUpdateNativeMediaSelectionAvailability,
-            onSkipMarker: onSkipMarker
-        )
-        return playerView
-    }
-
-    func updateNSView(_ playerView: AVPlayerView, context: Context) {
-        if playerView.player !== player {
-            playerView.player = player
-        }
-        context.coordinator.updatePlaybackSpeeds(
-            in: playerView,
-            playbackRate: playbackRate,
-            onSelectPlaybackRate: onSelectPlaybackRate
-        )
-        updatePresentationStyle(of: playerView)
-        PlexNativeVideoScalingConfiguration.apply(
-            to: playerView,
-            scalingMode: videoScalingMode
-        )
-        let preferredDisplayDynamicRange = videoDynamicRange.avDisplayDynamicRange
-        if playerView.preferredDisplayDynamicRange != preferredDisplayDynamicRange {
-            playerView.preferredDisplayDynamicRange = preferredDisplayDynamicRange
-        }
-        context.coordinator.updateAudioStage(in: playerView, overlay: audioOverlay)
-        context.coordinator.update(
-            mediaSelection: mediaSelection,
-            videoQualitySelection: videoQualitySelection,
-            videoDynamicRange: videoDynamicRange,
-            videoScalingMode: videoScalingMode,
-            canChangeMediaSelection: canChangeMediaSelection,
-            nativeMediaSelectionGeneration: nativeMediaSelectionGeneration,
-            markerAction: markerAction,
-            playerView: playerView,
-            restorePlayerInterface: restorePlayerInterface,
-            onSelectAudioStream: onSelectAudioStream,
-            onSelectSubtitleStream: onSelectSubtitleStream,
-            onSelectVideoQuality: onSelectVideoQuality,
-            onSelectVideoDynamicRange: onSelectVideoDynamicRange,
-            onSelectVideoScalingMode: onSelectVideoScalingMode,
-            onUpdateNativeMediaSelectionAvailability: onUpdateNativeMediaSelectionAvailability,
-            onSkipMarker: onSkipMarker
-        )
-    }
-
-    static func dismantleNSView(_ playerView: AVPlayerView, coordinator: Coordinator) {
-        coordinator.stopFullScreenKeyboardHandler()
-    }
-
-    func sizeThatFits(
-        _ proposal: ProposedViewSize,
-        nsView: AVPlayerView,
-        context: Context
-    ) -> CGSize? {
-        PlexNativePlayerSizing.exactSize(for: proposal)
-    }
-
-    private func updatePresentationStyle(of playerView: AVPlayerView) {
-        let isAudio = audioOverlay != nil
-        let controlsStyle: AVPlayerViewControlsStyle = isAudio ? .inline : .floating
-        if playerView.controlsStyle != controlsStyle {
-            playerView.controlsStyle = controlsStyle
-        }
-        playerView.showsFullScreenToggleButton = !isAudio
-        playerView.allowsPictureInPicturePlayback = !isAudio
-    }
-
-    @MainActor
-    final class Coordinator: NSObject, @MainActor AVPlayerViewDelegate, @MainActor AVPlayerViewPictureInPictureDelegate {
-        private let presentationLifecycle: PlexPlayerPresentationLifecycle
-        private var fullScreenKeyboardHandler: PlexVideoFullScreenKeyboardHandler?
-        private var restorePlayerInterface: (@escaping (Bool) -> Void) -> Void
-        private var onSelectPlaybackRate: (PlexPlaybackRate) -> Void
-        private var mediaSelection: PlexPlaybackMediaSelection?
-        private var videoQualitySelection: PlexVideoQualitySelection?
-        private var videoDynamicRange: PlexVideoDisplayDynamicRange?
-        private var videoScalingMode: PlexVideoScalingMode?
-        private var canChangeMediaSelection = false
-        private var nativeMediaSelectionGeneration: UInt
-        private var markerAction: PlexPlaybackMarkerAction?
-        private var inspectedItemIdentifier: ObjectIdentifier?
-        private var nativeAvailability: PlexNativeMediaSelectionAvailability?
-        private var inspectionTask: Task<Void, Never>?
-        private var playbackRateObservation: NSKeyValueObservation?
-        private weak var observedPlaybackRatePlayer: AVPlayer?
-        private var playbackRateObservationEpoch = PlexNativePlaybackRateObservationEpoch()
-        private let audioStageHost = PlexAudioPlayerStageHost()
-        private var markerHostingView: NSHostingView<PlexSkipMarkerControl>?
-        private var onSelectAudioStream: (Int) -> Void
-        private var onSelectSubtitleStream: (Int?) -> Void
-        private var onSelectVideoQuality: (PlexVideoQuality) -> Void
-        private var onSelectVideoDynamicRange: (PlexVideoDisplayDynamicRange) -> Void
-        private var onSelectVideoScalingMode: (PlexVideoScalingMode) -> Void
-        private var onUpdateNativeMediaSelectionAvailability: (
-            PlexNativeMediaSelectionAvailability,
-            UInt
-        ) -> Void
-        private var onSkipMarker: () -> Void
-
-        init(
-            presentationLifecycle: PlexPlayerPresentationLifecycle,
-            nativeMediaSelectionGeneration: UInt,
-            restorePlayerInterface: @escaping (@escaping (Bool) -> Void) -> Void,
-            onSelectPlaybackRate: @escaping (PlexPlaybackRate) -> Void,
-            onSelectAudioStream: @escaping (Int) -> Void,
-            onSelectSubtitleStream: @escaping (Int?) -> Void,
-            onSelectVideoQuality: @escaping (PlexVideoQuality) -> Void,
-            onSelectVideoDynamicRange: @escaping (PlexVideoDisplayDynamicRange) -> Void,
-            onSelectVideoScalingMode: @escaping (PlexVideoScalingMode) -> Void,
-            onUpdateNativeMediaSelectionAvailability: @escaping (
-                PlexNativeMediaSelectionAvailability,
-                UInt
-            ) -> Void,
-            onSkipMarker: @escaping () -> Void
-        ) {
-            self.presentationLifecycle = presentationLifecycle
-            self.nativeMediaSelectionGeneration = nativeMediaSelectionGeneration
-            self.restorePlayerInterface = restorePlayerInterface
-            self.onSelectPlaybackRate = onSelectPlaybackRate
-            self.onSelectAudioStream = onSelectAudioStream
-            self.onSelectSubtitleStream = onSelectSubtitleStream
-            self.onSelectVideoQuality = onSelectVideoQuality
-            self.onSelectVideoDynamicRange = onSelectVideoDynamicRange
-            self.onSelectVideoScalingMode = onSelectVideoScalingMode
-            self.onUpdateNativeMediaSelectionAvailability = onUpdateNativeMediaSelectionAvailability
-            self.onSkipMarker = onSkipMarker
-        }
-
-        func updatePlaybackSpeeds(
-            in playerView: AVPlayerView,
-            playbackRate: PlexPlaybackRate,
-            onSelectPlaybackRate: @escaping (PlexPlaybackRate) -> Void
-        ) {
-            self.onSelectPlaybackRate = onSelectPlaybackRate
-            PlexNativePlaybackSpeedConfiguration.apply(
-                to: playerView,
-                playbackRate: playbackRate
-            )
-
-            guard let player = playerView.player else {
-                playbackRateObservation?.invalidate()
-                playbackRateObservation = nil
-                observedPlaybackRatePlayer = nil
-                playbackRateObservationEpoch.invalidate()
-                return
-            }
-
-            guard !playbackRateObservationEpoch.isCurrent(player: player) else {
-                return
-            }
-
-            playbackRateObservation?.invalidate()
-            observedPlaybackRatePlayer = player
-            let ticket = playbackRateObservationEpoch.begin(player: player)
-            playbackRateObservation = player.observe(
-                \.defaultRate,
-                options: [.new]
-            ) { [weak self] _, change in
-                guard let rawValue = change.newValue else {
-                    return
-                }
-                Task { @MainActor [weak self] in
-                    guard let self,
-                          let observedPlaybackRatePlayer,
-                          let playbackRate = playbackRateObservationEpoch.playbackRate(
-                            for: rawValue,
-                            ticket: ticket,
-                            player: observedPlaybackRatePlayer
-                          ) else {
-                        return
-                    }
-                    self.onSelectPlaybackRate(playbackRate)
-                }
-            }
-        }
-
-        func updateAudioStage(in playerView: AVPlayerView, overlay: PlexAudioPlayerOverlay?) {
-            audioStageHost.update(
-                in: playerView.contentOverlayView,
-                overlay: overlay
-            )
-        }
-
-        func installMarkerOverlay(in playerView: AVPlayerView) {
-            guard markerHostingView == nil, let overlayView = playerView.contentOverlayView else {
-                return
-            }
-
-            let hostingView = NSHostingView(
-                rootView: PlexSkipMarkerControl(action: nil, perform: onSkipMarker)
-            )
-            hostingView.translatesAutoresizingMaskIntoConstraints = false
-            overlayView.addSubview(hostingView)
-            NSLayoutConstraint.activate([
-                hostingView.trailingAnchor.constraint(
-                    equalTo: overlayView.layoutMarginsGuide.trailingAnchor
-                ),
-                hostingView.bottomAnchor.constraint(equalTo: overlayView.bottomAnchor, constant: -84),
-            ])
-            markerHostingView = hostingView
-        }
-
-        func update(
-            mediaSelection: PlexPlaybackMediaSelection,
-            videoQualitySelection: PlexVideoQualitySelection,
-            videoDynamicRange: PlexVideoDisplayDynamicRange,
-            videoScalingMode: PlexVideoScalingMode,
-            canChangeMediaSelection: Bool,
-            nativeMediaSelectionGeneration: UInt,
-            markerAction: PlexPlaybackMarkerAction?,
-            playerView: AVPlayerView,
-            restorePlayerInterface: @escaping (@escaping (Bool) -> Void) -> Void,
-            onSelectAudioStream: @escaping (Int) -> Void,
-            onSelectSubtitleStream: @escaping (Int?) -> Void,
-            onSelectVideoQuality: @escaping (PlexVideoQuality) -> Void,
-            onSelectVideoDynamicRange: @escaping (PlexVideoDisplayDynamicRange) -> Void,
-            onSelectVideoScalingMode: @escaping (PlexVideoScalingMode) -> Void,
-            onUpdateNativeMediaSelectionAvailability: @escaping (
-                PlexNativeMediaSelectionAvailability,
-                UInt
-            ) -> Void,
-            onSkipMarker: @escaping () -> Void
-        ) {
-            self.restorePlayerInterface = restorePlayerInterface
-            self.onSelectAudioStream = onSelectAudioStream
-            self.onSelectSubtitleStream = onSelectSubtitleStream
-            self.onSelectVideoQuality = onSelectVideoQuality
-            self.onSelectVideoDynamicRange = onSelectVideoDynamicRange
-            self.onSelectVideoScalingMode = onSelectVideoScalingMode
-            self.onUpdateNativeMediaSelectionAvailability = onUpdateNativeMediaSelectionAvailability
-            self.onSkipMarker = onSkipMarker
-            let generationChanged = self.nativeMediaSelectionGeneration
-                != nativeMediaSelectionGeneration
-            self.nativeMediaSelectionGeneration = nativeMediaSelectionGeneration
-            if generationChanged {
-                nativeAvailability = nil
-                inspectionTask?.cancel()
-                inspectionTask = nil
-                playerView.actionPopUpButtonMenu = nil
-            }
-            let selectionChanged = self.mediaSelection != mediaSelection
-            let qualityChanged = self.videoQualitySelection != videoQualitySelection
-            let dynamicRangeChanged = self.videoDynamicRange != videoDynamicRange
-            let scalingModeChanged = self.videoScalingMode != videoScalingMode
-            let mediaAvailabilityChanged = self.canChangeMediaSelection != canChangeMediaSelection
-            let markerChanged = self.markerAction != markerAction
-            self.mediaSelection = mediaSelection
-            self.videoQualitySelection = videoQualitySelection
-            self.videoDynamicRange = videoDynamicRange
-            self.videoScalingMode = videoScalingMode
-            self.canChangeMediaSelection = canChangeMediaSelection
-            self.markerAction = markerAction
-            if markerChanged {
-                markerHostingView?.rootView = PlexSkipMarkerControl(
-                    action: markerAction,
-                    perform: onSkipMarker
-                )
-            }
-
-            guard let item = playerView.player?.currentItem else {
-                inspectedItemIdentifier = nil
-                nativeAvailability = nil
-                inspectionTask?.cancel()
-                inspectionTask = nil
-                playerView.actionPopUpButtonMenu = nil
-                return
-            }
-
-            let itemIdentifier = ObjectIdentifier(item)
-            if generationChanged, inspectedItemIdentifier == itemIdentifier {
-                return
-            }
-            if inspectedItemIdentifier != itemIdentifier {
-                inspectedItemIdentifier = itemIdentifier
-                nativeAvailability = nil
-                inspectionTask?.cancel()
-                playerView.actionPopUpButtonMenu = nil
-                inspectNativeOptions(for: item, playerView: playerView)
-                return
-            }
-
-            if selectionChanged || qualityChanged || dynamicRangeChanged || scalingModeChanged
-                || mediaAvailabilityChanged || markerChanged,
-               let nativeAvailability {
-                playerView.actionPopUpButtonMenu = makeActionMenu(
-                    for: mediaSelection,
-                    videoQualitySelection: videoQualitySelection,
-                    videoDynamicRange: videoDynamicRange,
-                    videoScalingMode: videoScalingMode,
-                    nativeAvailability: nativeAvailability,
-                    markerAction: markerAction
-                )
-            }
-        }
-
-        func installFullScreenKeyboardHandler(on playerView: AVPlayerView) {
-            fullScreenKeyboardHandler = PlexVideoFullScreenKeyboardHandler(
-                playerView: playerView,
-                lifecycle: presentationLifecycle
-            )
-            fullScreenKeyboardHandler?.start()
-        }
-
-        func stopFullScreenKeyboardHandler() {
-            fullScreenKeyboardHandler?.stop()
-            fullScreenKeyboardHandler = nil
-        }
-
-        func playerViewWillEnterFullScreen(_ playerView: AVPlayerView) {
-            presentationLifecycle.willEnterFullScreen()
-        }
-
-        func playerViewDidEnterFullScreen(_ playerView: AVPlayerView) {
-            presentationLifecycle.didEnterFullScreen()
-        }
-
-        func playerViewWillExitFullScreen(_ playerView: AVPlayerView) {
-            presentationLifecycle.willExitFullScreen()
-        }
-
-        func playerViewDidExitFullScreen(_ playerView: AVPlayerView) {
-            presentationLifecycle.didExitFullScreen()
-        }
-
-        func playerView(
-            _ playerView: AVPlayerView,
-            restoreUserInterfaceForFullScreenExitWithCompletionHandler completionHandler: @escaping (Bool) -> Void
-        ) {
-            restorePlayerInterface(completionHandler)
-        }
-
-        func playerViewWillStartPicture(inPicture playerView: AVPlayerView) {
-            presentationLifecycle.willStartPictureInPicture()
-        }
-
-        func playerView(
-            _ playerView: AVPlayerView,
-            failedToStartPictureInPictureWithError error: any Error
-        ) {
-            presentationLifecycle.failedToStartPictureInPicture()
-        }
-
-        func playerViewDidStopPicture(inPicture playerView: AVPlayerView) {
-            presentationLifecycle.didStopPictureInPicture()
-        }
-
-        func playerView(
-            _ playerView: AVPlayerView,
-            restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void
-        ) {
-            restorePlayerInterface(completionHandler)
-        }
-
-        private func inspectNativeOptions(for item: AVPlayerItem, playerView: AVPlayerView) {
-            let inspectionGeneration = nativeMediaSelectionGeneration
-            inspectionTask = Task { @MainActor [weak self, weak item, weak playerView] in
-                guard let self, let item, let playerView else {
-                    return
-                }
-
-                guard let availability = try? await PlexNativeMediaInspector
-                    .mediaSelectionAvailability(asset: item.asset) else {
-                    return
-                }
-
-                guard !Task.isCancelled,
-                      inspectedItemIdentifier == ObjectIdentifier(item),
-                      nativeMediaSelectionGeneration == inspectionGeneration,
-                      let mediaSelection,
-                      let videoQualitySelection,
-                      let videoDynamicRange,
-                      let videoScalingMode else {
-                    return
-                }
-                nativeAvailability = availability
-                onUpdateNativeMediaSelectionAvailability(availability, inspectionGeneration)
-                playerView.actionPopUpButtonMenu = makeActionMenu(
-                    for: mediaSelection,
-                    videoQualitySelection: videoQualitySelection,
-                    videoDynamicRange: videoDynamicRange,
-                    videoScalingMode: videoScalingMode,
-                    nativeAvailability: availability,
-                    markerAction: markerAction
-                )
-            }
-        }
-
-        private func makeActionMenu(
-            for selection: PlexPlaybackMediaSelection,
-            videoQualitySelection: PlexVideoQualitySelection,
-            videoDynamicRange: PlexVideoDisplayDynamicRange,
-            videoScalingMode: PlexVideoScalingMode,
-            nativeAvailability: PlexNativeMediaSelectionAvailability,
-            markerAction: PlexPlaybackMarkerAction?
-        ) -> NSMenu? {
-            let includesVideoQuality = videoQualitySelection.isVideo
-            let serverManagedSelection = PlexServerManagedMediaSelection(
-                selection: selection,
-                nativeAvailability: nativeAvailability
-            )
-            let includesAudio = !serverManagedSelection.audioOptions.isEmpty
-            let includesSubtitles = !serverManagedSelection.subtitleOptions.isEmpty
-            guard markerAction != nil || includesVideoQuality || includesAudio || includesSubtitles else {
-                return nil
-            }
-
-            let menu = NSMenu(title: "Playback Options")
-            if let markerAction {
-                let item = NSMenuItem(
-                    title: markerAction.label,
-                    action: #selector(skipMarker),
-                    keyEquivalent: ""
-                )
-                item.target = self
-                item.image = NSImage(
-                    systemSymbolName: "forward.end.fill",
-                    accessibilityDescription: nil
-                )
-                menu.addItem(item)
-                if includesVideoQuality || includesAudio || includesSubtitles {
-                    menu.addItem(.separator())
-                }
-            }
-            if includesVideoQuality {
-                let item = NSMenuItem(title: "Video Quality", action: nil, keyEquivalent: "")
-                item.submenu = videoQualityMenu(selection: videoQualitySelection)
-                menu.addItem(item)
-            }
-            if videoQualitySelection.isVideo {
-                let item = NSMenuItem(title: "Video Dynamic Range", action: nil, keyEquivalent: "")
-                item.submenu = videoDynamicRangeMenu(selection: videoDynamicRange)
-                menu.addItem(item)
-
-                let scalingItem = NSMenuItem(
-                    title: "Video Scaling",
-                    action: nil,
-                    keyEquivalent: ""
-                )
-                scalingItem.submenu = videoScalingMenu(selection: videoScalingMode)
-                menu.addItem(scalingItem)
-            }
-            if includesAudio {
-                let item = NSMenuItem(title: "Audio", action: nil, keyEquivalent: "")
-                item.submenu = audioMenu(options: serverManagedSelection.audioOptions)
-                menu.addItem(item)
-            }
-            if includesSubtitles {
-                let item = NSMenuItem(title: "Subtitles", action: nil, keyEquivalent: "")
-                item.submenu = subtitleMenu(options: serverManagedSelection.subtitleOptions)
-                menu.addItem(item)
-            }
-            return menu
-        }
-
-        private func audioMenu(options: [PlexMediaSelectionOption]) -> NSMenu {
-            let menu = NSMenu(title: "Audio")
-            for option in options {
-                let item = NSMenuItem(
-                    title: option.title,
-                    action: #selector(selectAudioStream(_:)),
-                    keyEquivalent: ""
-                )
-                item.target = self
-                item.representedObject = option.id
-                item.state = option.isSelected ? .on : .off
-                item.isEnabled = canChangeMediaSelection
-                menu.addItem(item)
-            }
-            return menu
-        }
-
-        private func subtitleMenu(options: [PlexMediaSelectionOption]) -> NSMenu {
-            let menu = NSMenu(title: "Subtitles")
-            let offItem = NSMenuItem(
-                title: "Off",
-                action: #selector(selectSubtitleStream(_:)),
-                keyEquivalent: ""
-            )
-            offItem.target = self
-            offItem.representedObject = 0
-            offItem.state = options.contains(where: \.isSelected) ? .off : .on
-            offItem.isEnabled = canChangeMediaSelection
-            menu.addItem(offItem)
-            menu.addItem(.separator())
-
-            for option in options {
-                let item = NSMenuItem(
-                    title: option.title,
-                    action: #selector(selectSubtitleStream(_:)),
-                    keyEquivalent: ""
-                )
-                item.target = self
-                item.representedObject = option.id
-                item.state = option.isSelected ? .on : .off
-                item.isEnabled = canChangeMediaSelection
-                menu.addItem(item)
-            }
-            return menu
-        }
-
-        private func videoQualityMenu(selection: PlexVideoQualitySelection) -> NSMenu {
-            let menu = NSMenu(title: "Video Quality")
-            for quality in PlexVideoQuality.allCases {
-                let item = NSMenuItem(
-                    title: quality.label,
-                    action: #selector(selectVideoQuality(_:)),
-                    keyEquivalent: ""
-                )
-                item.target = self
-                item.representedObject = quality.rawValue
-                item.state = quality == selection.selectedQuality ? .on : .off
-                item.isEnabled = selection.canSelect(quality)
-                menu.addItem(item)
-            }
-            return menu
-        }
-
-        private func videoDynamicRangeMenu(selection: PlexVideoDisplayDynamicRange) -> NSMenu {
-            let menu = NSMenu(title: "Video Dynamic Range")
-            for dynamicRange in PlexVideoDisplayDynamicRange.allCases {
-                let item = NSMenuItem(
-                    title: dynamicRange.label,
-                    action: #selector(selectVideoDynamicRange(_:)),
-                    keyEquivalent: ""
-                )
-                item.target = self
-                item.representedObject = dynamicRange.rawValue
-                item.state = dynamicRange == selection ? .on : .off
-                menu.addItem(item)
-            }
-            return menu
-        }
-
-        private func videoScalingMenu(selection: PlexVideoScalingMode) -> NSMenu {
-            let menu = NSMenu(title: "Video Scaling")
-            for scalingMode in PlexVideoScalingMode.allCases {
-                let item = NSMenuItem(
-                    title: scalingMode.label,
-                    action: #selector(selectVideoScalingMode(_:)),
-                    keyEquivalent: ""
-                )
-                item.target = self
-                item.representedObject = scalingMode.rawValue
-                item.state = scalingMode == selection ? .on : .off
-                menu.addItem(item)
-            }
-            return menu
-        }
-
-        @objc private func selectAudioStream(_ sender: NSMenuItem) {
-            guard let streamID = sender.representedObject as? Int else {
-                return
-            }
-            onSelectAudioStream(streamID)
-        }
-
-        @objc private func selectSubtitleStream(_ sender: NSMenuItem) {
-            guard let streamID = sender.representedObject as? Int else {
-                return
-            }
-            onSelectSubtitleStream(streamID == 0 ? nil : streamID)
-        }
-
-        @objc private func selectVideoQuality(_ sender: NSMenuItem) {
-            guard let rawValue = sender.representedObject as? String,
-                  let quality = PlexVideoQuality(rawValue: rawValue) else {
-                return
-            }
-            onSelectVideoQuality(quality)
-        }
-
-        @objc private func selectVideoDynamicRange(_ sender: NSMenuItem) {
-            guard let rawValue = sender.representedObject as? String,
-                  let dynamicRange = PlexVideoDisplayDynamicRange(rawValue: rawValue) else {
-                return
-            }
-            onSelectVideoDynamicRange(dynamicRange)
-        }
-
-        @objc private func selectVideoScalingMode(_ sender: NSMenuItem) {
-            guard let rawValue = sender.representedObject as? String,
-                  let scalingMode = PlexVideoScalingMode(rawValue: rawValue) else {
-                return
-            }
-            onSelectVideoScalingMode(scalingMode)
-        }
-
-        @objc private func skipMarker() {
-            onSkipMarker()
-        }
-
-    }
-}
-
-@MainActor
-struct PlexNativePlaybackRateObservationEpoch {
-    struct Ticket: Equatable, Sendable {
-        let generation: UInt
-        let playerIdentifier: ObjectIdentifier
-    }
-
-    private var generation: UInt = 0
-    private var currentTicket: Ticket?
-
-    mutating func begin(player: AVPlayer) -> Ticket {
-        generation &+= 1
-        let ticket = Ticket(
-            generation: generation,
-            playerIdentifier: ObjectIdentifier(player)
-        )
-        currentTicket = ticket
-        return ticket
-    }
-
-    mutating func invalidate() {
-        generation &+= 1
-        currentTicket = nil
-    }
-
-    func isCurrent(player: AVPlayer) -> Bool {
-        guard let currentTicket else {
-            return false
-        }
-        return currentTicket.generation == generation
-            && currentTicket.playerIdentifier == ObjectIdentifier(player)
-    }
-
-    func playbackRate(
-        for observedRawValue: Float,
-        ticket: Ticket,
-        player: AVPlayer
-    ) -> PlexPlaybackRate? {
-        guard currentTicket == ticket,
-              ticket.generation == generation,
-              ticket.playerIdentifier == ObjectIdentifier(player),
-              abs(player.defaultRate - observedRawValue) < 0.001 else {
-            return nil
-        }
-        return PlexPlaybackRate(remoteCommandValue: observedRawValue)
-    }
-}
-
-extension PlexVideoDisplayDynamicRange {
-    var avDisplayDynamicRange: AVDisplayDynamicRange {
-        switch self {
-        case .automatic: .automatic
-        case .standard: .standard
-        case .constrainedHigh: .constrainedHigh
-        case .high: .high
         }
     }
 }
@@ -2822,6 +1934,11 @@ final class PlexPlayerSessionModel {
         }
         userInteractionStore.recordInteraction()
         coordinator.close(self)
+    }
+
+    func seek(to position: TimeInterval) {
+        guard coordinator.canSeek else { return }
+        requestSeek(to: position)
     }
 
     private func requestSeek(to position: TimeInterval) {

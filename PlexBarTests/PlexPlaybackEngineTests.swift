@@ -9,11 +9,11 @@ import Testing
 
 @MainActor
 struct PlexPlaybackEngineTests {
-    @Test func videoDynamicRangeMapsExactlyToTheMacOS26AVKitPolicy() {
-        #expect(PlexVideoDisplayDynamicRange.automatic.avDisplayDynamicRange == .automatic)
-        #expect(PlexVideoDisplayDynamicRange.standard.avDisplayDynamicRange == .standard)
-        #expect(PlexVideoDisplayDynamicRange.constrainedHigh.avDisplayDynamicRange == .constrainedHigh)
-        #expect(PlexVideoDisplayDynamicRange.high.avDisplayDynamicRange == .high)
+    @Test func videoDynamicRangeMapsExactlyToTheMacOS26LayerPolicy() {
+        #expect(PlexVideoDisplayDynamicRange.automatic.layerDynamicRange == .automatic)
+        #expect(PlexVideoDisplayDynamicRange.standard.layerDynamicRange == .standard)
+        #expect(PlexVideoDisplayDynamicRange.constrainedHigh.layerDynamicRange == .constrainedHigh)
+        #expect(PlexVideoDisplayDynamicRange.high.layerDynamicRange == .high)
         #expect(PlexVideoDisplayDynamicRange.allCases.map(\.label) == [
             "Automatic",
             "Standard Dynamic Range",
@@ -870,14 +870,6 @@ struct PlexPlaybackEngineTests {
         #expect(PlexPlaybackTransportAction(status: .failed("failed")) == nil)
     }
 
-    @Test func bareSpaceShortcutBelongsOnlyToTheFocusedPlayerSurface() {
-        #expect(PlexPlaybackKeyboardShortcut.playPause(isPlayerSurfaceFocused: false) == nil)
-
-        let shortcut = PlexPlaybackKeyboardShortcut.playPause(isPlayerSurfaceFocused: true)
-        #expect(shortcut?.key.character == KeyEquivalent.space.character)
-        #expect(shortcut?.modifiers.isEmpty == true)
-    }
-
     @Test func playbackRateSelectionRequiresAnActiveOwner() {
         let coordinator = PlexPlayerCoordinator()
         var selections: [PlexPlaybackRate] = []
@@ -1236,69 +1228,6 @@ struct PlexPlaybackEngineTests {
         #expect(PlexNativePlaybackSpeedConfiguration.playbackRate(for: nil) == nil)
     }
 
-    @Test func nativePlaybackRateObservationRejectsStalePlayersAndValues() {
-        var epoch = PlexNativePlaybackRateObservationEpoch()
-        let firstPlayer = AVPlayer()
-        let secondPlayer = AVPlayer()
-
-        firstPlayer.defaultRate = PlexPlaybackRate.oneAndAHalf.rawValue
-        let firstTicket = epoch.begin(player: firstPlayer)
-        #expect(epoch.isCurrent(player: firstPlayer))
-        #expect(!epoch.isCurrent(player: secondPlayer))
-        #expect(
-            epoch.playbackRate(
-                for: PlexPlaybackRate.oneAndAHalf.rawValue,
-                ticket: firstTicket,
-                player: firstPlayer
-            ) == .oneAndAHalf
-        )
-
-        firstPlayer.defaultRate = PlexPlaybackRate.double.rawValue
-        #expect(
-            epoch.playbackRate(
-                for: PlexPlaybackRate.oneAndAHalf.rawValue,
-                ticket: firstTicket,
-                player: firstPlayer
-            ) == nil
-        )
-        #expect(
-            epoch.playbackRate(
-                for: PlexPlaybackRate.double.rawValue,
-                ticket: firstTicket,
-                player: firstPlayer
-            ) == .double
-        )
-
-        secondPlayer.defaultRate = PlexPlaybackRate.half.rawValue
-        let secondTicket = epoch.begin(player: secondPlayer)
-        #expect(!epoch.isCurrent(player: firstPlayer))
-        #expect(epoch.isCurrent(player: secondPlayer))
-        #expect(
-            epoch.playbackRate(
-                for: PlexPlaybackRate.double.rawValue,
-                ticket: firstTicket,
-                player: firstPlayer
-            ) == nil
-        )
-        #expect(
-            epoch.playbackRate(
-                for: PlexPlaybackRate.half.rawValue,
-                ticket: secondTicket,
-                player: secondPlayer
-            ) == .half
-        )
-
-        epoch.invalidate()
-        #expect(!epoch.isCurrent(player: secondPlayer))
-        #expect(
-            epoch.playbackRate(
-                for: PlexPlaybackRate.half.rawValue,
-                ticket: secondTicket,
-                player: secondPlayer
-            ) == nil
-        )
-    }
-
     @Test func playbackRatesRoundTripOnlySupportedRemoteCommandValues() {
         #expect(PlexPlaybackRate.allCases.map(\.rawValue) == [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2])
         for playbackRate in PlexPlaybackRate.allCases {
@@ -1309,7 +1238,7 @@ struct PlexPlaybackEngineTests {
         #expect(PlexPlaybackRate(remoteCommandValue: 1.1) == nil)
     }
 
-    @Test func fullScreenLifecycleKeepsPlaybackAliveUntilAVKitFinishesExiting() {
+    @Test func fullScreenLifecycleKeepsPlaybackAliveUntilTheWindowFinishesExiting() {
         let lifecycle = PlexPlayerPresentationLifecycle()
 
         #expect(!lifecycle.keepsPlaybackAliveWhenViewDisappears)

@@ -1,21 +1,7 @@
 import SwiftUI
 
-extension FocusedValues {
-    @Entry var plexPlayerSurfaceIsFocused: Bool?
-}
-
-enum PlexPlaybackKeyboardShortcut {
-    static func playPause(isPlayerSurfaceFocused: Bool) -> KeyboardShortcut? {
-        guard isPlayerSurfaceFocused else {
-            return nil
-        }
-        return KeyboardShortcut(.space, modifiers: [])
-    }
-}
-
 struct PlexPlaybackCommands: Commands {
     @Environment(\.openWindow) private var openWindow
-    @FocusedValue(\.plexPlayerSurfaceIsFocused) private var playerSurfaceIsFocused
     @Bindable var coordinator: PlexPlayerCoordinator
     @Bindable var settingsStore: PlexSettingsStore
 
@@ -33,9 +19,8 @@ struct PlexPlaybackCommands: Commands {
                 systemImage: coordinator.transportAction?.systemImage ?? "play.fill",
                 action: coordinator.togglePlayback
             )
-            .keyboardShortcut(PlexPlaybackKeyboardShortcut.playPause(
-                isPlayerSurfaceFocused: playerSurfaceIsFocused == true
-            ))
+            // Transport keys are routed by the player so text fields, sliders,
+            // and queue controls retain their normal keyboard behavior.
             .disabled(coordinator.transportAction == nil)
 
             Button("Stop", systemImage: "stop.fill", action: coordinator.stopPlayback)

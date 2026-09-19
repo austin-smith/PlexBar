@@ -13,7 +13,7 @@ This file defines project constraints for coding agents working in this reposito
 - Minimum supported platform is macOS 26+.
 - PlexBar is one regular macOS app with a primary window and a persistent menu-bar extra. The window and menu-bar UI must share the same stores and services.
 - UI work should stay SwiftUI-first.
-- Use native Apple media frameworks. `AVPlayerView` may be bridged into SwiftUI where SwiftUI has no equivalent macOS player view; do not replace native controls with a custom imitation.
+- Use native Apple media frameworks for playback and presentation. The player uses one unified SwiftUI control panel backed by AVPlayer and AVPlayerLayer, with native Picture in Picture, AirPlay, and window fullscreen APIs.
 - Do not introduce web views, cross-platform UI layers, or third-party playback engines.
 
 ## Project Boundaries

@@ -5,9 +5,9 @@ import Testing
 @MainActor
 struct PlexVideoFullScreenKeyboardTests {
     @Test func fTogglesVideoAndEscapeOnlyExitsFullScreen() {
-        #expect(action("f", fullScreen: false) == .enter)
-        #expect(action("f", fullScreen: true) == .exit)
-        #expect(action("\u{1b}", fullScreen: true) == .exit)
+        #expect(action("f", fullScreen: false) == .enterFullScreen)
+        #expect(action("f", fullScreen: true) == .exitFullScreen)
+        #expect(action("\u{1b}", fullScreen: true) == .exitFullScreen)
         #expect(action("\u{1b}", fullScreen: false) == nil)
         #expect(action(" ", fullScreen: false) == nil)
     }
@@ -22,7 +22,7 @@ struct PlexVideoFullScreenKeyboardTests {
                 #expect(action("f", fullScreen: fullScreen, modifiers: modifiers) == nil)
             }
         }
-        #expect(action("F", fullScreen: false, modifiers: .capsLock) == .enter)
+        #expect(action("F", fullScreen: false, modifiers: .capsLock) == .enterFullScreen)
     }
 
     @Test func playbackSurvivesBothFullScreenTransitions() {
@@ -46,7 +46,7 @@ struct PlexVideoFullScreenKeyboardTests {
         fullScreen: Bool,
         editing: Bool = false,
         modifiers: NSEvent.ModifierFlags = []
-    ) -> PlexVideoFullScreenKeyboardHandler.Action? {
+    ) -> PlexPlayerTransportKeyboardHandler.Action? {
         let event = NSEvent.keyEvent(
             with: .keyDown,
             location: .zero,
@@ -59,10 +59,10 @@ struct PlexVideoFullScreenKeyboardTests {
             isARepeat: false,
             keyCode: characters == "\u{1b}" ? 53 : 3
         )!
-        return PlexVideoFullScreenKeyboardHandler.action(
+        return PlexPlayerTransportKeyboardHandler.action(
             for: event,
-            isFullScreenActive: fullScreen,
-            isEditingText: editing
+            hasFocusedControl: editing,
+            isFullScreenActive: fullScreen
         )
     }
 }
