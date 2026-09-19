@@ -6,15 +6,34 @@ struct PlexPlaybackEndedOverlay: View {
     let dismiss: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            content
+        GeometryReader { geometry in
+            ViewThatFits(in: .vertical) {
+                VStack(alignment: .leading, spacing: 20) {
+                    header
+                    content(scrollsSuggestions: true)
+                }
+                .padding(20)
+                .fixedSize(horizontal: false, vertical: true)
+
+                VStack(alignment: .leading, spacing: 20) {
+                    header
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            content(scrollsSuggestions: false)
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .frame(width: min(460, geometry.size.width))
+            .background(.regularMaterial, in: .rect(cornerRadius: 18))
+            .clipShape(.rect(cornerRadius: 18))
+            .shadow(radius: 24, y: 10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: 520, height: 460)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .shadow(radius: 24, y: 10)
-        .padding(32)
+        .padding(.horizontal, 24)
+        .padding(.top, 24)
+        .padding(.bottom, 48)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Playback Finished")
     }
@@ -22,7 +41,9 @@ struct PlexPlaybackEndedOverlay: View {
     private var header: some View {
         HStack {
             Text(session.postPlayNextItem == nil ? "More to Watch" : "Up Next")
-                .font(.headline)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
 
             Spacer()
 
@@ -41,47 +62,27 @@ struct PlexPlaybackEndedOverlay: View {
                 .labelStyle(.iconOnly)
                 .help("Close")
         }
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .background(.bar)
     }
 
     @ViewBuilder
-    private var content: some View {
+    private func content(scrollsSuggestions: Bool) -> some View {
         if session.postPlayNextItem != nil || !session.postPlayHubs.isEmpty {
-            List {
-                if let nextItem = session.postPlayNextItem {
-                    playingNextSection(nextItem)
-                }
+            if let nextItem = session.postPlayNextItem {
+                playingNextItem(nextItem)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
-                ForEach(session.postPlayHubs) { hub in
-                    let additionalItems = postPlayItems(in: hub)
-                    if !additionalItems.isEmpty {
-                        Section(hub.title) {
-                            ForEach(additionalItems) { item in
-                                PlexPostPlayItemRow(
-                                    item: item,
-                                    serverURL: session.artworkServerURL,
-                                    token: session.artworkToken,
-                                    clientContext: session.artworkClientContext,
-                                    action: { session.playPostPlayItem(item) }
-                                )
-                                .disabled(session.isLoading)
-                            }
-                        }
+            if !suggestionHubs.isEmpty || session.postPlayErrorMessage != nil {
+                if scrollsSuggestions {
+                    ScrollView {
+                        suggestions
                     }
-                }
-
-                if let errorMessage = session.postPlayErrorMessage {
-                    Section("Refresh Error") {
-                        Text(errorMessage)
-                            .foregroundStyle(.secondary)
-                        Button("Try Again", action: session.requestPostPlayRefresh)
-                            .disabled(session.isLoadingPostPlay || session.isLoading)
-                    }
+                    .frame(height: suggestionsHeight)
+                    .defaultScrollAnchor(.top)
+                } else {
+                    suggestions
                 }
             }
-            .listStyle(.inset)
         } else {
             if session.isLoadingPostPlay {
                 ProgressView("Loading…")
@@ -101,6 +102,42 @@ struct PlexPlaybackEndedOverlay: View {
         }
     }
 
+    private var suggestions: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            ForEach(suggestionHubs) { hub in
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(hub.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityAddTraits(.isHeader)
+
+                    ForEach(postPlayItems(in: hub)) { item in
+                        PlexPostPlayItemRow(
+                            item: item,
+                            serverURL: session.artworkServerURL,
+                            token: session.artworkToken,
+                            clientContext: session.artworkClientContext,
+                            action: { session.playPostPlayItem(item) }
+                        )
+                        .disabled(session.isLoading)
+                    }
+                }
+            }
+
+            if let errorMessage = session.postPlayErrorMessage {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Refresh Error")
+                        .font(.subheadline.weight(.semibold))
+                    Text(errorMessage)
+                        .foregroundStyle(.secondary)
+                    Button("Try Again", action: session.requestPostPlayRefresh)
+                        .disabled(session.isLoadingPostPlay || session.isLoading)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func postPlayItems(in hub: PlexHub) -> [PlexMediaItem] {
         guard let nextItem = session.postPlayNextItem else {
             return hub.metadata
@@ -112,20 +149,32 @@ struct PlexPlaybackEndedOverlay: View {
         }
     }
 
-    private func playingNextSection(_ item: PlexMediaItem) -> some View {
-        Section("Playing Next") {
-            PlexPostPlayNextItem(
-                item: item,
-                serverURL: session.artworkServerURL,
-                token: session.artworkToken,
-                clientContext: session.artworkClientContext,
-                countdownTotalSeconds: session.postPlayCountdownTotalSeconds,
-                countdownRemainingSeconds: session.postPlayCountdownRemainingSeconds,
-                isLoading: session.isLoading,
-                play: session.playPostPlayNextItem,
-                cancelAutoplay: session.cancelPostPlayAutoplay
-            )
-        }
+    private var suggestionHubs: [PlexHub] {
+        session.postPlayHubs.filter { !postPlayItems(in: $0).isEmpty }
+    }
+
+    @ScaledMetric(relativeTo: .body) private var suggestionRowHeight: CGFloat = 54
+    @ScaledMetric(relativeTo: .subheadline) private var suggestionHeadingHeight: CGFloat = 16
+
+    private var suggestionsHeight: CGFloat {
+        // Show the first heading and two complete rows, with further suggestions scrolling.
+        guard let firstHub = suggestionHubs.first else { return 120 }
+        let rowCount = min(postPlayItems(in: firstHub).count, 2)
+        return suggestionHeadingHeight + CGFloat(rowCount) * (suggestionRowHeight + 10)
+    }
+
+    private func playingNextItem(_ item: PlexMediaItem) -> some View {
+        PlexPostPlayNextItem(
+            item: item,
+            serverURL: session.artworkServerURL,
+            token: session.artworkToken,
+            clientContext: session.artworkClientContext,
+            countdownTotalSeconds: session.postPlayCountdownTotalSeconds,
+            countdownRemainingSeconds: session.postPlayCountdownRemainingSeconds,
+            isLoading: session.isLoading,
+            play: session.playPostPlayNextItem,
+            cancelAutoplay: session.cancelPostPlayAutoplay
+        )
     }
 }
 
@@ -139,28 +188,29 @@ private struct PlexPostPlayNextItem: View {
     let isLoading: Bool
     let play: () -> Void
     let cancelAutoplay: () -> Void
-    @ScaledMetric(relativeTo: .body) private var artworkWidth: CGFloat = 72
-    @ScaledMetric(relativeTo: .body) private var artworkHeight: CGFloat = 106
+    @ScaledMetric(relativeTo: .body) private var artworkWidth: CGFloat = 80
+    @ScaledMetric(relativeTo: .body) private var artworkHeight: CGFloat = 120
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                PlexArtworkView(
-                    primaryImageURL: artworkURL,
-                    fallbackImageURL: nil,
-                    token: token,
-                    clientContext: clientContext,
-                    placeholderSymbol: item.placeholderSymbol,
-                    width: artworkWidth,
-                    height: artworkHeight,
-                    cornerRadius: 8
-                )
-                .accessibilityHidden(true)
+        HStack(alignment: .top, spacing: 16) {
+            PlexArtworkView(
+                primaryImageURL: artworkURL,
+                fallbackImageURL: nil,
+                token: token,
+                clientContext: clientContext,
+                placeholderSymbol: item.placeholderSymbol,
+                width: artworkWidth,
+                height: artworkHeight,
+                cornerRadius: 8
+            )
+            .accessibilityHidden(true)
 
+            VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(item.title)
-                        .font(.headline)
+                        .font(.title3.weight(.semibold))
                         .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if let subtitle = item.subtitle {
                         Text(subtitle)
@@ -169,37 +219,37 @@ private struct PlexPostPlayNextItem: View {
                             .lineLimit(2)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
 
-            if let countdownTotalSeconds,
-               let countdownRemainingSeconds {
-                VStack(alignment: .leading, spacing: 5) {
-                    ProgressView(
-                        value: Double(countdownRemainingSeconds),
-                        total: Double(countdownTotalSeconds)
-                    )
-                    .accessibilityLabel("Time Until Auto Play")
-                    .accessibilityValue("\(countdownRemainingSeconds) seconds")
+                if let countdownTotalSeconds,
+                   let countdownRemainingSeconds {
+                    VStack(alignment: .leading, spacing: 5) {
+                        ProgressView(
+                            value: Double(countdownRemainingSeconds),
+                            total: Double(countdownTotalSeconds)
+                        )
+                        .accessibilityLabel("Time Until Auto Play")
+                        .accessibilityValue("\(countdownRemainingSeconds) seconds")
 
-                    Text("Playing in \(countdownRemainingSeconds) seconds")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        Text("Playing in \(countdownRemainingSeconds) seconds")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            }
 
-            HStack {
-                Button("Play Now", systemImage: "play.fill", action: play)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isLoading)
-
-                if countdownRemainingSeconds != nil {
-                    Button("Cancel Auto Play", action: cancelAutoplay)
+                HStack {
+                    Button("Play Now", systemImage: "play.fill", action: play)
+                        .buttonStyle(.borderedProminent)
                         .disabled(isLoading)
+
+                    if countdownRemainingSeconds != nil {
+                        Button("Cancel Auto Play", action: cancelAutoplay)
+                            .disabled(isLoading)
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, minHeight: artworkHeight, alignment: .topLeading)
         }
-        .padding(.vertical, 6)
         .accessibilityElement(children: .contain)
     }
 
@@ -217,8 +267,8 @@ private struct PlexPostPlayItemRow: View {
     let token: String
     let clientContext: PlexClientContext
     let action: () -> Void
-    @ScaledMetric(relativeTo: .body) private var artworkWidth: CGFloat = 42
-    @ScaledMetric(relativeTo: .body) private var artworkHeight: CGFloat = 62
+    @ScaledMetric(relativeTo: .body) private var artworkWidth: CGFloat = 36
+    @ScaledMetric(relativeTo: .body) private var artworkHeight: CGFloat = 54
 
     var body: some View {
         Button(action: action) {
@@ -255,7 +305,6 @@ private struct PlexPostPlayItemRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel([item.title, item.subtitle].compactMap { $0 }.joined(separator: ", "))
         .accessibilityHint("Starts this post-play item.")
-        .listRowInsets(EdgeInsets(top: 6, leading: 8, bottom: 6, trailing: 8))
     }
 
     private var artworkURL: URL? {
