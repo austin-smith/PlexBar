@@ -80,3 +80,34 @@ jobs:
           name: macos-test-results
           path: build/TestResults/
           retention-days: 7
+
+  tvos-build-and-test:
+    name: tvOS Build + Test
+    runs-on: xcode-27
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build and test Apple TV
+        run: |
+          mkdir -p build/TestResults
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBarTV \
+            -configuration Debug \
+            -destination 'platform=tvOS Simulator,name=Apple TV 4K (3rd generation),OS=latest' \
+            -derivedDataPath build/TVOSDerivedData \
+            -resultBundlePath build/TestResults/PlexBarTV.xcresult \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: tvos-test-results
+          path: build/TestResults/
+          retention-days: 7
