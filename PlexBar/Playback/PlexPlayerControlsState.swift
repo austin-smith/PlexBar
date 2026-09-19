@@ -6,20 +6,36 @@ import Foundation
 @Observable
 final class PlexPlayerControlsState {
     var isPointerActive = true
-    var isHoveringControls = false
+    private(set) var isKeyboardNavigating = false
     var hasKeyboardFocus = false
     var isTimelineFocused = false
     let scrub = PlexPlayerScrubState()
     var isScrubbing: Bool { scrub.isActive }
     var isMenuTracking = false
     var isPopoverPresented = false
+    @ObservationIgnored private let inactivityDelay: Duration
     @ObservationIgnored private var hideTask: Task<Void, Never>?
+
+    init(inactivityDelay: Duration = .seconds(3)) {
+        self.inactivityDelay = inactivityDelay
+    }
+
+    func pointerActivity() {
+        isKeyboardNavigating = false
+        reveal()
+    }
+
+    func keyboardActivity(isNavigation: Bool) {
+        if isNavigation { isKeyboardNavigating = true }
+        reveal()
+    }
 
     func reveal() {
         isPointerActive = true
         hideTask?.cancel()
+        let delay = inactivityDelay
         hideTask = Task { [weak self] in
-            do { try await Task.sleep(for: .seconds(3)) } catch { return }
+            do { try await Task.sleep(for: delay) } catch { return }
             self?.isPointerActive = false
             self?.hideTask = nil
         }
@@ -31,7 +47,10 @@ final class PlexPlayerControlsState {
     }
 
     func isVisible(status: PlexPlaybackStatus, voiceOverEnabled: Bool) -> Bool {
-        isPointerActive || isHoveringControls || hasKeyboardFocus || isTimelineFocused || isScrubbing || isMenuTracking || isPopoverPresented
+        // Focus keeps controls available for Tab navigation, but a return to
+        // pointer input allows idle playback to hide them again.
+        isPointerActive || (isKeyboardNavigating && (hasKeyboardFocus || isTimelineFocused))
+            || isScrubbing || isMenuTracking || isPopoverPresented
             || status != .playing || voiceOverEnabled
     }
 }

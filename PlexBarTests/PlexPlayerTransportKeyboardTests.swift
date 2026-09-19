@@ -35,6 +35,10 @@ struct PlexPlayerTransportKeyboardTests {
                 characters: "", charactersIgnoringModifiers: "", isARepeat: repeatKey, keyCode: key
             )!
         }
+        #expect(!handler.handleKeyDown(event(48)))
+        #expect(state.isKeyboardNavigating)
+        state.pointerActivity()
+        #expect(!state.isKeyboardNavigating)
         #expect(handler.handleKeyDown(event(124)))
         #expect(handler.handleKeyDown(event(124, repeatKey: true)))
         #expect(offsets == [10, 10])

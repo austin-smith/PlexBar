@@ -41,6 +41,29 @@ struct PlexVideoFullScreenKeyboardTests {
         #expect(!lifecycle.isFullScreenActive)
     }
 
+    @Test func playerWindowAppearanceRestoresWhenReturningToTheLibrary() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false
+        )
+        window.toolbarStyle = .unified
+        window.titlebarAppearsTransparent = false
+        let presentation = PlexPlayerPresentationController()
+        presentation.attach(window: window)
+        #expect(window.toolbarStyle == .unifiedCompact)
+        #expect(window.titlebarAppearsTransparent)
+        // Reattaching the same view must not overwrite the saved library style.
+        presentation.attach(window: window)
+        presentation.attach(window: nil)
+        #expect(window.toolbarStyle == .unified)
+        #expect(!window.titlebarAppearsTransparent)
+        presentation.attach(window: window)
+        presentation.detach()
+        #expect(window.toolbarStyle == .unified)
+        #expect(!window.titlebarAppearsTransparent)
+        window.orderOut(nil)
+    }
+
     private func action(
         _ characters: String,
         fullScreen: Bool,

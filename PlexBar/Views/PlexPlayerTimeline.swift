@@ -7,6 +7,8 @@ struct PlexPlayerTimeline: View {
     let scrub: PlexPlayerScrubState
     let onCommit: (Double) -> Void
     let onPreview: (Double?) -> Void
+    let isKeyboardNavigating: Bool
+    let isControlsVisible: Bool
     let onFocusChanged: (Bool) -> Void
     @Environment(\.isEnabled) private var isEnabled
     @FocusState private var isFocused: Bool
@@ -81,6 +83,12 @@ struct PlexPlayerTimeline: View {
             if scrub.isActive, scrub.position == nil { onPreview(nil) }
         }
         .onChange(of: isFocused) { onFocusChanged(isFocused) }
+        .onChange(of: isControlsVisible) {
+            if !isControlsVisible { isFocused = false }
+        }
+        .onChange(of: isKeyboardNavigating) {
+            if !isKeyboardNavigating { isFocused = false }
+        }
         .onChange(of: isEnabled) {
             if !isEnabled { hoverPosition = nil; scrub.cancel(); onPreview(nil) }
         }

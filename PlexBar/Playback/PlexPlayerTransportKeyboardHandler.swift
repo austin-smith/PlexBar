@@ -76,6 +76,8 @@ final class PlexPlayerTransportKeyboardHandler {
             return false
         }
 
+        // Observe Tab even though AppKit/SwiftUI handles the navigation itself.
+        controlsState.keyboardActivity(isNavigation: event.keyCode == 48)
         guard let action = Self.action(
             for: event,
             hasFocusedControl: controlsState.hasKeyboardFocus || Self.hasFocusedControl(window.firstResponder),

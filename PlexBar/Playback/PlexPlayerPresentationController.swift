@@ -8,6 +8,8 @@ final class PlexPlayerPresentationController: NSObject, @MainActor AVPictureInPi
     private(set) var canStartPictureInPicture = false
     var errorMessage: String?
     @ObservationIgnored private weak var window: NSWindow?
+    @ObservationIgnored private var originalToolbarStyle: NSWindow.ToolbarStyle?
+    @ObservationIgnored private var originalTitlebarTransparency: Bool?
     @ObservationIgnored private var lifecycle: PlexPlayerPresentationLifecycle?
     @ObservationIgnored private var pictureInPicture: AVPictureInPictureController?
     @ObservationIgnored private var possibleObservation: NSKeyValueObservation?
@@ -35,8 +37,13 @@ final class PlexPlayerPresentationController: NSObject, @MainActor AVPictureInPi
         guard self.window !== window else { return }
         windowObservers.forEach(NotificationCenter.default.removeObserver)
         windowObservers = []
+        restoreWindowAppearance()
         self.window = window
         guard let window else { return }
+        originalToolbarStyle = window.toolbarStyle
+        originalTitlebarTransparency = window.titlebarAppearsTransparent
+        window.toolbarStyle = .unifiedCompact
+        window.titlebarAppearsTransparent = true
         if window.styleMask.contains(.fullScreen) {
             lifecycle?.willEnterFullScreen()
             lifecycle?.didEnterFullScreen()
@@ -55,6 +62,13 @@ final class PlexPlayerPresentationController: NSObject, @MainActor AVPictureInPi
                 MainActor.assumeIsolated { self?.handleWindowNotification(name) }
             })
         }
+    }
+
+    private func restoreWindowAppearance() {
+        if let originalToolbarStyle { window?.toolbarStyle = originalToolbarStyle }
+        if let originalTitlebarTransparency { window?.titlebarAppearsTransparent = originalTitlebarTransparency }
+        originalToolbarStyle = nil
+        originalTitlebarTransparency = nil
     }
 
     private func handleWindowNotification(_ name: Notification.Name) {
@@ -91,6 +105,7 @@ final class PlexPlayerPresentationController: NSObject, @MainActor AVPictureInPi
         pictureInPicture = nil
         windowObservers.forEach(NotificationCenter.default.removeObserver)
         windowObservers = []
+        restoreWindowAppearance()
         window = nil
         restoreInterface = nil
     }

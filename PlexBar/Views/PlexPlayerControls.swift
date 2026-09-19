@@ -39,6 +39,12 @@ struct PlexPlayerControls: View {
         GlassEffectContainer(spacing: 0) {
             controlPanel
         }
+        // Fade the complete glass container so its native effect and controls
+        // share the same visibility, hit testing, and accessibility lifetime.
+        .opacity(isVisible ? 1 : 0)
+        .allowsHitTesting(isVisible)
+        .accessibilityHidden(!isVisible)
+        .animation(reduceMotion ? nil : .easeOut(duration: isVisible ? 0.1 : 0.3), value: isVisible)
     }
 
     private var controlPanel: some View {
@@ -86,17 +92,22 @@ struct PlexPlayerControls: View {
         .labelStyle(.iconOnly)
         .buttonStyle(PlexPlayerControlButtonStyle())
         .font(.system(size: 15, weight: .medium))
-        .onHover { hovering in
-            state.isHoveringControls = hovering
-            state.reveal()
+        .onChange(of: state.isKeyboardNavigating) {
+            if !state.isKeyboardNavigating { focusedControl = nil }
         }
+        .onChange(of: state.isScrubbing) { state.reveal() }
         .onChange(of: showsVolume) {
             state.isPopoverPresented = showsVolume
             state.reveal()
         }
         .onChange(of: focusedControl) { state.hasKeyboardFocus = focusedControl != nil }
         .onChange(of: session.playbackPreviewSource) { preview.configure(session.playbackPreviewSource) }
-        .onChange(of: isVisible) { if !isVisible { preview.hide() } }
+        .onChange(of: isVisible) {
+            if !isVisible {
+                preview.hide()
+                focusedControl = nil
+            }
+        }
         .onChange(of: session.presentation.id) {
             state.scrub.reset()
             state.reveal()
@@ -108,15 +119,10 @@ struct PlexPlayerControls: View {
         .onDisappear {
             preview.hide()
             state.hasKeyboardFocus = false
-            state.isHoveringControls = false
             state.scrub.reset()
             state.isTimelineFocused = false
             state.isPopoverPresented = false
         }
-        .opacity(isVisible ? 1 : 0)
-        .allowsHitTesting(isVisible)
-        .accessibilityHidden(!isVisible)
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: isVisible)
     }
 
     private var contentHeader: some View {
@@ -163,6 +169,8 @@ struct PlexPlayerControls: View {
                         preview.hide()
                     }
                 },
+                isKeyboardNavigating: state.isKeyboardNavigating,
+                isControlsVisible: isVisible,
                 onFocusChanged: { state.isTimelineFocused = $0 }
             )
             .disabled(!coordinator.canSeek || duration == nil)

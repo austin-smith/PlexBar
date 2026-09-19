@@ -118,6 +118,7 @@ final class PlexPlayerPresentationLifecycle {
 }
 
 struct PlexPlayerView: View {
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.openWindow) private var openWindow
@@ -164,6 +165,13 @@ struct PlexPlayerView: View {
                     isInteractionBlocked: overlaySelection.isPresented
                         || session.qualitySuggestion != nil
                         || showsPostPlay,
+                    isCursorHidingAllowed: session.presentation.plan.mediaKind == .video
+                        && !controlsState.isVisible(status: session.engine.status, voiceOverEnabled: voiceOverEnabled)
+                        && !overlaySelection.isPresented && !showsPostPlay
+                        && session.qualitySuggestion == nil && session.errorMessage == nil
+                        && playerPresentation.errorMessage == nil && mediaOptions.errorMessage == nil
+                        && !presentationLifecycle.isPictureInPictureActive
+                        && !presentationLifecycle.isFullScreenTransitioning,
                     restorePlayerInterface: restorePlayerInterface
                 )
 
@@ -296,11 +304,14 @@ struct PlexPlayerView: View {
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button("Back to Library", systemImage: "chevron.backward", action: closePlayer)
+                    .labelStyle(.iconOnly)
                     .help("Stop Playback and Return to Library")
             }
 
         }
-        .toolbar(presentationLifecycle.isFullScreenActive ? .hidden : .automatic, for: .windowToolbar)
+        .toolbar(removing: .title)
+        .toolbarVisibility(presentationLifecycle.isFullScreenActive ? .hidden : .automatic, for: .windowToolbar)
+        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .task {
             controlsState.reveal()
             await session.start()
@@ -496,7 +507,7 @@ struct PlexPlayerStage<Content: View>: View {
 
     var body: some View {
         ZStack {
-            Color.black
+            Color.black.ignoresSafeArea()
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
