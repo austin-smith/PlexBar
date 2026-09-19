@@ -896,7 +896,7 @@ private final class TVPlaybackMockProtocol: URLProtocol, @unchecked Sendable {
             client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
             return
         }
-        let task = Task {
+        let task = Task { @Sendable [self, request = request] in
             do {
                 let (response, data) = try await handler(request)
                 guard !Task.isCancelled else { return }

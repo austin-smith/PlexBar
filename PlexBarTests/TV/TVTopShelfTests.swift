@@ -351,7 +351,7 @@ private final class TopShelfMockProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         guard let handler = Self.handler.withLock({ $0 }) else { return }
-        let loading = Task {
+        let loading = Task { @Sendable [self, request = request] in
             do {
                 let (status, data) = try await handler(request)
                 try Task.checkCancellation()
