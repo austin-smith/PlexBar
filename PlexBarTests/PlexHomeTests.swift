@@ -1,3 +1,4 @@
+@testable import PlexClientKit
 import PlexModels
 #if os(macOS)
 import Foundation

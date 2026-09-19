@@ -1,3 +1,4 @@
+@testable import PlexClientKit
 import PlexModels
 import AppKit
 import SwiftUI

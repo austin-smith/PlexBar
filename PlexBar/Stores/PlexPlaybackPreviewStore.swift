@@ -1,3 +1,4 @@
+import PlexClientKit
 import Foundation
 import Observation
 import OSLog

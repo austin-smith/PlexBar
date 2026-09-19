@@ -1,3 +1,4 @@
+import PlexClientKit
 import SwiftUI
 
 struct PosterStackView: View {

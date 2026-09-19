@@ -1,3 +1,4 @@
+@testable import PlexClientKit
 import CryptoKit
 import Foundation
 import Testing

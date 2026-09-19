@@ -21,10 +21,3 @@ enum AppConstants {
     static let defaultHistoryPollIntervalSeconds = 900
     static let allowedHistoryPollIntervalSeconds = [900, 3_600, 86_400]
 }
-
-enum KeychainAccounts {
-    static let userToken = "plex-user-token"
-    static let serverToken = "plex-server-token"
-    static let jwtKeyID = "plex-jwt-key-id"
-    static let jwtPrivateKey = "plex-jwt-private-key"
-}

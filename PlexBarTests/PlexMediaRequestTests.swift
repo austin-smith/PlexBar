@@ -1,3 +1,4 @@
+@testable import PlexClientKit
 import PlexModels
 import Foundation
 import Testing

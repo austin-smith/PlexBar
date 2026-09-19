@@ -1,3 +1,4 @@
+import PlexClientKit
 import SwiftUI
 
 struct PlexPlaybackSettingsView: View {

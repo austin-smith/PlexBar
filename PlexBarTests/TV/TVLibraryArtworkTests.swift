@@ -1,4 +1,5 @@
 #if os(tvOS)
+@testable import PlexClientKit
 import Foundation
 import Testing
 import Synchronization

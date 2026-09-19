@@ -1,3 +1,4 @@
+@testable import PlexClientKit
 import Testing
 @testable import PlexBar
 

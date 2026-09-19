@@ -1,3 +1,5 @@
+import PlexTopShelf
+import PlexClientKit
 import PlexModels
 import Foundation
 import Observation
@@ -300,8 +302,8 @@ final class TVAppStore {
         client: TVPlexClient = TVPlexClient(),
         defaults: UserDefaults = .standard,
         authClient: PlexAuthClient = PlexAuthClient(),
-        deviceIdentityStore: any PlexDeviceIdentityProviding = PlexKeychainDeviceIdentityStore(),
-        keychain: KeychainStore = KeychainStore(service: AppConstants.bundleIdentifier),
+        deviceIdentityStore: any PlexDeviceIdentityProviding = PlexKeychainDeviceIdentityStore(keychain: KeychainStore(service: TVAppConfiguration.bundleIdentifier)),
+        keychain: KeychainStore = KeychainStore(service: TVAppConfiguration.bundleIdentifier),
         topShelfPublisher: TVTopShelfPublisher = TVTopShelfPublisher()
     ) {
         self.client = client
@@ -314,6 +316,7 @@ final class TVAppStore {
         self.accountStorage = accountStorage
         accountJWTManager = PlexAccountJWTManager(
             storage: accountStorage,
+            clientContext: { PlexClientContext(clientIdentifier: $0) },
             client: authClient,
             deviceIdentityStore: deviceIdentityStore
         )

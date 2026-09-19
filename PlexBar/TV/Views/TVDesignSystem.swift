@@ -1,3 +1,4 @@
+import PlexClientKit
 import PlexModels
 import SwiftUI
 
@@ -6,15 +7,6 @@ enum TVTheme {
     static let canvas = Color(red: 0.025, green: 0.028, blue: 0.035)
 }
 
-enum TVTypography {
-    static let title = Font.system(size: 36, weight: .semibold)
-    static let sectionTitle = Font.system(size: 28, weight: .semibold)
-    static let body = Font.system(size: 24)
-    static let action = Font.system(size: 24, weight: .semibold)
-    static let cardTitle = Font.system(size: 20, weight: .semibold)
-    static let metadata = Font.system(size: 20)
-    static let caption = Font.system(size: 18)
-}
 
 enum TVLayout {
     static let sectionSpacing: CGFloat = 32

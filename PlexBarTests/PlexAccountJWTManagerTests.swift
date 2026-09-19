@@ -1,3 +1,4 @@
+@testable import PlexClientKit
 import Foundation
 import Testing
 @testable import PlexBar
@@ -371,6 +372,7 @@ struct PlexAccountJWTManagerTests {
     ) -> PlexAccountJWTManager {
         PlexAccountJWTManager(
             storage: settings,
+            clientContext: { PlexClientContext(clientIdentifier: $0) },
             client: client,
             deviceIdentityStore: PlexMemoryDeviceIdentityStore(identity: identity),
             now: { now }

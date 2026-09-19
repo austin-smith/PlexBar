@@ -25,6 +25,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Check app source boundaries
+        run: python3 script/check_source_boundaries.py
+
       - name: Test shared data contracts
         run: swift test --package-path Packages/PlexData
 

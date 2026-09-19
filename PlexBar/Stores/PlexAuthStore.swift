@@ -1,3 +1,4 @@
+import PlexClientKit
 import PlexModels
 import AppKit
 import Foundation
@@ -49,7 +50,7 @@ final class PlexAuthStore {
         historyStore: PlexHistoryStore,
         libraryStore: PlexLibraryStore,
         client: PlexAuthClient = PlexAuthClient(),
-        deviceIdentityStore: any PlexDeviceIdentityProviding = PlexKeychainDeviceIdentityStore(),
+        deviceIdentityStore: any PlexDeviceIdentityProviding = PlexKeychainDeviceIdentityStore(keychain: KeychainStore(service: AppConstants.bundleIdentifier)),
         accountJWTManager: PlexAccountJWTManager? = nil
     ) {
         self.settings = settings
@@ -61,6 +62,7 @@ final class PlexAuthStore {
         self.deviceIdentityStore = deviceIdentityStore
         self.accountJWTManager = accountJWTManager ?? PlexAccountJWTManager(
             storage: settings,
+            clientContext: { PlexClientContext(clientIdentifier: $0) },
             client: client,
             deviceIdentityStore: deviceIdentityStore
         )

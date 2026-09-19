@@ -1,3 +1,4 @@
+import PlexClientKit
 import AppKit
 import SwiftUI
 

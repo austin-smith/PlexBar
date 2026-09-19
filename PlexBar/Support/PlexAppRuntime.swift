@@ -1,3 +1,4 @@
+import PlexClientKit
 import Foundation
 
 @MainActor
@@ -73,7 +74,7 @@ struct PlexAppRuntime {
             geoIPClient: geoIPClient,
             sessionEventsClient: sessionEventsClient,
             connectionResolver: PlexConnectionResolver(client: apiClient),
-            deviceIdentityStore: PlexKeychainDeviceIdentityStore(),
+            deviceIdentityStore: PlexKeychainDeviceIdentityStore(keychain: KeychainStore(service: AppConstants.bundleIdentifier)),
             downloadTransferCoordinator: .live(packageStore: downloadPackageStore),
             downloadPackageStore: downloadPackageStore,
             downloadJobRegistry: PlexDownloadJobRegistry(),

@@ -1,3 +1,4 @@
+import PlexClientKit
 import PlexModels
 
 /// Reuses the existing content presentations for the compact player header.

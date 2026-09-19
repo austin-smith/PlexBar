@@ -1,3 +1,4 @@
+import PlexTopShelf
 import os
 import TVServices
 

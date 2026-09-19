@@ -1,3 +1,4 @@
+import PlexClientKit
 import CoreGraphics
 import Observation
 import SwiftUI

@@ -1,5 +1,7 @@
 import PlexModels
 #if os(tvOS)
+@testable import PlexTopShelf
+@testable import PlexClientKit
 import AVFoundation
 import Foundation
 import Observation

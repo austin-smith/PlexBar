@@ -22,7 +22,9 @@ This file defines project constraints for coding agents working in this reposito
 - Studio is a separate macOS app target, `PlexBarStudio`, with sources in `Studio/`, tests in `StudioTests/`, and its own README in `Studio/README.md`.
 - Shared Plex models and mock-data contracts live in the local `Packages/PlexData` package. Apps import its products; do not add cross-app source-file membership or duplicate shared types.
 - Package tests live in `Packages/PlexData/Tests/` and run with `swift test --package-path Packages/PlexData`.
-- Keep package code independent of app UI, stores, authentication, playback orchestration, and resource locations. Each app owns its resource loading.
+- Keep `PlexData` independent of app UI, stores, authentication, playback orchestration, and resource locations. Each app owns its resource loading.
+- Shared authentication, playback support, and reusable presentation live in `Packages/PlexClient` (`PlexClientKit`). The TV app and extension share `PlexTopShelf` from that package. App identity, scenes, resource loading, and playback-session orchestration stay in their app targets.
+- Run `python3 script/check_source_boundaries.py` to verify that application targets compile only their own sources; shared implementations must be imported as package products.
 - Keep view code in `Views/`, stateful app logic in `Stores/`, API/auth code in `Services/`, and shared helpers in `Support/`.
 - Keep playback orchestration in `Playback/`, app-specific models in `Models/`, and shared decoded Plex contracts in the package's `Sources/PlexModels/`.
 

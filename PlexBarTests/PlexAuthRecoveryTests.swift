@@ -1,3 +1,4 @@
+@testable import PlexClientKit
 import PlexModels
 import Foundation
 import Testing
@@ -112,6 +113,7 @@ struct PlexAuthRecoveryTests {
         let authClient = PlexAuthClient(session: session)
         let tokenManager = PlexAccountJWTManager(
             storage: settings,
+            clientContext: { PlexClientContext(clientIdentifier: $0) },
             client: authClient,
             deviceIdentityStore: PlexMemoryDeviceIdentityStore(identity: identity)
         )

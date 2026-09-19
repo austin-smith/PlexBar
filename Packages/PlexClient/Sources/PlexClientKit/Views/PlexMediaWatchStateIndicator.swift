@@ -1,0 +1,75 @@
+import SwiftUI
+
+public struct PlexMediaWatchStateIndicator: View {
+    public enum Scale {
+        case compact
+        case standard
+        case large
+
+        public var badgeSize: CGFloat {
+            switch self {
+            case .compact: 14
+            case .standard: 18
+            case .large: 24
+            }
+        }
+
+        public var symbolSize: CGFloat {
+            switch self {
+            case .compact: 7
+            case .standard: 9
+            case .large: 12
+            }
+        }
+
+        public var edgeInset: CGFloat {
+            switch self {
+            case .compact: 4
+            case .standard: 6
+            case .large: 8
+            }
+        }
+    }
+
+    public let isWatched: Bool
+    public var scale: Scale = .standard
+
+    public var body: some View {
+        Color.clear
+            .overlay(alignment: .topTrailing) {
+                if isWatched {
+                    watchedBadge
+                        .padding(scale.edgeInset)
+                }
+            }
+            .accessibilityHidden(true)
+    }
+
+    private var watchedBadge: some View {
+        Image(systemName: "checkmark")
+            .font(.system(size: scale.symbolSize, weight: .semibold))
+            .foregroundStyle(.black.opacity(0.88))
+            .frame(width: scale.badgeSize, height: scale.badgeSize)
+            .background(.white.opacity(0.96), in: Circle())
+            .overlay {
+                Circle()
+                    .stroke(.black.opacity(0.72), lineWidth: 1)
+            }
+    }
+
+    public init(isWatched: Bool, scale: Scale = .standard) {
+        self.isWatched = isWatched
+        self.scale = scale
+    }
+}
+
+extension View {
+    public func plexWatchedIndicator(
+        isWatched: Bool,
+        scale: PlexMediaWatchStateIndicator.Scale = .standard
+    ) -> some View {
+        overlay {
+            PlexMediaWatchStateIndicator(isWatched: isWatched, scale: scale)
+        }
+    }
+}

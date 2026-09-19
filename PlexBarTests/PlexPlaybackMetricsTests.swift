@@ -1,3 +1,4 @@
+@testable import PlexClientKit
 import CoreGraphics
 import Foundation
 import Testing

@@ -1,3 +1,4 @@
+import PlexClientKit
 import Foundation
 
 struct PlexArtworkPrefetchRequest: Hashable, Sendable {

@@ -1,5 +1,6 @@
 import PlexModels
 #if os(tvOS)
+@testable import PlexClientKit
 import Foundation
 import Synchronization
 import Testing

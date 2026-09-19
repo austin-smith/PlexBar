@@ -1,3 +1,4 @@
+@testable import PlexClientKit
 import AudioToolbox
 import CoreMedia
 import Foundation
