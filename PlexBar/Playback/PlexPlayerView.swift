@@ -1907,6 +1907,13 @@ final class PlexPlayerSessionModel {
     }
 
     private func resumePlayback(ticket: PlexPlaybackSessionEpoch.Ticket) {
+        // Rewind on Resume applies to an established paused session, not to
+        // the server bookmark still being prepared for the first frame.
+        if engine.isPreparingInitialPosition {
+            engine.play()
+            updateNowPlaying(force: true)
+            return
+        }
         guard let action = PlexRewindOnResumePolicy.action(
             status: engine.status,
             position: engine.position,

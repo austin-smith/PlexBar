@@ -11,6 +11,8 @@ enum PlexNativePlayerRecoveryPolicy {
 @MainActor
 @Observable
 final class PlexPlaybackEngine {
+    var isPreparingInitialPosition: Bool { pendingStartTime != nil }
+
     private(set) var status: PlexPlaybackStatus = .idle
     private(set) var waitingReason: PlexPlaybackWaitingReason?
     private(set) var position: TimeInterval = 0
@@ -20,17 +22,22 @@ final class PlexPlaybackEngine {
     private(set) var playbackRate: PlexPlaybackRate = .normal
     private(set) var unexpectedTimeJumpRevision: UInt = 0
 
-    private(set) var player = AVPlayer()
+    private(set) var player: AVPlayer
     @ObservationIgnored private var monitorTask: Task<Void, Never>?
     @ObservationIgnored private var endObservationTask: Task<Void, Never>?
     @ObservationIgnored private var timeJumpObservationTask: Task<Void, Never>?
     @ObservationIgnored private var mediaInspectionTask: Task<Void, Never>?
     @ObservationIgnored private var metricsTask: Task<Void, Never>?
     @ObservationIgnored private var inspectedItemIdentifier: ObjectIdentifier?
-    @ObservationIgnored private var pendingStartTime: TimeInterval?
+    private var pendingStartTime: TimeInterval?
+    @ObservationIgnored private var initialSeekTask: Task<Void, Never>?
     @ObservationIgnored private var autoplayAfterPendingSeek = true
     @ObservationIgnored private var seekSequence = PlexPlaybackSeekSequence()
     @ObservationIgnored private var expectedTimeJumps = PlexPlaybackTimeJumpExpectations()
+
+    init(player: AVPlayer = AVPlayer()) {
+        self.player = player
+    }
 
     func load(plan: PlexPlaybackPlan, autoplay: Bool = true) async throws {
         let playerRequiresReplacement = PlexNativePlayerRecoveryPolicy.requiresReplacement(
@@ -50,6 +57,7 @@ final class PlexPlaybackEngine {
         player.replaceCurrentItem(with: item)
         duration = plan.duration
         pendingStartTime = plan.startTime > 0 ? plan.startTime : nil
+        position = pendingStartTime ?? 0
         autoplayAfterPendingSeek = autoplay
         observeEnd(of: item)
         observeTimeJumps(of: item)
@@ -60,16 +68,23 @@ final class PlexPlaybackEngine {
         )
         startMonitoring()
         if autoplay {
-            player.play()
+            play()
         } else {
-            player.pause()
-            status = .paused
+            pause()
         }
     }
 
     func play() {
         autoplayAfterPendingSeek = true
         player.defaultRate = playbackRate.rawValue
+        // A play command records intent while the initial position is pending.
+        // Only a successful seek may release playback from that position.
+        guard pendingStartTime == nil else {
+            player.pause()
+            if case .failed = status { return }
+            status = .preparing
+            return
+        }
         player.play()
         updateWaitingReason(nil)
         status = .playing
@@ -89,6 +104,7 @@ final class PlexPlaybackEngine {
 
         self.playbackRate = playbackRate
         player.defaultRate = playbackRate.rawValue
+        guard pendingStartTime == nil else { return }
         switch status {
         case .preparing, .playing, .buffering:
             player.play()
@@ -98,18 +114,28 @@ final class PlexPlaybackEngine {
     }
 
     func reserveSeek(to position: TimeInterval) -> PlexPlaybackSeekSequence.Request {
-        seekSequence.reserve(absoluteTarget: position, duration: duration)
+        let request = seekSequence.reserve(absoluteTarget: position, duration: duration)
+        updatePendingInitialPosition(for: request)
+        return request
     }
 
     func reserveSkip(
         by offset: TimeInterval,
         duration: TimeInterval?
     ) -> PlexPlaybackSeekSequence.Request {
-        seekSequence.reserve(
+        let request = seekSequence.reserve(
             relativeOffset: offset,
             currentPosition: position,
             duration: duration ?? self.duration
         )
+        updatePendingInitialPosition(for: request)
+        return request
+    }
+
+    private func updatePendingInitialPosition(for request: PlexPlaybackSeekSequence.Request) {
+        guard pendingStartTime != nil else { return }
+        pendingStartTime = request.target
+        position = request.target
     }
 
     func performSeek(_ request: PlexPlaybackSeekSequence.Request) async -> Bool {
@@ -123,14 +149,27 @@ final class PlexPlaybackEngine {
             toleranceBefore: .zero,
             toleranceAfter: .zero
         )
-        guard completed, player.currentItem === item else {
+        guard player.currentItem === item, seekSequence.isCurrent(request) else {
             expectedTimeJumps.cancel(timeJumpToken)
+            return false
+        }
+        guard completed else {
+            expectedTimeJumps.cancel(timeJumpToken)
+            if pendingStartTime != nil {
+                player.pause()
+                updateWaitingReason(nil)
+                status = .failed("macOS could not resume this stream at the saved position.")
+            }
             return false
         }
         guard seekSequence.finish(request) else {
             return false
         }
         position = request.target
+        if pendingStartTime != nil {
+            pendingStartTime = nil
+            if autoplayAfterPendingSeek { play() } else { pause() }
+        }
         return true
     }
 
@@ -141,13 +180,17 @@ final class PlexPlaybackEngine {
     }
 
     func cancelPendingSeek() {
-        player.currentItem?.cancelPendingSeeks()
         seekSequence.invalidate()
+        initialSeekTask?.cancel()
+        initialSeekTask = nil
+        player.currentItem?.cancelPendingSeeks()
     }
 
     func stop() {
         monitorTask?.cancel()
         monitorTask = nil
+        initialSeekTask?.cancel()
+        initialSeekTask = nil
         endObservationTask?.cancel()
         endObservationTask = nil
         timeJumpObservationTask?.cancel()
@@ -226,7 +269,7 @@ final class PlexPlaybackEngine {
                     continue
                 }
                 let currentPosition = max(currentSeconds, 0)
-                position = currentPosition
+                if pendingStartTime == nil { position = currentPosition }
                 guard !expectedTimeJumps.consume(position: currentPosition) else {
                     continue
                 }
@@ -334,6 +377,7 @@ final class PlexPlaybackEngine {
     }
 
     private func refreshState() {
+        if case .failed = status { return }
         if player.status == .failed {
             updateWaitingReason(nil)
             status = .failed(
@@ -344,7 +388,7 @@ final class PlexPlaybackEngine {
         }
 
         let currentSeconds = player.currentTime().seconds
-        if currentSeconds.isFinite {
+        if pendingStartTime == nil, currentSeconds.isFinite {
             position = max(currentSeconds, 0)
         }
 
@@ -359,21 +403,19 @@ final class PlexPlaybackEngine {
         }
 
         if let startTime = pendingStartTime {
-            pendingStartTime = nil
-            Task { [weak self, weak item] in
-                guard let self, let item else {
-                    return
-                }
-                let completed = await seek(to: startTime)
-                guard completed, player.currentItem === item else {
-                    return
-                }
-                if autoplayAfterPendingSeek {
-                    play()
-                } else {
-                    pause()
+            // Reserve synchronously so a newer user seek wins even if this task
+            // has not started yet. Retain the target for reporting and recovery.
+            if initialSeekTask == nil, seekSequence.pendingTarget == nil {
+                let request = reserveSeek(to: startTime)
+                initialSeekTask = Task { [weak self, weak item] in
+                    guard !Task.isCancelled, let self, let item,
+                          player.currentItem === item else { return }
+                    _ = await performSeek(request)
+                    guard player.currentItem === item else { return }
+                    initialSeekTask = nil
                 }
             }
+            return
         }
 
         refreshTimeControlState()
