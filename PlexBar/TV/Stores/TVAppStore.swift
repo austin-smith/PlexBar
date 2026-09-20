@@ -236,7 +236,11 @@ final class TVAppStore {
             cancelPlaybackPreparation()
             homePath = []
             if oldValue?.serverIdentifier != connection?.serverIdentifier {
+                homeRefreshID = UUID()
+                isLoadingHome = false
+                isLoadingLibraries = false
                 homeHubs = []
+                resetLibraries()
                 topShelfPublisher.clear()
             }
         }
@@ -1572,6 +1576,17 @@ final class TVAppStore {
         )
     }
 
+    private func resetLibraries() {
+        libraries = []
+        libraryItems = [:]
+        libraryTotalSizes = [:]
+        libraryErrors = [:]
+        libraryQueries = [:]
+        libraryRequestIDs = [:]
+        libraryNextOffsets = [:]
+        libraryPaginationFailureIDs = []
+    }
+
     func logout() async {
         accountJWTManager.invalidatePreparation()
         sessionRevision = UUID()
@@ -1593,14 +1608,7 @@ final class TVAppStore {
         connection = nil
         connectionState = .disconnected
         homeHubs = []
-        libraries = []
-        libraryItems = [:]
-        libraryTotalSizes = [:]
-        libraryErrors = [:]
-        libraryQueries = [:]
-        libraryRequestIDs = [:]
-        libraryNextOffsets = [:]
-        libraryPaginationFailureIDs = []
+        resetLibraries()
         searchHubs = []
         searchErrorMessage = nil
         clearPlaybackSleepTimer()

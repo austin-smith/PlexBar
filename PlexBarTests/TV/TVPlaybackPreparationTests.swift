@@ -323,6 +323,52 @@ struct TVPlaybackPreparationTests {
         #expect(!fixture.store.isLoading(library))
     }
 
+    @Test(arguments: [200, 500])
+    func serverSwitchClearsLibrariesBeforeRefreshCompletes(status: Int) async throws {
+        let gate = TVTimelineResponseGate()
+        let fixture = try await Fixture(includeLibraries: true, otherServerLibrariesGate: gate, otherServerLibrariesStatus: status)
+        defer { fixture.close() }
+        let library = try #require(fixture.store.libraries.first)
+        await fixture.store.loadLibrary(library)
+        #expect(fixture.store.libraryItems[library.id]?.isEmpty == false)
+        let switching = Task { await fixture.selectOtherServer() }
+        await gate.waitUntilEntered()
+        #expect(fixture.store.libraries.isEmpty)
+        #expect(fixture.store.libraryItems.isEmpty)
+        #expect(fixture.store.libraryTotalSizes.isEmpty)
+        #expect(fixture.store.libraryErrors.isEmpty)
+        #expect(!fixture.store.isLoading(library))
+        await gate.release()
+        await switching.value
+        if status == 500 {
+            #expect(fixture.store.libraries.isEmpty)
+            #expect(fixture.store.errorMessage?.contains("500") == true)
+        } else {
+            let other = try #require(fixture.store.libraries.first)
+            #expect(other.id == library.id)
+            #expect(other.title == "Other Movies")
+            await fixture.store.loadLibrary(other)
+            #expect(fixture.store.libraryItems[other.id]?.map(\.ratingKey) == ["other"])
+        }
+    }
+
+    @Test func oldLibraryRequestCannotRestoreDataAfterServerSwitch() async throws {
+        let gate = TVTimelineResponseGate()
+        let fixture = try await Fixture(libraryGate: gate, includeLibraries: true)
+        defer { fixture.close() }
+        let library = try #require(fixture.store.libraries.first)
+        let oldLoad = Task { await fixture.store.loadLibrary(library) }
+        await gate.waitUntilEntered()
+        await fixture.selectOtherServer()
+        #expect(fixture.store.libraryItems.isEmpty)
+        let other = try #require(fixture.store.libraries.first)
+        await fixture.store.loadLibrary(other)
+        await gate.release()
+        await oldLoad.value
+        #expect(fixture.store.libraryItems[other.id]?.map(\.ratingKey) == ["other"])
+        #expect(!fixture.store.isLoading(other))
+    }
+
     @Test
     func failedLibraryLoadHasLocalErrorAndCanRetry() async throws {
         let fixture = try await Fixture(libraryStatus: 500)
@@ -808,6 +854,9 @@ struct TVPlaybackPreparationTests {
             playbackPlanGate: TVTimelineResponseGate? = nil,
             libraryGate: TVTimelineResponseGate? = nil,
             libraryStatus: Int = 200,
+            includeLibraries: Bool = false,
+            otherServerLibrariesGate: TVTimelineResponseGate? = nil,
+            otherServerLibrariesStatus: Int = 200,
             neighborMetadataStatus: OSAllocatedUnfairLock<Int>? = nil,
             episodeMetadata: String? = nil,
             includeNextEpisode: Bool = false,
@@ -841,7 +890,13 @@ struct TVPlaybackPreparationTests {
                     case "/hubs/continueWatching":
                         json = #"{"MediaContainer":{"Hub":[]}}"#
                     case "/library/sections/all":
-                        json = #"{"MediaContainer":{"Directory":[]}}"#
+                        if request.url?.host == "other.plex.test", let otherServerLibrariesGate {
+                            await otherServerLibrariesGate.blockResponse()
+                        }
+                        let title = request.url?.host == "other.plex.test" ? "Other Movies" : "Movies"
+                        json = includeLibraries
+                            ? #"{"MediaContainer":{"Directory":[{"key":"1","title":"\#(title)","type":"movie","composite":"/library/sections/1/composite"}]}}"#
+                            : #"{"MediaContainer":{"Directory":[]}}"#
                     case "/library/sections/1/filters":
                         json = #"{"MediaContainer":{"Directory":[{"filter":"genre","title":"Genre","filterType":"string","key":"/library/sections/1/genre"},{"filter":"unwatched","title":"Unplayed","filterType":"boolean"}]}}"#
                     case "/library/sections/1/sorts":
@@ -860,9 +915,9 @@ struct TVPlaybackPreparationTests {
                     case "/library/sections/1/all":
                         let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
                         let sorted = query.contains { $0.name == "sort" }
-                        if !sorted, let libraryGate { await libraryGate.blockResponse() }
+                        if !sorted, request.url?.host == "plex.test", let libraryGate { await libraryGate.blockResponse() }
                         let offset = Int(request.value(forHTTPHeaderField: "X-Plex-Container-Start") ?? "0") ?? 0
-                        let key = offset == 2 ? "last" : sorted ? "sorted" : "default"
+                        let key = request.url?.host == "other.plex.test" ? "other" : offset == 2 ? "last" : sorted ? "sorted" : "default"
                         json = #"{"MediaContainer":{"offset":\#(offset),"totalSize":3,"Metadata":[{"ratingKey":"\#(key)","title":"Item","type":"movie"}]}}"#
                     case "/library/metadata/7":
                         json = #"{"MediaContainer":{"Metadata":[\#(hierarchy)]}}"#
@@ -909,6 +964,7 @@ struct TVPlaybackPreparationTests {
                     case "/library/metadata/41", "/library/metadata/43": neighborMetadataStatus?.withLock { $0 } ?? 200
                     case "/library/metadata/72/children": selectedSeasonStatus
                     case "/library/sections/1/all": libraryStatus
+                    case "/library/sections/all": request.url?.host == "other.plex.test" ? otherServerLibrariesStatus : 200
                     default: 200
                     }
                     let response = HTTPURLResponse(url: request.url!, statusCode: statusCode, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
