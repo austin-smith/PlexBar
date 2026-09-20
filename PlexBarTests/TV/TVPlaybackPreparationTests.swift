@@ -81,6 +81,184 @@ struct TVPlaybackPreparationTests {
     }
 
     @Test
+    func watchedStateSuccessWaitsForAcknowledgementAndCoalescesCompletionEvents() async throws {
+        let gate = TVTimelineResponseGate()
+        let fixture = try await Fixture(watchedStateGate: gate)
+        defer { fixture.close() }
+        let connection = try #require(fixture.store.connection)
+        let update = fixture.store.makeWatchedStateUpdate(for: try Self.item(Self.episodeJSON), connection: connection)
+        let revision = fixture.store.playbackMetadataRevision
+        let homeCount = fixture.homeRequestCount
+
+        fixture.store.presentPlayback(TVPlexPlaybackRequest(item: update.item, startTime: 0))
+        fixture.store.markWatched(update)
+        fixture.store.markWatched(update)
+        await gate.waitUntilEntered()
+        #expect(update.state == .pending)
+        #expect(fixture.watchedStateRequests.count == 1)
+        #expect(fixture.homeRequestCount == homeCount)
+        #expect(fixture.store.playbackMetadataRevision == revision)
+        fixture.store.dismissPlayer()
+        await gate.release()
+        try await waitFor { update.state == .succeeded && !fixture.store.isLoadingHome }
+
+        #expect(fixture.store.playbackMetadataRevision != revision)
+        #expect(fixture.homeRequestCount == homeCount + 1)
+        fixture.store.markWatched(update)
+        #expect(update.state == .succeeded)
+        #expect(fixture.watchedStateRequests.count == 1)
+        let request = try #require(fixture.watchedStateRequests.first)
+        #expect(request.httpMethod == "PUT")
+        #expect(request.url?.host == "plex.test")
+        let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        #expect(query.contains(URLQueryItem(name: "key", value: "42")))
+        #expect(query.contains(URLQueryItem(name: "identifier", value: "com.plexapp.plugins.library")))
+        #expect(fixture.store.watchedStateFailures.isEmpty)
+    }
+
+    @Test
+    func watchedStateFailureSurvivesAdvancingAndRetriesTheOriginalItemExplicitly() async throws {
+        let status = OSAllocatedUnfairLock(initialState: 500)
+        let fixture = try await Fixture(watchedStateStatus: status)
+        defer { fixture.close() }
+        let connection = try #require(fixture.store.connection)
+        let firstItem = try Self.item(Self.episodeJSON)
+        let nextItem = try Self.item(Self.episodeJSON.replacingOccurrences(of: "42", with: "43"))
+        let first = fixture.store.makeWatchedStateUpdate(for: firstItem, connection: connection)
+        let revision = fixture.store.playbackMetadataRevision
+        let homeCount = fixture.homeRequestCount
+        fixture.store.markWatched(first)
+        fixture.store.presentPlayback(TVPlexPlaybackRequest(item: nextItem, startTime: 0))
+        try await waitFor { first.state == .failed }
+        let failure = try #require(fixture.store.watchedStateFailures.first)
+        #expect(failure.update === first)
+        #expect(failure.message.contains("500"))
+        #expect(fixture.store.playbackMetadataRevision == revision)
+        #expect(fixture.homeRequestCount == homeCount)
+        #expect(fixture.store.errorMessage == nil)
+        fixture.store.markWatched(first)
+        #expect(first.state == .failed)
+        #expect(fixture.watchedStateRequests.count == 1)
+        fixture.store.dismissPlayer()
+        #expect(fixture.store.watchedStateFailures.first?.id == failure.id)
+
+        fixture.store.retryWatchedStateUpdate(failure)
+        try await waitFor { first.state == .failed }
+        let repeatedFailure = try #require(fixture.store.watchedStateFailures.first)
+        #expect(repeatedFailure.id != failure.id)
+        #expect(fixture.homeRequestCount == homeCount)
+        #expect(fixture.store.playbackMetadataRevision == revision)
+
+        // Dismissal of the alert and its Retry action may arrive in either order.
+        fixture.store.dismissWatchedStateFailure(repeatedFailure)
+        status.withLock { $0 = 200 }
+        fixture.store.retryWatchedStateUpdate(repeatedFailure)
+        fixture.store.retryWatchedStateUpdate(repeatedFailure)
+        try await waitFor { first.state == .succeeded && !fixture.store.isLoadingHome }
+        #expect(fixture.store.watchedStateFailures.isEmpty)
+        let second = fixture.store.makeWatchedStateUpdate(for: nextItem, connection: connection)
+        fixture.store.markWatched(second)
+        try await waitFor { second.state == .succeeded && !fixture.store.isLoadingHome }
+        let keys = fixture.watchedStateRequests.map { request in
+            URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "key" }?.value
+        }
+        #expect(keys == ["42", "42", "42", "43"])
+    }
+
+    @Test
+    func missingWatchedEndpointSurfacesFailureWithoutRefreshingMetadata() async throws {
+        let fixture = try await Fixture(includesScrobbleEndpoint: false)
+        defer { fixture.close() }
+        let connection = try #require(fixture.store.connection)
+        let update = fixture.store.makeWatchedStateUpdate(for: try Self.item(Self.episodeJSON), connection: connection)
+        let revision = fixture.store.playbackMetadataRevision
+        let homeCount = fixture.homeRequestCount
+        fixture.store.markWatched(update)
+        try await waitFor { update.state == .failed }
+        #expect(fixture.store.watchedStateFailures.first?.message == PlexAPIError.missingLibraryTimelineFeature.localizedDescription)
+        #expect(fixture.watchedStateRequests.isEmpty)
+        #expect(fixture.store.playbackMetadataRevision == revision)
+        #expect(fixture.homeRequestCount == homeCount)
+    }
+
+    @Test
+    func watchedStateProviderDiscoveryFailurePropagates() async throws {
+        let providerStatus = OSAllocatedUnfairLock(initialState: 200)
+        let fixture = try await Fixture(providerStatus: providerStatus)
+        defer { fixture.close() }
+        let connection = try #require(fixture.store.connection)
+        providerStatus.withLock { $0 = 503 }
+        // A fresh client forces discovery instead of using the connection fixture's cache.
+        let client = fixture.makeClient()
+        do {
+            try await client.markWatched(try Self.item(Self.episodeJSON), connection: connection)
+            Issue.record("Provider discovery failure was suppressed.")
+        } catch {
+            #expect(error.localizedDescription.contains("503"))
+        }
+        #expect(fixture.watchedStateRequests.isEmpty)
+    }
+
+    @Test(arguments: [200, 500])
+    func serverSwitchInvalidatesPendingWatchedStateUpdates(status: Int) async throws {
+        let gate = TVTimelineResponseGate()
+        let fixture = try await Fixture(watchedStateGate: gate, watchedStateStatus: OSAllocatedUnfairLock(initialState: status))
+        defer { fixture.close() }
+        let connection = try #require(fixture.store.connection)
+        let item = try Self.item(Self.episodeJSON)
+        let pending = fixture.store.makeWatchedStateUpdate(for: item, connection: connection)
+        let notStarted = fixture.store.makeWatchedStateUpdate(for: item, connection: connection)
+        fixture.store.markWatched(pending)
+        await gate.waitUntilEntered()
+        await fixture.selectOtherServer()
+        let revision = fixture.store.playbackMetadataRevision
+        let homeCount = fixture.homeRequestCount
+        fixture.store.markWatched(notStarted)
+        #expect(notStarted.state == .invalidated)
+        await gate.release()
+        try await waitFor { pending.state == .invalidated }
+        #expect(fixture.store.watchedStateFailures.isEmpty)
+        #expect(fixture.store.playbackMetadataRevision == revision)
+        #expect(fixture.homeRequestCount == homeCount)
+        #expect(fixture.watchedStateRequests.map { $0.url?.host } == ["plex.test"])
+    }
+
+    @Test
+    func serverSwitchDiscardsWatchedFailureAndRejectsItsStaleRetry() async throws {
+        let fixture = try await Fixture(watchedStateStatus: OSAllocatedUnfairLock(initialState: 500))
+        defer { fixture.close() }
+        let update = fixture.store.makeWatchedStateUpdate(
+            for: try Self.item(Self.episodeJSON), connection: try #require(fixture.store.connection)
+        )
+        fixture.store.markWatched(update)
+        try await waitFor { update.state == .failed }
+        let failure = try #require(fixture.store.watchedStateFailures.first)
+        await fixture.selectOtherServer()
+        #expect(fixture.store.watchedStateFailures.isEmpty)
+        fixture.store.retryWatchedStateUpdate(failure)
+        #expect(update.state == .invalidated)
+        #expect(fixture.watchedStateRequests.map { $0.url?.host } == ["plex.test"])
+    }
+
+    @Test
+    func metadataRefreshFailureDoesNotUndoSuccessfulWatchedWrite() async throws {
+        let homeStatus = OSAllocatedUnfairLock(initialState: 200)
+        let fixture = try await Fixture(homeStatus: homeStatus)
+        defer { fixture.close() }
+        let update = fixture.store.makeWatchedStateUpdate(
+            for: try Self.item(Self.episodeJSON), connection: try #require(fixture.store.connection)
+        )
+        homeStatus.withLock { $0 = 500 }
+        fixture.store.markWatched(update)
+        try await waitFor { update.state == .succeeded && !fixture.store.isLoadingHome }
+        #expect(fixture.store.errorMessage?.contains("500") == true)
+        #expect(fixture.store.watchedStateFailures.isEmpty)
+        fixture.store.markWatched(update)
+        #expect(update.state == .succeeded)
+        #expect(fixture.watchedStateRequests.count == 1)
+    }
+
+    @Test
     func finalPlaybackReportCompletesBeforeBrowseMetadataIsInvalidated() async throws {
         let gate = TVTimelineResponseGate()
         let fixture = try await Fixture(timelineGate: gate)
@@ -607,7 +785,8 @@ struct TVPlaybackPreparationTests {
 
     @Test(arguments: ["accept", "reject"])
     func nativeContentProposalRemainsActionableAfterEnd(action: String) async throws {
-        let fixture = try await Fixture()
+        let gate = TVTimelineResponseGate()
+        let fixture = try await Fixture(watchedStateGate: gate)
         defer { fixture.close() }
         fixture.store.autoplayNextEpisode = true
         fixture.store.autoplayCountdown = .fiveSeconds
@@ -629,6 +808,7 @@ struct TVPlaybackPreparationTests {
         #expect(fixture.store.playbackRequest?.id == request.id,
                 "AVKit owns the visible proposal until the user accepts or rejects it.")
         #expect(session.shouldPresentContentProposal(proposal))
+        await gate.waitUntilEntered()
 
         if action == "accept" {
             session.acceptContentProposal(proposal)
@@ -648,6 +828,16 @@ struct TVPlaybackPreparationTests {
         }
         #expect(!session.shouldPresentContentProposal(proposal))
         #expect(playerItem.nextContentProposal == nil)
+        #expect(fixture.watchedStateRequests.count == 1,
+                "The end notification and proposal acceptance must share one watched-state update.")
+        await gate.release()
+        // Reject also refreshes after its final timeline report; drain both writes
+        // before invalidating the fixture's network session.
+        let expectedHomeRequests = action == "accept" ? 2 : 3
+        try await waitFor {
+            fixture.homeRequestCount == expectedHomeRequests
+                && !fixture.store.isLoadingHome && !fixture.store.isLoadingLibraries
+        }
     }
 
     @Test
@@ -851,6 +1041,11 @@ struct TVPlaybackPreparationTests {
             selectedEpisodeStatus: Int = 200,
             selectedSeasonStatus: Int = 200,
             timelineGate: TVTimelineResponseGate? = nil,
+            watchedStateGate: TVTimelineResponseGate? = nil,
+            watchedStateStatus: OSAllocatedUnfairLock<Int>? = nil,
+            providerStatus: OSAllocatedUnfairLock<Int>? = nil,
+            includesScrobbleEndpoint: Bool = true,
+            homeStatus: OSAllocatedUnfairLock<Int>? = nil,
             playbackPlanGate: TVTimelineResponseGate? = nil,
             libraryGate: TVTimelineResponseGate? = nil,
             libraryStatus: Int = 200,
@@ -941,7 +1136,10 @@ struct TVPlaybackPreparationTests {
                             ? #"{"MediaContainer":{"Metadata":[\#(episode),\#(next)]}}"#
                             : #"{"MediaContainer":{"Metadata":[\#(episode)]}}"#
                     case "/media/providers":
-                        json = #"{"MediaContainer":{"MediaProvider":[{"identifier":"com.plexapp.plugins.library","Feature":[{"type":"promoted","key":"/hubs/promoted"},{"type":"continuewatching","key":"/hubs/continueWatching"},{"type":"search","key":"/provider/search"},{"type":"playqueue","key":"/provider/queue"},{"type":"timeline","key":"/provider/timeline"}]}]}}"#
+                        json = #"{"MediaContainer":{"MediaProvider":[{"identifier":"com.plexapp.plugins.library","Feature":[{"type":"promoted","key":"/hubs/promoted"},{"type":"continuewatching","key":"/hubs/continueWatching"},{"type":"search","key":"/provider/search"},{"type":"playqueue","key":"/provider/queue"},{"type":"timeline","key":"/provider/timeline"\#(includesScrobbleEndpoint ? ",\"scrobbleKey\":\"/provider/scrobble\"" : "")}]}]}}"#
+                    case "/provider/scrobble":
+                        if let watchedStateGate { await watchedStateGate.blockResponse() }
+                        json = #"{"MediaContainer":{}}"#
                     case "/provider/timeline":
                         timelineEvents.continuation.yield(request)
                         if request.url?.host == "plex.test", let timelineGate {
@@ -957,6 +1155,9 @@ struct TVPlaybackPreparationTests {
                         throw URLError(.unsupportedURL)
                     }
                     let statusCode = switch request.url?.path {
+                    case "/media/providers": providerStatus?.withLock { $0 } ?? 200
+                    case "/provider/scrobble": watchedStateStatus?.withLock { $0 } ?? 200
+                    case "/hubs/promoted": homeStatus?.withLock { $0 } ?? 200
                     case "/provider/search": searchStatus?.withLock { $0 } ?? 200
                     case "/hubs/all": Int(request.value(forHTTPHeaderField: "X-Plex-Container-Start") ?? "0") == failingHubOffset ? hubStatus?.withLock { $0 } ?? 200 : 200
                     case "/library/streams/9": subtitleOffsetStatus?.withLock { $0 } ?? 200
@@ -997,6 +1198,16 @@ struct TVPlaybackPreparationTests {
             store.availableServers = [server]
             await store.selectServer(server)
             #expect(store.isConnected)
+        }
+
+        func makeClient() -> TVPlexClient { TVPlexClient(session: session) }
+
+        var watchedStateRequests: [URLRequest] {
+            requests.withLock { $0.filter { $0.url?.path == "/provider/scrobble" } }
+        }
+
+        var homeRequestCount: Int {
+            requests.withLock { $0.filter { $0.url?.path == "/hubs/promoted" }.count }
         }
 
         func makePlaybackSession() -> TVPlaybackSession {

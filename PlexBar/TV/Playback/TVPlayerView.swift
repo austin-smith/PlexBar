@@ -179,6 +179,12 @@ struct TVPlayerView: View {
         } message: {
             Text(session.queueNavigationErrorMessage ?? "Plex could not update this playback session.")
         }
+        .modifier(TVWatchedStateFailureAlert(
+            isActive: store.playbackRequest != nil
+                && session.mediaSelectionErrorMessage == nil
+                && session.queueNavigationErrorMessage == nil
+                && session.qualitySuggestion == nil
+        ))
         .onDisappear {
             session.stop(request: request)
         }
@@ -1643,7 +1649,7 @@ final class TVPlaybackSession {
     @ObservationIgnored private var authorizedContentProposals: [AVContentProposal] = []
     @ObservationIgnored private var qualitySuggestionState =
         PlexPlaybackQualitySuggestionSessionState()
-    @ObservationIgnored private var hasMarkedCurrentItemWatched = false
+    @ObservationIgnored private var watchedStateUpdate: TVAppStore.WatchedStateUpdate?
     @ObservationIgnored private var hasReachedEnd = false
     @ObservationIgnored private var handledEndRequestID: UUID?
     @ObservationIgnored private var hasRejectedContentProposal = false
@@ -1727,7 +1733,7 @@ final class TVPlaybackSession {
             selectedAudioBoost = store.audioBoost
             currentRequest = playbackRequest
             currentStore = store
-            hasMarkedCurrentItemWatched = false
+            watchedStateUpdate = store.makeWatchedStateUpdate(for: playbackRequest.item, connection: playbackConnection)
             hasReachedEnd = false
             hasRejectedContentProposal = false
             stoppedTimelineSessionIdentifier = nil
@@ -2000,10 +2006,7 @@ final class TVPlaybackSession {
             ) else {
                 return
             }
-            markCurrentItemWatchedIfNeeded(
-                currentRequest.item,
-                store: currentStore
-            )
+            markCurrentItemWatchedIfNeeded(store: currentStore)
             currentStore.presentPlayback(
                 proposedNextRequest.withPlaybackRate(playbackRate)
             )
@@ -3039,7 +3042,7 @@ final class TVPlaybackSession {
         failedQueueOperation = nil
         queueNavigationErrorMessage = nil
         updateNowPlaying(force: true)
-        markCurrentItemWatchedIfNeeded(currentRequest.item, store: store)
+        markCurrentItemWatchedIfNeeded(store: store)
         let playbackRate = playbackRate(for: player)
 
         if store.playbackSleepTimer.stopsAtEndOfItem {
@@ -3366,7 +3369,7 @@ final class TVPlaybackSession {
         currentRequest = nil
         currentStore = nil
         hasPrepared = false
-        hasMarkedCurrentItemWatched = false
+        watchedStateUpdate = nil
         hasReachedEnd = false
         handledEndRequestID = nil
         hasRejectedContentProposal = false
@@ -4314,13 +4317,9 @@ final class TVPlaybackSession {
         }
     }
 
-    private func markCurrentItemWatchedIfNeeded(
-        _ item: PlexMediaItem,
-        store: TVAppStore
-    ) {
-        guard !hasMarkedCurrentItemWatched else { return }
-        hasMarkedCurrentItemWatched = true
-        Task { await store.markWatched(item) }
+    private func markCurrentItemWatchedIfNeeded(store: TVAppStore) {
+        guard let watchedStateUpdate else { return }
+        store.markWatched(watchedStateUpdate)
     }
 
     private func playbackFailureMessage(player: AVPlayer, item: AVPlayerItem) -> String? {

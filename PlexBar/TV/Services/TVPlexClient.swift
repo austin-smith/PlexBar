@@ -821,16 +821,15 @@ actor TVPlexClient {
             .response
     }
 
-    func markWatched(_ item: PlexMediaItem, connection: TVPlexConnection) async {
-        guard let endpoints = try? await libraryProviderEndpoints(connection: connection),
-              let parameters = try? PlexWatchedStateRequestParameters(
-                  watched: true,
-                  ratingKey: item.ratingKey,
-                  endpoints: endpoints
-              ) else {
-            return
-        }
-        _ = try? await data(
+    func markWatched(_ item: PlexMediaItem, connection: TVPlexConnection) async throws {
+        let endpoints = try await libraryProviderEndpoints(connection: connection)
+        let parameters = try PlexWatchedStateRequestParameters(
+            watched: true,
+            ratingKey: item.ratingKey,
+            endpoints: endpoints
+        )
+        try Task.checkCancellation()
+        _ = try await data(
             path: parameters.endpointPath,
             queryItems: parameters.queryItems,
             method: "PUT",

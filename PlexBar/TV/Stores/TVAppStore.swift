@@ -54,6 +54,9 @@ final class TVAppStore {
     private let defaults: UserDefaults
     private let accountStorage: TVPlexAccountJWTStorage
     private let accountJWTManager: PlexAccountJWTManager
+    private var watchedStateTasks: [UUID: Task<Void, Never>] = [:]
+    private(set) var watchedStateFailures: [WatchedStateFailure] = []
+    private var watchedStateRevision = UUID()
     private var libraryRequestIDs: [String: UUID] = [:]
     private var libraryQueries: [String: LibraryQuery] = [:]
     private var libraryNextOffsets: [String: Int] = [:]
@@ -232,6 +235,7 @@ final class TVAppStore {
     private(set) var connection: TVPlexConnection? {
         didSet {
             guard oldValue != connection else { return }
+            invalidateWatchedStateUpdates()
             topShelfRouteTask?.cancel()
             cancelPlaybackPreparation()
             homePath = []
@@ -449,6 +453,7 @@ final class TVAppStore {
     }
 
     func startPlexDeviceAuthorization() {
+        invalidateWatchedStateUpdates()
         sessionRevision = UUID()
         let revision = sessionRevision
         accountJWTManager.invalidatePreparation()
@@ -1355,11 +1360,93 @@ final class TVAppStore {
         return response
     }
 
-    func markWatched(_ item: PlexMediaItem) async {
-        guard let connection else { return }
-        await client.markWatched(item, connection: connection)
-        guard self.connection == connection else { return }
-        await refreshAll()
+    @MainActor
+    final class WatchedStateUpdate {
+        enum State { case ready, pending, succeeded, failed, invalidated }
+        let id = UUID()
+        let item: PlexMediaItem
+        fileprivate let connection: TVPlexConnection
+        fileprivate let revision: UUID
+        fileprivate(set) var state = State.ready
+
+        fileprivate init(item: PlexMediaItem, connection: TVPlexConnection, revision: UUID) {
+            self.item = item
+            self.connection = connection
+            self.revision = revision
+        }
+    }
+
+    struct WatchedStateFailure: Identifiable {
+        let id = UUID()
+        let update: WatchedStateUpdate
+        let message: String
+    }
+
+    func makeWatchedStateUpdate(
+        for item: PlexMediaItem,
+        connection: TVPlexConnection
+    ) -> WatchedStateUpdate {
+        WatchedStateUpdate(item: item, connection: connection, revision: watchedStateRevision)
+    }
+
+    func markWatched(_ update: WatchedStateUpdate) {
+        guard update.state == .ready else { return }
+        startWatchedStateUpdate(update)
+    }
+
+    func retryWatchedStateUpdate(_ failure: WatchedStateFailure) {
+        guard failure.update.state == .failed else { return }
+        startWatchedStateUpdate(failure.update)
+    }
+
+    func dismissWatchedStateFailure(_ failure: WatchedStateFailure) {
+        watchedStateFailures.removeAll { $0.id == failure.id }
+    }
+
+    private func startWatchedStateUpdate(_ update: WatchedStateUpdate) {
+        guard isCurrentWatchedStateUpdate(update) else {
+            update.state = .invalidated
+            watchedStateFailures.removeAll { $0.update.id == update.id }
+            return
+        }
+        update.state = .pending
+        watchedStateFailures.removeAll { $0.update.id == update.id }
+        // The store owns this write so advancing or dismissing the player cannot lose it.
+        watchedStateTasks[update.id] = Task { [weak self] in
+            guard let self else { return }
+            defer { watchedStateTasks[update.id] = nil }
+            do {
+                try Task.checkCancellation()
+                guard isCurrentWatchedStateUpdate(update) else { throw CancellationError() }
+                try await client.markWatched(update.item, connection: update.connection)
+                try Task.checkCancellation()
+                guard isCurrentWatchedStateUpdate(update) else { throw CancellationError() }
+                update.state = .succeeded
+                playbackMetadataRevision = UUID()
+                // A failed metadata refresh must not retry a PUT that already succeeded.
+                await refreshAll()
+            } catch {
+                guard !Task.isCancelled, isCurrentWatchedStateUpdate(update) else {
+                    update.state = .invalidated
+                    return
+                }
+                update.state = .failed
+                watchedStateFailures.append(WatchedStateFailure(
+                    update: update, message: error.localizedDescription
+                ))
+            }
+        }
+    }
+
+    private func isCurrentWatchedStateUpdate(_ update: WatchedStateUpdate) -> Bool {
+        update.revision == watchedStateRevision && update.connection == connection
+    }
+
+    private func invalidateWatchedStateUpdates() {
+        watchedStateRevision = UUID()
+        for task in watchedStateTasks.values { task.cancel() }
+        watchedStateTasks.removeAll()
+        watchedStateFailures.removeAll()
     }
 
     func nextEpisode(after item: PlexMediaItem) async -> PlexMediaItem? {

@@ -16,6 +16,7 @@ struct PlexBarTVApp: App {
 private struct TVRootView: View {
     @Environment(TVAppStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
+    @State private var isPlayerPresented = false
 
     var body: some View {
         @Bindable var store = store
@@ -39,10 +40,17 @@ private struct TVRootView: View {
                 Task { await store.refreshAll() }
             }
         }
-        .fullScreenCover(item: $store.playbackRequest, onDismiss: store.dismissPlayer) { request in
+        .fullScreenCover(item: $store.playbackRequest, onDismiss: {
+            store.dismissPlayer()
+            isPlayerPresented = false
+        }) { request in
             TVPlayerView(request: request)
                 .environment(store)
+                .onAppear { isPlayerPresented = true }
         }
+        .modifier(TVWatchedStateFailureAlert(
+            isActive: store.playbackRequest == nil && !isPlayerPresented && store.errorMessage == nil
+        ))
         .alert("PlexBar", isPresented: Binding(
             get: { store.errorMessage != nil },
             set: { if !$0 { store.errorMessage = nil } }
