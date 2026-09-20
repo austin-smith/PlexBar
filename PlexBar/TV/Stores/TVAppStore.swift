@@ -1408,7 +1408,8 @@ final class TVAppStore {
                 : 0,
             autoplay: autoplay,
             playbackRate: playbackRate,
-            videoQualityOverride: request.videoQualityOverride
+            videoQualityOverride: request.videoQualityOverride,
+            forceVideoTranscode: request.forceVideoTranscode
         )
     }
 
@@ -1438,7 +1439,8 @@ final class TVAppStore {
             startTime: queue.isCinemaPreplayQueue ? 0 : item.resumeSeconds,
             autoplay: autoplay,
             playbackRate: playbackRate,
-            videoQualityOverride: request.videoQualityOverride
+            videoQualityOverride: request.videoQualityOverride,
+            forceVideoTranscode: request.forceVideoTranscode
         )
     }
 
@@ -1529,7 +1531,8 @@ final class TVAppStore {
             queueSourcePreference: request.queueSourcePreference,
             startTime: 0,
             playbackRate: playbackRate,
-            videoQualityOverride: request.videoQualityOverride
+            videoQualityOverride: request.videoQualityOverride,
+            forceVideoTranscode: request.forceVideoTranscode
         )
     }
 
@@ -1564,7 +1567,8 @@ final class TVAppStore {
             queueSourcePreference: request.queueSourcePreference,
             startTime: item.resumeSeconds,
             playbackRate: playbackRate,
-            videoQualityOverride: request.videoQualityOverride
+            videoQualityOverride: request.videoQualityOverride,
+            forceVideoTranscode: request.forceVideoTranscode
         )
     }
 

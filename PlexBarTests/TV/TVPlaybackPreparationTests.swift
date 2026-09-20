@@ -379,14 +379,14 @@ struct TVPlaybackPreparationTests {
         #expect(query.contains(URLQueryItem(name: "time", value: "123000")))
     }
 
-    @Test(arguments: ["next", "prepared-next", "previous", "up-next"])
-    func explicitQueueNavigationStartsPlaybackAndKeepsSelectedQuality(destination: String) async throws {
+    @Test(arguments: ["next", "prepared-next", "previous", "up-next"], [false, true])
+    func explicitQueueNavigationStartsPlaybackAndKeepsSelectedQuality(destination: String, forceConversion: Bool) async throws {
         let fixture = try await Fixture()
         defer { fixture.close() }
         let item = try Self.item(Self.episodeJSON)
         let request = TVPlexPlaybackRequest(
             item: item, queue: try Self.navigationQueue(), startTime: 123,
-            autoplay: false, playbackRate: .oneAndAHalf, videoQualityOverride: .hd4Mbps
+            autoplay: false, playbackRate: .oneAndAHalf, videoQualityOverride: .hd4Mbps, forceVideoTranscode: forceConversion
         )
         let session = fixture.makePlaybackSession()
         await session.prepare(request: request, store: fixture.store)
@@ -413,19 +413,21 @@ struct TVPlaybackPreparationTests {
         #expect(replacement.autoplay, "Choosing a queue item is an explicit Play action, as on macOS.")
         #expect(replacement.playbackRate == .oneAndAHalf)
         #expect(replacement.videoQualityOverride == .hd4Mbps)
+        #expect(replacement.forceVideoTranscode == forceConversion)
         #expect(replacement.queue?.currentItem.ratingKey == replacement.item.ratingKey)
         let stopped = try #require(fixture.requests.withLock { $0.last { $0.url?.path == "/provider/timeline" } })
         let query = URLComponents(url: stopped.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
         #expect(query.contains(URLQueryItem(name: "time", value: "123000")))
     }
 
-    @Test(arguments: ["continuous", "repeat"])
-    func automaticQueueTransitionsKeepSelectedQuality(transition: String) async throws {
-        let fixture = try await Fixture()
+    @Test(arguments: ["continuous", "repeat", "next-episode"], [false, true])
+    func automaticQueueTransitionsKeepSelectedQuality(transition: String, forceConversion: Bool) async throws {
+        let fixture = try await Fixture(includeNextEpisode: transition == "next-episode")
         defer { fixture.close() }
         let request = TVPlexPlaybackRequest(
-            item: try Self.item(Self.episodeJSON), queue: try Self.navigationQueue(),
-            startTime: 123, videoQualityOverride: .hd4Mbps
+            item: try Self.item(Self.episodeJSON.replacingOccurrences(of: "\"type\":\"episode\"", with: "\"type\":\"episode\",\"parentRatingKey\":\"72\",\"index\":1")),
+            queue: transition == "next-episode" ? nil : try Self.navigationQueue(),
+            startTime: 123, videoQualityOverride: .hd4Mbps, forceVideoTranscode: forceConversion
         )
         let next: TVPlexPlaybackRequest
         if transition == "repeat" {
@@ -438,6 +440,7 @@ struct TVPlaybackPreparationTests {
         #expect(next.autoplay)
         #expect(next.playbackRate == .oneAndAHalf)
         #expect(next.videoQualityOverride == .hd4Mbps)
+        #expect(next.forceVideoTranscode == forceConversion)
     }
 
     @Test(arguments: [true, false])
@@ -807,6 +810,7 @@ struct TVPlaybackPreparationTests {
             libraryStatus: Int = 200,
             neighborMetadataStatus: OSAllocatedUnfairLock<Int>? = nil,
             episodeMetadata: String? = nil,
+            includeNextEpisode: Bool = false,
             subtitleOffsetStatus: OSAllocatedUnfairLock<Int>? = nil,
             hubStatus: OSAllocatedUnfairLock<Int>? = nil,
             failingHubOffset: Int = 0,
@@ -876,7 +880,11 @@ struct TVPlaybackPreparationTests {
                     case "/library/metadata/7/children":
                         json = #"{"MediaContainer":{"Metadata":[{"ratingKey":"72","type":"season","title":"Season 2","index":2},{"ratingKey":"70","type":"season","title":"Season 1","index":1}]}}"#
                     case "/library/metadata/72/children":
-                        json = #"{"MediaContainer":{"Metadata":[\#(episode)]}}"#
+                        let next = episode.replacingOccurrences(of: "42", with: "43")
+                            .replacingOccurrences(of: "\"type\":\"episode\"", with: "\"type\":\"episode\",\"index\":2")
+                        json = includeNextEpisode
+                            ? #"{"MediaContainer":{"Metadata":[\#(episode),\#(next)]}}"#
+                            : #"{"MediaContainer":{"Metadata":[\#(episode)]}}"#
                     case "/media/providers":
                         json = #"{"MediaContainer":{"MediaProvider":[{"identifier":"com.plexapp.plugins.library","Feature":[{"type":"promoted","key":"/hubs/promoted"},{"type":"continuewatching","key":"/hubs/continueWatching"},{"type":"search","key":"/provider/search"},{"type":"playqueue","key":"/provider/queue"},{"type":"timeline","key":"/provider/timeline"}]}]}}"#
                     case "/provider/timeline":
