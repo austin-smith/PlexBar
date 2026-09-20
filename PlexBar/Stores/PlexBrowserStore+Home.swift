@@ -32,6 +32,8 @@ extension PlexBrowserStore {
     }
 
     func loadHomeHubs(forceRefresh: Bool = false) async {
+        guard !Task.isCancelled else { return }
+        let stateID = serverStateID
         guard connectionStore.settings.hasValidConfiguration else {
             homeState = PlexHomeState()
             return
@@ -44,10 +46,14 @@ extension PlexBrowserStore {
         }
 
         homeState.isLoadingHubs = true
-        defer { homeState.isLoadingHubs = false }
+        defer {
+            if serverStateID == stateID {
+                homeState.isLoadingHubs = false
+            }
+        }
 
         do {
-            homeState.hubs = try await connectionStore.perform { configuration in
+            let hubs = try await connectionStore.perform { configuration in
                 let endpoints = try await self.advertisedLibraryProviderEndpoints(
                     using: configuration
                 )
@@ -56,12 +62,15 @@ extension PlexBrowserStore {
                     using: configuration
                 )
             }
+            try Task.checkCancellation()
+            guard serverStateID == stateID else { return }
+            homeState.hubs = hubs
             homeState.hasLoadedHubs = true
             homeState.hubsErrorMessage = nil
         } catch is CancellationError {
             return
         } catch {
-            guard !Task.isCancelled else {
+            guard serverStateID == stateID, !Task.isCancelled else {
                 return
             }
             homeState.hubsErrorMessage = error.localizedDescription

@@ -16,6 +16,7 @@ final class PlexBrowserStore {
     let peopleLimit: Int
     let globalSearchStore: PlexGlobalSearchStore
 
+    private(set) var serverStateID = UUID()
     var homeState = PlexHomeState()
     var relatedContentState = PlexRelatedContentState()
     var relatedContentGenerationsByRatingKey: [String: UUID] = [:]
@@ -84,6 +85,7 @@ final class PlexBrowserStore {
 
 extension PlexBrowserStore {
     func resetServerScopedState() {
+        serverStateID = UUID()
         libraryBrowseDefinitionTasks.values.forEach { $0.cancel() }
         providerEndpointTasksByConnectionKey.values.forEach { $0.cancel() }
 
@@ -804,11 +806,13 @@ extension PlexBrowserStore {
     }
 
     func loadLibraryProviderCapabilities() async {
+        let stateID = serverStateID
         do {
             _ = try await connectionStore.perform { configuration in
                 try await self.libraryProviderEndpoints(using: configuration)
             }
         } catch {
+            guard serverStateID == stateID, !Task.isCancelled else { return }
             presentedProviderEndpoints = nil
             presentedProviderConnectionKey = nil
         }
@@ -916,10 +920,17 @@ extension PlexBrowserStore {
         }
     }
 
-    func reportTimeline(_ update: PlexTimelineUpdate) async -> PlexTimelineResponse? {
+    func reportTimeline(
+        _ update: PlexTimelineUpdate,
+        accountScope: String
+    ) async -> PlexTimelineResponse? {
+        guard connectionStore.accountCacheScope == accountScope else { return nil }
         do {
             return try await connectionStore.perform { configuration in
                 let endpoints = try await self.libraryProviderEndpoints(using: configuration)
+                guard self.connectionStore.accountCacheScope == accountScope else {
+                    throw CancellationError()
+                }
                 guard let timelinePath = endpoints.timelinePath else {
                     throw PlexAPIError.missingLibraryTimelineFeature
                 }
@@ -1480,6 +1491,7 @@ private extension PlexBrowserStore {
     func libraryProviderEndpoints(
         using configuration: PlexConnectionConfiguration
     ) async throws -> PlexLibraryProviderEndpoints {
+        let stateID = serverStateID
         let connectionKey = providerConnectionKey(
             serverIdentifier: configuration.serverIdentifier,
             serverURL: configuration.serverURL,
@@ -1493,6 +1505,8 @@ private extension PlexBrowserStore {
         }
         if let task = providerEndpointTasksByConnectionKey[connectionKey] {
             let endpoints = try await task.value
+            try Task.checkCancellation()
+            guard serverStateID == stateID else { throw CancellationError() }
             presentedProviderEndpoints = endpoints
             presentedProviderConnectionKey = connectionKey
             return endpoints
@@ -1502,9 +1516,15 @@ private extension PlexBrowserStore {
             try await client.fetchLibraryProviderEndpoints(using: configuration)
         }
         providerEndpointTasksByConnectionKey[connectionKey] = task
-        defer { providerEndpointTasksByConnectionKey[connectionKey] = nil }
+        defer {
+            if serverStateID == stateID {
+                providerEndpointTasksByConnectionKey[connectionKey] = nil
+            }
+        }
 
         let endpoints = try await task.value
+        try Task.checkCancellation()
+        guard serverStateID == stateID else { throw CancellationError() }
         providerEndpointsByConnectionKey[connectionKey] = endpoints
         presentedProviderEndpoints = endpoints
         presentedProviderConnectionKey = connectionKey

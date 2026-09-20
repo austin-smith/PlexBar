@@ -59,7 +59,7 @@ struct PlexHomeView: View {
                 perform: refresh
             )
         )
-        .task {
+        .task(id: browserStore.serverStateID) {
             async let capabilityLoad: Void = browserStore.loadLibraryProviderCapabilities()
             await browserStore.loadHomeHubs()
             _ = await capabilityLoad

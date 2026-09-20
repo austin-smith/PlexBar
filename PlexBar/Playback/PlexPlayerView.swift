@@ -623,7 +623,8 @@ final class PlexPlayerSessionModel {
     ) {
         self.presentation = presentation
         self.browserStore = browserStore
-        previewAccountScope = browserStore.connectionStore.accountCacheScope
+        let playbackAccountScope = browserStore.connectionStore.accountCacheScope
+        previewAccountScope = playbackAccountScope
         self.settingsStore = settingsStore
         self.userInteractionStore = userInteractionStore
         self.coordinator = coordinator
@@ -637,7 +638,7 @@ final class PlexPlayerSessionModel {
                     update: update
                 )
             }
-            return await browserStore.reportTimeline(update)
+            return await browserStore.reportTimeline(update, accountScope: playbackAccountScope)
         }
         queue = presentation.queue
     }
