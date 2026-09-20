@@ -128,7 +128,7 @@ struct PlexPlayerView: View {
     @State private var controlsState = PlexPlayerControlsState()
     @State private var playerPresentation = PlexPlayerPresentationController()
     @State private var mediaOptions = PlexPlayerMediaOptions()
-    @State private var overlaySelection = PlexPlayerOverlaySelection()
+    @State private var showsPlaybackInfo = false
     @State private var isPlaybackEndedOverlayDismissed = false
     private let coordinator: PlexPlayerCoordinator
     private let settingsStore: PlexSettingsStore
@@ -163,12 +163,12 @@ struct PlexPlayerView: View {
                     videoDynamicRange: settingsStore.videoDynamicRange,
                     videoScalingMode: settingsStore.videoScalingMode,
                     isVideo: session.presentation.plan.mediaKind == .video,
-                    isInteractionBlocked: isCommandPalettePresented || overlaySelection.isPresented
+                    isInteractionBlocked: isCommandPalettePresented || showsPlaybackInfo
                         || session.qualitySuggestion != nil
                         || showsPostPlay,
                     isCursorHidingAllowed: !isCommandPalettePresented && session.presentation.plan.mediaKind == .video
                         && !controlsState.isVisible(status: session.engine.status, voiceOverEnabled: voiceOverEnabled)
-                        && !overlaySelection.isPresented && !showsPostPlay
+                        && !showsPlaybackInfo && !showsPostPlay
                         && session.qualitySuggestion == nil && session.errorMessage == nil
                         && playerPresentation.errorMessage == nil && mediaOptions.errorMessage == nil
                         && !presentationLifecycle.isPictureInPictureActive
@@ -196,17 +196,17 @@ struct PlexPlayerView: View {
                         mediaOptions: mediaOptions,
                         state: controlsState,
                         lifecycle: presentationLifecycle,
-                        isInteractionEnabled: !isCommandPalettePresented && !overlaySelection.isPresented && !showsPostPlay
+                        isInteractionEnabled: !isCommandPalettePresented && !showsPlaybackInfo && !showsPostPlay
                             && session.qualitySuggestion == nil
                             && !presentationLifecycle.isPictureInPictureActive,
-                        showQueue: toggleUpNextOverlay,
+                        showQueue: toggleUpNext,
                         showInfo: togglePlaybackInfoOverlay
                     )
                 }
                 .padding(20)
-                .opacity(overlaySelection.isPresented || showsPostPlay ? 0 : 1)
-                .allowsHitTesting(!overlaySelection.isPresented && !showsPostPlay)
-                .accessibilityHidden(overlaySelection.isPresented || showsPostPlay)
+                .opacity(showsPlaybackInfo || showsPostPlay ? 0 : 1)
+                .allowsHitTesting(!showsPlaybackInfo && !showsPostPlay)
+                .accessibilityHidden(showsPlaybackInfo || showsPostPlay)
 
                 if session.showsVideoPreparationStage {
                     PlexVideoPreparationStage(
@@ -228,30 +228,26 @@ struct PlexPlayerView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 }
 
-                if let overlay = overlaySelection.selected {
+                if showsPlaybackInfo {
                     Color.black.opacity(overlayStyle.backgroundScrimOpacity)
                         .ignoresSafeArea()
                         .contentShape(Rectangle())
-                        .onTapGesture { overlaySelection.dismiss() }
+                        .onTapGesture { showsPlaybackInfo = false }
                         .transition(.opacity)
 
                     PlexPlayerHUD(
-                        title: overlay.label,
-                        systemImage: overlay.systemImage,
-                        dismiss: { overlaySelection.dismiss() }
+                        title: "Playback Info",
+                        systemImage: "info.circle",
+                        dismiss: { showsPlaybackInfo = false }
                     ) {
-                        switch overlay {
-                        case .info:
-                            PlexPlayerPlaybackInfoHUD(session: session)
-                        case .upNext:
-                            PlexUpNextHUD(session: session)
-                        }
+                        PlexPlayerPlaybackInfoHUD(session: session)
                     }
                     .padding(24)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     .zIndex(1)
                 }
             }
+            .coordinateSpace(.named("playerStage"))
             .animation(
                 accessibilityReduceMotion ? nil : .easeOut(duration: 0.2),
                 value: session.showsVideoPreparationStage
@@ -262,7 +258,7 @@ struct PlexPlayerView: View {
             )
             .animation(
                 accessibilityReduceMotion ? nil : .snappy(duration: 0.22),
-                value: overlaySelection.selected
+                value: showsPlaybackInfo
             )
         }
         .alert(
@@ -291,15 +287,15 @@ struct PlexPlayerView: View {
         .focusedSceneValue(
             \.plexPlayerInfoCommand,
             PlexFocusedCommandAction(
-                title: overlaySelection.commandTitle(for: .info),
+                title: showsPlaybackInfo ? "Hide Playback Info" : "Show Playback Info",
                 perform: togglePlaybackInfoOverlay
             )
         )
         .focusedSceneValue(
             \.plexPlayerUpNextCommand,
             PlexFocusedCommandAction(
-                title: overlaySelection.commandTitle(for: .upNext),
-                perform: toggleUpNextOverlay
+                title: controlsState.presentedPopover == .upNext ? "Hide Up Next" : "Show Up Next",
+                perform: toggleUpNext
             )
         )
         .focusedSceneValue(
@@ -370,7 +366,7 @@ struct PlexPlayerView: View {
             }
         }
         .onChange(of: session.presentation.item.ratingKey) {
-            overlaySelection.dismiss()
+            showsPlaybackInfo = false
             isPlaybackEndedOverlayDismissed = false
             controlsState.reveal()
         }
@@ -401,12 +397,14 @@ struct PlexPlayerView: View {
 
     private func togglePlaybackInfoOverlay() {
         controlsState.reveal()
-        overlaySelection.toggle(.info)
+        controlsState.dismissPopover()
+        showsPlaybackInfo.toggle()
     }
 
-    private func toggleUpNextOverlay() {
+    private func toggleUpNext() {
         controlsState.reveal()
-        overlaySelection.toggle(.upNext)
+        showsPlaybackInfo = false
+        controlsState.togglePopover(.upNext)
     }
 
     private var audioOverlay: PlexAudioPlayerOverlay? {
@@ -459,51 +457,6 @@ struct PlexPlayerOverlayStyle: Equatable {
 
     init(contrast: ColorSchemeContrast) {
         backgroundScrimOpacity = contrast == .increased ? 0.24 : 0.14
-    }
-}
-
-enum PlexPlayerOverlay: Equatable, Sendable {
-    case info
-    case upNext
-}
-
-struct PlexPlayerOverlaySelection: Equatable, Sendable {
-    private(set) var selected: PlexPlayerOverlay?
-
-    var isPresented: Bool {
-        selected != nil
-    }
-
-    func commandTitle(for overlay: PlexPlayerOverlay) -> String {
-        selected == overlay ? "Hide \(overlay.label)" : "Show \(overlay.label)"
-    }
-
-    mutating func toggle(_ overlay: PlexPlayerOverlay) {
-        selected = selected == overlay ? nil : overlay
-    }
-
-    mutating func dismiss() {
-        selected = nil
-    }
-
-    mutating func present(_ overlay: PlexPlayerOverlay) {
-        selected = overlay
-    }
-}
-
-extension PlexPlayerOverlay {
-    var label: String {
-        switch self {
-        case .info: "Playback Info"
-        case .upNext: "Up Next"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .info: "info.circle"
-        case .upNext: "list.bullet"
-        }
     }
 }
 

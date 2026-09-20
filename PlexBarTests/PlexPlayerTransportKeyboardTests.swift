@@ -17,9 +17,10 @@ struct PlexPlayerTransportKeyboardTests {
         coordinator.installSeeking(canSeek: true) { offsets.append($0) }
         coordinator.installNavigation(previous: {}, next: { nextCount += 1 })
         coordinator.updateNavigation(canGoPrevious: false, canGoNext: true)
+        let lifecycle = PlexPlayerPresentationLifecycle()
         let handler = PlexPlayerTransportKeyboardHandler(
             playerView: view,
-            lifecycle: PlexPlayerPresentationLifecycle(),
+            lifecycle: lifecycle,
             coordinator: coordinator,
             controlsState: state,
             toggleFullScreen: {}
@@ -52,10 +53,18 @@ struct PlexPlayerTransportKeyboardTests {
         state.isMenuTracking = true
         #expect(!handler.handleKeyDown(event(123)))
         state.isMenuTracking = false
-        state.isPopoverPresented = true
+        state.togglePopover(.volume)
         #expect(!handler.handleKeyDown(event(123)))
         #expect(!handler.handleKeyDown(event(124, modifiers: .command)))
-        state.isPopoverPresented = false
+        state.togglePopover(.upNext)
+        lifecycle.willEnterFullScreen()
+        lifecycle.didEnterFullScreen()
+        // The native popover owns Escape and navigation while it is open.
+        #expect(!handler.handleKeyDown(event(53)))
+        #expect(!handler.handleKeyDown(event(123)))
+        #expect(!handler.handleKeyDown(event(124, modifiers: .command)))
+        lifecycle.didExitFullScreen()
+        state.dismissPopover()
         handler.isBlocked = true
         #expect(!handler.handleKeyDown(event(123)))
         handler.isBlocked = false

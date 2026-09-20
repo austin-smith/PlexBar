@@ -12,7 +12,8 @@ final class PlexPlayerControlsState {
     let scrub = PlexPlayerScrubState()
     var isScrubbing: Bool { scrub.isActive }
     var isMenuTracking = false
-    var isPopoverPresented = false
+    private(set) var presentedPopover: PlexPlayerPopover?
+    var isPopoverPresented: Bool { presentedPopover != nil }
     @ObservationIgnored private let inactivityDelay: Duration
     @ObservationIgnored private var hideTask: Task<Void, Never>?
 
@@ -46,6 +47,18 @@ final class PlexPlayerControlsState {
         hideTask = nil
     }
 
+    func togglePopover(_ popover: PlexPlayerPopover) {
+        presentedPopover = presentedPopover == popover ? nil : popover
+        reveal()
+    }
+
+    func dismissPopover(_ popover: PlexPlayerPopover? = nil) {
+        // A previous popover can finish dismissing after its replacement opens.
+        guard popover == nil || presentedPopover == popover else { return }
+        presentedPopover = nil
+        reveal()
+    }
+
     func isVisible(status: PlexPlaybackStatus, voiceOverEnabled: Bool) -> Bool {
         // Focus keeps controls available for Tab navigation, but a return to
         // pointer input allows idle playback to hide them again.
@@ -53,6 +66,11 @@ final class PlexPlayerControlsState {
             || isScrubbing || isMenuTracking || isPopoverPresented
             || status != .playing || voiceOverEnabled
     }
+}
+
+enum PlexPlayerPopover: Equatable {
+    case volume
+    case upNext
 }
 
 enum PlexPlayerTimeDisplay {

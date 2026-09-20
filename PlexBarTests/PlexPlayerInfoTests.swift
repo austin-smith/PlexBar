@@ -184,42 +184,6 @@ struct PlexPlayerInfoTests {
         #expect(presentation.performanceRows.map(\.value) == ["1"])
     }
 
-    @Test func playerUsesOneMutuallyExclusiveInPlayerOverlay() {
-        var selection = PlexPlayerOverlaySelection()
-
-        #expect(!selection.isPresented)
-        #expect(selection.selected == nil)
-
-        selection.toggle(.info)
-        #expect(selection.isPresented)
-        #expect(selection.selected == .info)
-
-        selection.toggle(.upNext)
-        #expect(selection.selected == .upNext)
-
-        selection.toggle(.upNext)
-        #expect(!selection.isPresented)
-
-        selection.toggle(.info)
-        selection.dismiss()
-        #expect(selection.selected == nil)
-    }
-
-    @Test func playerOverlayCommandsDescribeTheActionTheyWillPerform() {
-        var selection = PlexPlayerOverlaySelection()
-
-        #expect(selection.commandTitle(for: .info) == "Show Playback Info")
-        #expect(selection.commandTitle(for: .upNext) == "Show Up Next")
-
-        selection.present(.info)
-        #expect(selection.commandTitle(for: .info) == "Hide Playback Info")
-        #expect(selection.commandTitle(for: .upNext) == "Show Up Next")
-
-        selection.present(.upNext)
-        #expect(selection.commandTitle(for: .info) == "Show Playback Info")
-        #expect(selection.commandTitle(for: .upNext) == "Hide Up Next")
-    }
-
     @Test func currentItemMutationTicketRejectsAQueueTransition() throws {
         let current = try playbackPresentation(
             ratingKey: "42",
