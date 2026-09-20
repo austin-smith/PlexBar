@@ -42,6 +42,7 @@ final class PlexSettingsStore {
     private let credentialStore: any PlexCredentialPersisting
     private let loginItemService: any PlexLoginItemControlling
     private var credentialLoadingTask: Task<PlexStoredCredentials, Error>?
+    private(set) var accountTokenRevision = UUID()
     private var credentialPersistenceTask: Task<Void, Error>?
     private var credentialPersistenceErrors: [String: Error] = [:]
     private var isApplyingLoadedCredentials = false
@@ -402,11 +403,14 @@ final class PlexSettingsStore {
         let normalizedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
         let previousToken = trimmedUserToken
         try Task.checkCancellation()
+        let revision = UUID()
+        accountTokenRevision = revision
         let persistenceTask = enqueueCredentialPersistence(
             normalizedToken.nilIfBlank,
             account: KeychainAccounts.userToken
         )
         try await persistenceTask.value
+        guard accountTokenRevision == revision else { throw CancellationError() }
 
         do {
             try Task.checkCancellation()
@@ -540,7 +544,8 @@ extension PlexSettingsStore: PlexAccountJWTStorage {
         trimmedUserToken
     }
 
-    func persistAccountToken(_ token: String) async throws {
+    func persistAccountToken(_ token: String, expectedRevision: UUID) async throws {
+        guard accountTokenRevision == expectedRevision else { throw CancellationError() }
         try await saveAuthenticatedUserToken(token)
     }
 }
@@ -550,6 +555,7 @@ private extension PlexSettingsStore {
         guard !isApplyingLoadedCredentials else {
             return
         }
+        accountTokenRevision = UUID()
         enqueueCredentialPersistence(trimmedUserToken.nilIfBlank, account: KeychainAccounts.userToken)
     }
 

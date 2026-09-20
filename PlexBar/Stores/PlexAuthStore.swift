@@ -127,6 +127,7 @@ final class PlexAuthStore {
     }
 
     func signOut() {
+        accountJWTManager.invalidatePreparation()
         signInTask?.cancel()
         accountTokenRefreshTask?.cancel()
         isAuthenticating = false
@@ -311,6 +312,7 @@ private extension PlexAuthStore {
                 return try await operation(refreshedToken.token)
             } catch let retryError as PlexAuthError where retryError.requiresTokenRefresh {
                 accountTokenRefreshTask?.cancel()
+                accountJWTManager.invalidatePreparation()
                 try await settings.saveAuthenticatedUserToken("")
                 throw retryError
             }

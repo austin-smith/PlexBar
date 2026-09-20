@@ -23,19 +23,51 @@ private actor RejectingJWTCredentialStore: PlexCredentialPersisting {
     }
 }
 
+private actor JWTResponseGate {
+    private var entered = false
+    private var entryWaiter: CheckedContinuation<Void, Never>?
+    private var releaseWaiter: CheckedContinuation<Void, Never>?
+
+    func block() async {
+        await withCheckedContinuation { continuation in
+            releaseWaiter = continuation
+            entered = true
+            entryWaiter?.resume()
+            entryWaiter = nil
+        }
+    }
+
+    func waitUntilEntered() async {
+        guard !entered else { return }
+        await withCheckedContinuation { entryWaiter = $0 }
+    }
+
+    func release() {
+        releaseWaiter?.resume()
+        releaseWaiter = nil
+    }
+}
+
 private actor RecordingAccountJWTClient: PlexAccountJWTClient {
     private let nonce: String
     private let exchangedToken: String
     private let registerError: Error?
     private let exchangeError: Error?
     private var calls: [JWTClientCall] = []
+    private var gate: JWTResponseGate?
+    private(set) var nonceRequestCount = 0
+    private let blockedStage: String?
 
     init(
         nonce: String = "test-nonce",
         exchangedToken: String,
         registerError: Error? = nil,
-        exchangeError: Error? = nil
+        exchangeError: Error? = nil,
+        gate: JWTResponseGate? = nil,
+        blockedStage: String? = nil
     ) {
+        self.gate = gate
+        self.blockedStage = blockedStage
         self.nonce = nonce
         self.exchangedToken = exchangedToken
         self.registerError = registerError
@@ -46,7 +78,8 @@ private actor RecordingAccountJWTClient: PlexAccountJWTClient {
         _ jwk: PlexJSONWebKey,
         legacyToken: String,
         clientContext: PlexClientContext
-    ) throws {
+    ) async throws {
+        if blockedStage == "registration" { await blockNextResponse() }
         calls.append(.registerJWK(
             legacyToken: legacyToken,
             use: jwk.use,
@@ -57,7 +90,9 @@ private actor RecordingAccountJWTClient: PlexAccountJWTClient {
         }
     }
 
-    func fetchJWTNonce(clientContext: PlexClientContext) throws -> String {
+    func fetchJWTNonce(clientContext: PlexClientContext) async throws -> String {
+        nonceRequestCount += 1
+        if blockedStage == "nonce" { await blockNextResponse() }
         calls.append(.fetchNonce(clientIdentifier: clientContext.clientIdentifier))
         return nonce
     }
@@ -65,7 +100,8 @@ private actor RecordingAccountJWTClient: PlexAccountJWTClient {
     func exchangeDeviceJWT(
         _ deviceJWT: String,
         clientContext: PlexClientContext
-    ) throws -> String {
+    ) async throws -> String {
+        if blockedStage == "exchange" { await blockNextResponse() }
         calls.append(.exchange(
             deviceJWT: deviceJWT,
             clientIdentifier: clientContext.clientIdentifier
@@ -76,8 +112,38 @@ private actor RecordingAccountJWTClient: PlexAccountJWTClient {
         return exchangedToken
     }
 
+    func suspendNextResponse(on gate: JWTResponseGate) {
+        self.gate = gate
+    }
+
+    private func blockNextResponse() async {
+        let nextGate = gate
+        gate = nil
+        await nextGate?.block()
+    }
+
     func recordedCalls() -> [JWTClientCall] {
         calls
+    }
+}
+
+private actor JWTBlockingCredentialStore: PlexCredentialPersisting {
+    private let gate: JWTResponseGate
+    private var shouldBlock = true
+    private var token = "legacy-account-token"
+
+    init(gate: JWTResponseGate) { self.gate = gate }
+
+    func loadCredentials() -> PlexStoredCredentials {
+        PlexStoredCredentials(userToken: token, serverToken: "")
+    }
+
+    func replace(_ value: String?, account: String) async {
+        if shouldBlock {
+            shouldBlock = false
+            await gate.block()
+        }
+        if account == KeychainAccounts.userToken { token = value ?? "" }
     }
 }
 
@@ -365,6 +431,131 @@ struct PlexAccountJWTManagerTests {
         #expect(testState.store.userToken == "legacy-account-token")
     }
 
+    @Test(arguments: ["registration", "nonce", "exchange"], [false, true])
+    func lateRefreshCannotRestoreSignedOutOrReplacedCredentials(stage: String, replaceAccount: Bool) async throws {
+        let state = try makeSettings(token: "legacy-account-token")
+        defer { state.cleanup() }
+        let issued = try accountJWT(expiration: now.addingTimeInterval(7 * 24 * 60 * 60))
+        let replacement = try accountJWT(expiration: now.addingTimeInterval(14 * 24 * 60 * 60))
+        let gate = JWTResponseGate()
+        let client = RecordingAccountJWTClient(exchangedToken: issued, gate: gate, blockedStage: stage)
+        let manager = makeManager(settings: state.store, client: client)
+        let refresh = Task { try await manager.prepareAccountToken() }
+        await gate.waitUntilEntered()
+
+        if replaceAccount {
+            _ = try await manager.acceptNewAccountToken(replacement, registeredKeyID: "replacement-key")
+        } else {
+            // Exercise the storage revision guard even without explicit task cancellation.
+            state.store.clearAuthentication()
+        }
+        await gate.release()
+        await #expect(throws: CancellationError.self) { try await refresh.value }
+        try await state.store.waitForCredentialPersistence()
+        let expected = replaceAccount ? replacement : ""
+        #expect(state.store.userToken == expected)
+        #expect(await state.credentials.loadCredentials().userToken == expected)
+        if replaceAccount {
+            #expect(state.store.registeredJWTKeyID == "replacement-key")
+            #expect(try await manager.prepareAccountToken().token == replacement)
+        }
+    }
+
+    @Test func invalidatedPreparationCannotClearOrReplaceANewerSharedTask() async throws {
+        let state = try makeSettings(token: "legacy-account-token")
+        defer { state.cleanup() }
+        let issued = try accountJWT(expiration: now.addingTimeInterval(7 * 24 * 60 * 60))
+        let oldGate = JWTResponseGate()
+        let newGate = JWTResponseGate()
+        let client = RecordingAccountJWTClient(exchangedToken: issued, gate: oldGate, blockedStage: "nonce")
+        let manager = makeManager(settings: state.store, client: client)
+        let old = Task { try await manager.prepareAccountToken() }
+        await oldGate.waitUntilEntered()
+        manager.invalidatePreparation()
+        state.store.clearAuthentication()
+        try await state.store.saveAuthenticatedUserToken("new-legacy-account-token")
+        await client.suspendNextResponse(on: newGate)
+        let current = Task { try await manager.prepareAccountToken() }
+        await newGate.waitUntilEntered()
+        await oldGate.release()
+        await #expect(throws: CancellationError.self) { try await old.value }
+
+        var waiterStarted = false
+        let waiter = Task {
+            waiterStarted = true
+            return try await manager.prepareAccountToken()
+        }
+        while !waiterStarted { await Task.yield() }
+        await newGate.release()
+        #expect(try await current.value.token == issued)
+        #expect(try await waiter.value.token == issued)
+        #expect(await client.nonceRequestCount == 2)
+        #expect(await state.credentials.loadCredentials().userToken == issued)
+    }
+
+    @Test func cancellingAWaiterDoesNotCancelTheSharedRefresh() async throws {
+        let state = try makeSettings(token: "legacy-account-token")
+        defer { state.cleanup() }
+        let issued = try accountJWT(expiration: now.addingTimeInterval(7 * 24 * 60 * 60))
+        let gate = JWTResponseGate()
+        let client = RecordingAccountJWTClient(exchangedToken: issued, gate: gate, blockedStage: "nonce")
+        let manager = makeManager(settings: state.store, client: client)
+        let refresh = Task { try await manager.prepareAccountToken() }
+        await gate.waitUntilEntered()
+        var waiterStarted = false
+        let waiter = Task {
+            waiterStarted = true
+            return try await manager.prepareAccountToken()
+        }
+        while !waiterStarted { await Task.yield() }
+        waiter.cancel()
+        await gate.release()
+        #expect(try await refresh.value.token == issued)
+        await #expect(throws: CancellationError.self) { try await waiter.value }
+        #expect(await client.nonceRequestCount == 1)
+        #expect(await state.credentials.loadCredentials().userToken == issued)
+    }
+
+    @Test(arguments: [false, true])
+    func acceptingANewAccountSharesItsPendingWriteAndHonorsSignOut(signOut: Bool) async throws {
+        let suite = "PlexAccountJWTManagerTests.accepting.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let gate = JWTResponseGate()
+        let credentials = JWTBlockingCredentialStore(gate: gate)
+        let settings = PlexSettingsStore(
+            defaults: defaults, credentialStore: credentials,
+            initialCredentials: PlexStoredCredentials(userToken: "legacy-account-token", serverToken: "")
+        )
+        let issued = try accountJWT(expiration: now.addingTimeInterval(7 * 24 * 60 * 60))
+        let client = RecordingAccountJWTClient(exchangedToken: issued)
+        let manager = makeManager(settings: settings, client: client)
+        let login = Task { try await manager.acceptNewAccountToken(issued, registeredKeyID: "new-key") }
+        await gate.waitUntilEntered()
+        var waiterStarted = false
+        let refresh = Task {
+            waiterStarted = true
+            return try await manager.prepareAccountToken(forceRefresh: true)
+        }
+        while !waiterStarted { await Task.yield() }
+        if signOut {
+            manager.invalidatePreparation()
+            settings.clearAuthentication()
+        }
+        await gate.release()
+        if signOut {
+            await #expect(throws: CancellationError.self) { try await login.value }
+            await #expect(throws: CancellationError.self) { try await refresh.value }
+        } else {
+            #expect(try await login.value.token == issued)
+            #expect(try await refresh.value.token == issued)
+        }
+        try await settings.waitForCredentialPersistence()
+        #expect(settings.userToken == (signOut ? "" : issued))
+        #expect(await credentials.loadCredentials().userToken == (signOut ? "" : issued))
+        #expect(await client.recordedCalls().isEmpty)
+    }
+
     private func makeManager(
         settings: PlexSettingsStore,
         client: RecordingAccountJWTClient,
@@ -386,19 +577,20 @@ struct PlexAccountJWTManagerTests {
         let suiteName = "PlexBarTests.PlexAccountJWTManager.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
+        let credentials = PlexMemoryCredentialStore(credentials: PlexStoredCredentials(
+            userToken: token, serverToken: serverToken
+        ))
         return JWTManagerTestState(
             store: PlexSettingsStore(
                 defaults: defaults,
-                credentialStore: PlexMemoryCredentialStore(credentials: PlexStoredCredentials(
-                    userToken: token,
-                    serverToken: serverToken
-                )),
+                credentialStore: credentials,
                 initialCredentials: PlexStoredCredentials(
                     userToken: token,
                     serverToken: serverToken
                 )
             ),
             defaults: defaults,
+            credentials: credentials,
             suiteName: suiteName
         )
     }
@@ -421,6 +613,7 @@ struct PlexAccountJWTManagerTests {
 private struct JWTManagerTestState {
     let store: PlexSettingsStore
     let defaults: UserDefaults
+    let credentials: PlexMemoryCredentialStore
     let suiteName: String
 
     func cleanup() {

@@ -1569,6 +1569,7 @@ final class TVAppStore {
     }
 
     func logout() async {
+        accountJWTManager.invalidatePreparation()
         sessionRevision = UUID()
         pendingTopShelfRoute = nil
         topShelfRouteTask?.cancel()
@@ -1796,6 +1797,7 @@ final class TVAppStore {
                 return try await operation(refreshedToken.token)
             } catch let retryError as PlexAuthError where retryError.requiresTokenRefresh {
                 accountTokenRefreshTask?.cancel()
+                accountJWTManager.invalidatePreparation()
                 try await accountStorage.persistAccountToken("")
                 throw retryError
             }

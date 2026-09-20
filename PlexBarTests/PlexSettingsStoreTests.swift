@@ -283,6 +283,31 @@ private actor BlockingCredentialStore: PlexCredentialPersisting {
 }
 
 @MainActor
+@Test(arguments: [false, true], ["", "new-account-token"])
+func supersedingAuthenticationWinsOverAnInFlightCredentialWrite(cancelWrite: Bool, replacement: String) async throws {
+    let suiteName = "PlexBarTests.supersedingAuthentication.\(UUID())"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let prior = PlexStoredCredentials(userToken: "prior-token", serverToken: "server-token")
+    let credentials = BlockingCredentialStore(credentials: prior)
+    let store = PlexSettingsStore(defaults: defaults, credentialStore: credentials, initialCredentials: prior)
+    let oldWrite = Task { try await store.saveAuthenticatedUserToken("refresh-token") }
+    await credentials.waitUntilReplacementIsBlocked()
+    if cancelWrite { oldWrite.cancel() }
+    store.clearAuthentication()
+    let revision = store.accountTokenRevision
+    let newWrite = Task { try await store.saveAuthenticatedUserToken(replacement) }
+    while store.accountTokenRevision == revision { await Task.yield() }
+    await credentials.resumeReplacement()
+
+    await #expect(throws: CancellationError.self) { try await oldWrite.value }
+    try await newWrite.value
+    try await store.waitForCredentialPersistence()
+    #expect(store.userToken == replacement)
+    #expect(await credentials.loadCredentials().userToken == replacement)
+}
+
+@MainActor
 @Test func laterCredentialSuccessDoesNotHideAnEarlierAccountFailure() async throws {
     let suiteName = "PlexBarTests.laterCredentialSuccessDoesNotHideAnEarlierAccountFailure"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
