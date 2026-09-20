@@ -5,6 +5,31 @@ import Testing
 
 @MainActor
 struct PlexPlayerControlsTests {
+    @Test func switchingPopoversKeepsTheAnchorVisibleAndIgnoresStaleDismissal() async throws {
+        let state = PlexPlayerControlsState(inactivityDelay: .milliseconds(40))
+        defer { state.stop() }
+
+        state.togglePopover(.volume)
+        state.togglePopover(.upNext)
+        // Native popover dismissal can arrive after the other button is clicked.
+        state.dismissPopover(.volume)
+        #expect(state.presentedPopover == .upNext)
+        try await waitForIdle(state)
+        #expect(state.isVisible(status: .playing, voiceOverEnabled: false))
+
+        state.togglePopover(.upNext)
+        #expect(!state.isPopoverPresented)
+        try await waitForIdle(state)
+        #expect(!state.isVisible(status: .playing, voiceOverEnabled: false))
+
+        state.togglePopover(.upNext)
+        state.togglePopover(.volume)
+        state.dismissPopover(.upNext)
+        #expect(state.presentedPopover == .volume)
+        state.dismissPopover()
+        #expect(!state.isPopoverPresented)
+    }
+
     @Test func controlsStayAvailableDuringInteractionAndPausedPlayback() {
         let state = PlexPlayerControlsState()
         state.isPointerActive = false
@@ -26,7 +51,7 @@ struct PlexPlayerControlsTests {
         state.isMenuTracking = true
         #expect(state.isVisible(status: .playing, voiceOverEnabled: false))
         state.isMenuTracking = false
-        state.isPopoverPresented = true
+        state.togglePopover(.volume)
         #expect(state.isVisible(status: .playing, voiceOverEnabled: false))
         state.stop()
     }
@@ -70,9 +95,9 @@ struct PlexPlayerControlsTests {
         state.isMenuTracking = true
         #expect(state.isVisible(status: .playing, voiceOverEnabled: false))
         state.isMenuTracking = false
-        state.isPopoverPresented = true
+        state.togglePopover(.volume)
         #expect(state.isVisible(status: .playing, voiceOverEnabled: false))
-        state.isPopoverPresented = false
+        state.dismissPopover()
         state.reveal()
         try await waitForIdle(state)
         #expect(!state.isVisible(status: .playing, voiceOverEnabled: false))

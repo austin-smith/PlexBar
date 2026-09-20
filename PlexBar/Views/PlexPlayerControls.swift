@@ -16,7 +16,7 @@ struct PlexPlayerControls: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var volume: Double = 1
     @State private var isMuted = false
-    @State private var showsVolume = false
+    @State private var availablePopoverHeight: CGFloat = 420
     @State private var preview = PlexPlaybackPreviewStore()
     @FocusState private var focusedControl: Control?
 
@@ -92,13 +92,27 @@ struct PlexPlayerControls: View {
         .labelStyle(.iconOnly)
         .buttonStyle(PlexPlayerControlButtonStyle())
         .font(.system(size: 15, weight: .medium))
+        .onGeometryChange(for: CGFloat.self) { geometry in
+            geometry.frame(in: .named("playerStage")).minY
+        } action: { top in
+            availablePopoverHeight = max(120, top - 16)
+        }
         .onChange(of: state.isKeyboardNavigating) {
             if !state.isKeyboardNavigating { focusedControl = nil }
         }
         .onChange(of: state.isScrubbing) { state.reveal() }
-        .onChange(of: showsVolume) {
-            state.isPopoverPresented = showsVolume
+        .onChange(of: state.presentedPopover) { previous, current in
+            preview.hide()
             state.reveal()
+            if current == nil, isInteractionEnabled, state.isKeyboardNavigating {
+                focusedControl = previous == .upNext ? .queue : .volumePopover
+            }
+        }
+        .onChange(of: isInteractionEnabled) {
+            if !isInteractionEnabled { state.dismissPopover() }
+        }
+        .onChange(of: lifecycle.isFullScreenTransitioning) {
+            if lifecycle.isFullScreenTransitioning { state.dismissPopover() }
         }
         .onChange(of: focusedControl) { state.hasKeyboardFocus = focusedControl != nil }
         .onChange(of: session.playbackPreviewSource) { preview.configure(session.playbackPreviewSource) }
@@ -121,7 +135,7 @@ struct PlexPlayerControls: View {
             state.hasKeyboardFocus = false
             state.scrub.reset()
             state.isTimelineFocused = false
-            state.isPopoverPresented = false
+            state.dismissPopover()
         }
     }
 
@@ -242,12 +256,12 @@ struct PlexPlayerControls: View {
 
     private var volumeButton: some View {
         Button("Volume", systemImage: volumeSymbol) {
-            showsVolume.toggle()
+            state.togglePopover(.volume)
         }
         .help("Adjust Volume")
         .accessibilityValue("\(Int((isMuted ? 0 : volume) * 100)) percent")
         .focused($focusedControl, equals: .volumePopover)
-        .popover(isPresented: $showsVolume, arrowEdge: .top) {
+        .popover(isPresented: popoverBinding(.volume), arrowEdge: .top) {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("Volume")
@@ -291,8 +305,19 @@ struct PlexPlayerControls: View {
         HStack(spacing: 2) {
             volumeButton
             Button("Up Next", systemImage: "list.bullet", action: showQueue)
-                .help("Show Up Next")
+                .help(state.presentedPopover == .upNext ? "Hide Up Next" : "Show Up Next")
+                .accessibilityValue(state.presentedPopover == .upNext ? "Expanded" : "Collapsed")
+                .background {
+                    if state.presentedPopover == .upNext {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(.white.opacity(0.14))
+                    }
+                }
                 .focused($focusedControl, equals: .queue)
+                .popover(isPresented: popoverBinding(.upNext), arrowEdge: .top) {
+                    PlexUpNextPopover(session: session, maximumHeight: availablePopoverHeight)
+                        .environment(\.colorScheme, .dark)
+                }
             PlexPlaybackOptionsMenu(
                 session: session,
                 settingsStore: settingsStore,
@@ -303,6 +328,15 @@ struct PlexPlayerControls: View {
             .menuIndicator(.hidden)
             .focused($focusedControl, equals: .options)
         }
+    }
+
+    private func popoverBinding(_ popover: PlexPlayerPopover) -> Binding<Bool> {
+        Binding(
+            get: { state.presentedPopover == popover },
+            set: { isPresented in
+                if !isPresented { state.dismissPopover(popover) }
+            }
+        )
     }
 
     private var presentationControls: some View {
