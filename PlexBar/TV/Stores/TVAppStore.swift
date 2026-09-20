@@ -1314,12 +1314,16 @@ final class TVAppStore {
         )
     }
 
-    func reportPlayback(_ update: PlexTimelineUpdate) async -> PlexTimelineResponse? {
-        guard let connection else { return nil }
+    func reportPlayback(
+        _ update: PlexTimelineUpdate,
+        connection: TVPlexConnection
+    ) async -> PlexTimelineResponse? {
+        guard self.connection == connection else { return nil }
         let response = await client.reportTimeline(update, connection: connection)
+        guard self.connection == connection else { return nil }
         // Read server metadata only after the final position report has completed.
         // Dismissing AVKit happens before that asynchronous write finishes.
-        if update.state == .stopped, update.continuing == false, self.connection == connection {
+        if update.state == .stopped, update.continuing == false {
             playbackMetadataRevision = UUID()
             Task { await refreshAll() }
         }

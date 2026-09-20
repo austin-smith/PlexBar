@@ -88,12 +88,13 @@ struct TVPlaybackPreparationTests {
         var homeRequests = fixture.homeRequests.makeAsyncIterator()
         _ = await homeRequests.next() // Initial connection load.
         let revision = fixture.store.playbackMetadataRevision
+        let connection = try #require(fixture.store.connection)
         fixture.store.dismissPlayer()
         let report = Task {
             await fixture.store.reportPlayback(PlexTimelineUpdate(
                 ratingKey: "42", state: .stopped, time: 124_000, duration: 1_800_000,
                 sessionIdentifier: "test-session", continuing: false
-            ))
+            ), connection: connection)
         }
         await gate.waitUntilEntered()
 
@@ -104,6 +105,74 @@ struct TVPlaybackPreparationTests {
         _ = await report.value
         #expect(fixture.store.playbackMetadataRevision != revision)
         _ = await homeRequests.next() // Automatic refresh after the report.
+    }
+
+    @Test
+    func queuedStopKeepsItsConnectionWhenTheSessionIsReusedOnAnotherServer() async throws {
+        let gate = TVTimelineResponseGate()
+        let fixture = try await Fixture(timelineGate: gate)
+        defer { fixture.close() }
+        let session = fixture.makePlaybackSession()
+        let firstRequest = TVPlexPlaybackRequest(item: try Self.item(Self.episodeJSON), startTime: 0)
+        let firstPreparation = Task { await session.prepare(request: firstRequest, store: fixture.store) }
+        await gate.waitUntilEntered()
+        let firstStop = try #require(session.stop(request: firstRequest))
+
+        await fixture.selectOtherServer()
+        let revision = fixture.store.playbackMetadataRevision
+        let secondRequest = TVPlexPlaybackRequest(item: try Self.item(Self.episodeJSON), startTime: 123)
+        await session.prepare(request: secondRequest, store: fixture.store)
+        let secondStop = try #require(session.stop(request: secondRequest))
+        await secondStop.value
+        #expect(fixture.store.playbackMetadataRevision != revision)
+        let secondRevision = fixture.store.playbackMetadataRevision
+
+        await gate.release()
+        await firstPreparation.value
+        await firstStop.value
+        #expect(fixture.store.playbackMetadataRevision == secondRevision)
+        let reports = fixture.requests.withLock { $0.filter { $0.url?.path == "/provider/timeline" } }
+        #expect(reports.count == 2)
+        #expect(reports.map { $0.url?.host } == ["plex.test", "other.plex.test"])
+        #expect(reports.last?.value(forHTTPHeaderField: "X-Plex-Session-Identifier") == secondRequest.sessionIdentifier)
+    }
+
+    @Test
+    func serverSwitchBeforeTheFirstTimelineReportDoesNotRetargetTheFinalStop() async throws {
+        let fixture = try await Fixture()
+        defer { fixture.close() }
+        let session = fixture.makePlaybackSession()
+        let request = TVPlexPlaybackRequest(item: try Self.item(Self.episodeJSON), startTime: 123)
+        await session.prepare(request: request, store: fixture.store)
+        #expect(session.player != nil)
+        #expect(!fixture.requests.withLock { $0.contains { $0.url?.path == "/provider/timeline" } })
+
+        await fixture.selectOtherServer()
+        let revision = fixture.store.playbackMetadataRevision
+        let stop = try #require(session.stop(request: request))
+        await stop.value
+
+        #expect(session.player == nil)
+        #expect(fixture.store.playbackMetadataRevision == revision)
+        #expect(!fixture.requests.withLock { $0.contains { $0.url?.path == "/provider/timeline" } })
+    }
+
+    @Test
+    func serverSwitchDuringPreparationRejectsTheOldPlaybackPlan() async throws {
+        let gate = TVTimelineResponseGate()
+        let fixture = try await Fixture(playbackPlanGate: gate)
+        defer { fixture.close() }
+        let session = fixture.makePlaybackSession()
+        let request = TVPlexPlaybackRequest(item: try Self.item(Self.episodeJSON), startTime: 123)
+        let preparation = Task { await session.prepare(request: request, store: fixture.store) }
+        await gate.waitUntilEntered()
+        await fixture.selectOtherServer()
+        await gate.release()
+        await preparation.value
+
+        #expect(session.player == nil)
+        #expect(session.errorMessage == nil)
+        #expect(!fixture.requests.withLock { $0.contains { $0.url?.path == "/provider/timeline" } })
     }
 
     @Test
@@ -144,7 +213,7 @@ struct TVPlaybackPreparationTests {
 
         await session.prepare(request: request, store: fixture.store)
         #expect(session.player != nil)
-        session.stop(store: fixture.store, request: request)
+        session.stop(request: request)
 
         let report = try #require(await timelineRequests.next())
         let query = URLComponents(url: report.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
@@ -188,7 +257,7 @@ struct TVPlaybackPreparationTests {
         let retryRequest = try #require(decisionRequests.last)
         let query = URLComponents(url: retryRequest.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
         #expect(query.contains(URLQueryItem(name: "offset", value: "123")))
-        session.stop(store: fixture.store, request: request)
+        session.stop(request: request)
         _ = try #require(await timelineRequests.next())
         _ = await homeRequests.next()
         await fixture.waitForRefreshCompletion()
@@ -277,7 +346,7 @@ struct TVPlaybackPreparationTests {
         )
         let session = fixture.makePlaybackSession()
         await session.prepare(request: request, store: fixture.store)
-        defer { session.stop(store: fixture.store, request: request) }
+        defer { session.stop(request: request) }
         #expect(session.isPreparingInitialPosition)
         #expect(session.player?.currentTime().seconds == 0)
         #expect(session.playbackVersionSelection?.canSelect(1) == true)
@@ -321,7 +390,7 @@ struct TVPlaybackPreparationTests {
         )
         let session = fixture.makePlaybackSession()
         await session.prepare(request: request, store: fixture.store)
-        defer { session.stop(store: fixture.store, request: request) }
+        defer { session.stop(request: request) }
         // Repeat One disables speculative next-item preparation. Explicit navigation
         // must still behave exactly like an already prepared next item.
         if destination == "prepared-next" {
@@ -383,7 +452,7 @@ struct TVPlaybackPreparationTests {
         let session = fixture.makePlaybackSession()
         await session.prepare(request: request, store: fixture.store)
         session.setRepeatMode(.one)
-        defer { session.stop(store: fixture.store, request: request) }
+        defer { session.stop(request: request) }
         let originalPlayer = try #require(session.player)
         session.playNextItem()
         try await waitFor { session.queueNavigationErrorMessage != nil }
@@ -420,7 +489,7 @@ struct TVPlaybackPreparationTests {
         )
         let session = fixture.makePlaybackSession()
         await session.prepare(request: request, store: fixture.store)
-        defer { session.stop(store: fixture.store, request: request) }
+        defer { session.stop(request: request) }
         let player = try #require(session.player)
         #expect(session.subtitleOffsetSelection?.streamID == 9)
         session.setSubtitleOffset(100)
@@ -459,7 +528,7 @@ struct TVPlaybackPreparationTests {
         )
         let session = fixture.makePlaybackSession()
         await session.prepare(request: request, store: fixture.store)
-        defer { session.stop(store: fixture.store, request: request) }
+        defer { session.stop(request: request) }
         let playerItem = try #require(session.player?.currentItem)
         // A failed speculative lookup must still allow one authoritative attempt at EOF.
         try await waitFor { fixture.requests.withLock { $0.contains { $0.url?.path == "/library/metadata/43" } } }
@@ -500,7 +569,7 @@ struct TVPlaybackPreparationTests {
         fixture.store.presentPlayback(request)
         let session = fixture.makePlaybackSession()
         await session.prepare(request: request, store: fixture.store)
-        defer { session.stop(store: fixture.store, request: request) }
+        defer { session.stop(request: request) }
         let playerItem = try #require(session.player?.currentItem)
         try await waitFor { playerItem.nextContentProposal != nil }
         let proposal = try #require(playerItem.nextContentProposal)
@@ -733,6 +802,7 @@ struct TVPlaybackPreparationTests {
             selectedEpisodeStatus: Int = 200,
             selectedSeasonStatus: Int = 200,
             timelineGate: TVTimelineResponseGate? = nil,
+            playbackPlanGate: TVTimelineResponseGate? = nil,
             libraryGate: TVTimelineResponseGate? = nil,
             libraryStatus: Int = 200,
             neighborMetadataStatus: OSAllocatedUnfairLock<Int>? = nil,
@@ -759,7 +829,8 @@ struct TVPlaybackPreparationTests {
                     let json: String
                     switch request.url?.path {
                     case "/identity":
-                        json = #"{"MediaContainer":{"machineIdentifier":"test-server","friendlyName":"Test Server"}}"#
+                        let serverID = request.url?.host == "other.plex.test" ? "other-server" : "test-server"
+                        json = #"{"MediaContainer":{"machineIdentifier":"\#(serverID)","friendlyName":"Test Server"}}"#
                     case "/hubs/promoted":
                         homeEvents.continuation.yield(())
                         json = #"{"MediaContainer":{"Hub":[]}}"#
@@ -810,9 +881,12 @@ struct TVPlaybackPreparationTests {
                         json = #"{"MediaContainer":{"MediaProvider":[{"identifier":"com.plexapp.plugins.library","Feature":[{"type":"promoted","key":"/hubs/promoted"},{"type":"continuewatching","key":"/hubs/continueWatching"},{"type":"search","key":"/provider/search"},{"type":"playqueue","key":"/provider/queue"},{"type":"timeline","key":"/provider/timeline"}]}]}}"#
                     case "/provider/timeline":
                         timelineEvents.continuation.yield(request)
-                        if let timelineGate { await timelineGate.blockResponse() }
+                        if request.url?.host == "plex.test", let timelineGate {
+                            await timelineGate.blockResponse()
+                        }
                         json = #"{"MediaContainer":{}}"#
                     case "/video/:/transcode/universal/decision":
+                        if let playbackPlanGate { await playbackPlanGate.blockResponse() }
                         json = #"{"MediaContainer":{"generalDecisionCode":1000,"Metadata":[{"ratingKey":"42","title":"Episode","Media":[{"Part":[{"decision":"directplay","key":"/library/parts/2/file.mp4"}]}]}]}}"#
                     case "/provider/queue":
                         json = #"{"MediaContainer":{"playQueueID":9,"playQueueVersion":1,"playQueueTotalCount":2,"playQueueSelectedItemID":502,"playQueueSelectedItemOffset":1,"offset":0,"Metadata":[{"ratingKey":"41","title":"Earlier episode","type":"episode","playQueueItemID":"501"},{"ratingKey":"42","title":"Selected episode","type":"episode","playQueueItemID":"502"}]}}"#
@@ -862,6 +936,14 @@ struct TVPlaybackPreparationTests {
                 asset.resourceLoader.setDelegate(loader, queue: .main)
                 return AVPlayerItem(asset: asset)
             }
+        }
+
+        func selectOtherServer() async {
+            await store.selectServer(PlexServerResource(
+                id: "other-server", name: "Other Server", productVersion: nil, accessToken: "other-token",
+                connections: [PlexServerConnection(uri: URL(string: "https://other.plex.test")!, local: true, relay: false)]
+            ))
+            #expect(store.connection?.serverIdentifier == "other-server")
         }
 
         func close() {

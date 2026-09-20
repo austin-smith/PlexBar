@@ -180,7 +180,7 @@ struct TVPlayerView: View {
             Text(session.queueNavigationErrorMessage ?? "Plex could not update this playback session.")
         }
         .onDisappear {
-            session.stop(store: store, request: request)
+            session.stop(request: request)
         }
         .onChange(of: scenePhase) { _, newPhase in
             session.scenePhaseDidChange(newPhase)
@@ -1615,6 +1615,7 @@ final class TVPlaybackSession {
     @ObservationIgnored private var preparingRequestID: UUID?
     @ObservationIgnored private var timelineCadence = PlexTimelineReportCadence()
     @ObservationIgnored private var timelineReporter: PlexTimelineReportSequencer?
+    @ObservationIgnored private var timelineConnection: TVPlexConnection?
     @ObservationIgnored private var nowPlayingArtwork: MPMediaItemArtwork?
     @ObservationIgnored private var publishedNowPlayingItemIdentifier: ObjectIdentifier?
     @ObservationIgnored private var publishedNowPlayingFingerprint:
@@ -1658,11 +1659,7 @@ final class TVPlaybackSession {
 
     func prepare(request: TVPlexPlaybackRequest, store: TVAppStore) async {
         if let currentRequest, currentRequest.id != request.id {
-            if let currentStore {
-                stop(store: currentStore, request: currentRequest)
-            } else {
-                resetPlayer()
-            }
+            stop(request: currentRequest)
         }
         if let preparingRequestID, preparingRequestID != request.id {
             preparationEpoch.invalidate()
@@ -1680,6 +1677,7 @@ final class TVPlaybackSession {
         }
 
         do {
+            guard let playbackConnection = store.connection else { throw TVPlexError.notConnected }
             let recovery = pendingRecovery?.request
             let videoQuality = recovery?.videoQuality
                 ?? request.videoQualityOverride
@@ -1691,10 +1689,12 @@ final class TVPlaybackSession {
                 )
             } ?? request
             let plan = try await store.playbackPlan(for: playbackRequest, recovery: recovery)
+            guard store.connection == playbackConnection else { throw CancellationError() }
             try checkCurrentPreparation(
                 preparationTicket,
                 requestID: request.id
             )
+            configureTimelineReporter(for: store, connection: playbackConnection)
             try configureAudioSession(for: plan.mediaKind)
             let playerItem = makePlayerItem(plan.url)
             PlexNativeSubtitleStyle.apply(to: playerItem, size: store.subtitleSize)
@@ -1857,10 +1857,11 @@ final class TVPlaybackSession {
         return true
     }
 
-    func stop(store: TVAppStore, request: TVPlexPlaybackRequest) {
-        guard let player else {
+    @discardableResult
+    func stop(request: TVPlexPlaybackRequest) -> Task<Void, Never>? {
+        guard let player, let timelineReporter else {
             resetPlayer()
-            return
+            return nil
         }
         let playbackRequest = currentRequest ?? request
         let time = playbackPosition(for: player)
@@ -1871,14 +1872,14 @@ final class TVPlaybackSession {
             stoppedTimelineContinuing = false
         }
         resetPlayer()
-        guard shouldReportStopped else { return }
-        Task {
+        guard shouldReportStopped else { return nil }
+        return Task {
             _ = await reportPlayback(
                 of: playbackRequest,
                 state: .stopped,
                 time: time.isFinite ? time : 0,
                 continuing: false,
-                store: store
+                reporter: timelineReporter
             )
         }
     }
@@ -4541,16 +4542,18 @@ final class TVPlaybackSession {
         }
         stoppedTimelineSessionIdentifier = request.sessionIdentifier
         stoppedTimelineContinuing = nil
+        let timelineReporter = timelineReporter
         resetPlayer()
         pendingRecovery = recovery.map { (request.id, $0, playbackRate) }
         canRetryPlayback = true
         errorMessage = message
+        guard let timelineReporter else { return }
         Task {
             _ = await reportPlayback(
                 of: request,
                 state: .stopped,
                 time: time.isFinite ? time : 0,
-                store: store
+                reporter: timelineReporter
             )
         }
     }
@@ -4571,7 +4574,7 @@ final class TVPlaybackSession {
         time: TimeInterval? = nil,
         stateOverride: PlexTimelineState? = nil
     ) async {
-        guard let player, let currentRequest, let currentStore else { return }
+        guard let player, let currentRequest, let timelineReporter else { return }
         let state = stateOverride ?? timelineState(for: player)
         let instant = ContinuousClock.now
         guard force || timelineCadence.shouldReport(state: state, at: instant) else { return }
@@ -4580,7 +4583,7 @@ final class TVPlaybackSession {
             of: currentRequest,
             state: state,
             time: position,
-            store: currentStore
+            reporter: timelineReporter
         )
         guard self.player === player,
               self.currentRequest?.id == currentRequest.id else { return }
@@ -4595,7 +4598,7 @@ final class TVPlaybackSession {
         continuing: Bool?,
         time: TimeInterval? = nil
     ) async -> Bool {
-        guard let player, let currentRequest, let currentStore else { return false }
+        guard let player, let currentRequest, let timelineReporter else { return false }
         let sessionIdentifier = currentRequest.sessionIdentifier
         let alreadyReported = stoppedTimelineSessionIdentifier == sessionIdentifier
             && stoppedTimelineContinuing == continuing
@@ -4611,7 +4614,7 @@ final class TVPlaybackSession {
                 state: .stopped,
                 time: position.isFinite ? position : 0,
                 continuing: continuing,
-                store: currentStore
+                reporter: timelineReporter
             )
         }
         return self.player === player
@@ -4650,7 +4653,7 @@ final class TVPlaybackSession {
         state: PlexTimelineState,
         time: TimeInterval,
         continuing: Bool? = nil,
-        store: TVAppStore
+        reporter: PlexTimelineReportSequencer
     ) async -> PlexTimelineResponse? {
         let time = time.isFinite ? max(time, 0) : 0
         let update = PlexTimelineUpdate(
@@ -4663,18 +4666,16 @@ final class TVPlaybackSession {
                 ?? request.item.playQueueItemID,
             continuing: continuing
         )
-        return await timelineReporter(for: store).report(update)
+        return await reporter.report(update)
     }
 
-    private func timelineReporter(for store: TVAppStore) -> PlexTimelineReportSequencer {
-        if let timelineReporter {
-            return timelineReporter
-        }
+    private func configureTimelineReporter(for store: TVAppStore, connection: TVPlexConnection) {
+        guard timelineConnection != connection else { return }
         let reporter = PlexTimelineReportSequencer { [store] update in
-            await store.reportPlayback(update)
+            await store.reportPlayback(update, connection: connection)
         }
         timelineReporter = reporter
-        return reporter
+        timelineConnection = connection
     }
 
     private func terminatePlayback(_ termination: PlexTimelineResponse.Termination) {
