@@ -1,6 +1,7 @@
 import PlexClientKit
 import PlexModels
 import Foundation
+import CryptoKit
 import Observation
 
 @MainActor
@@ -35,6 +36,7 @@ final class PlexSettingsStore {
         static let skipIntroBehavior = "plex.skipIntroBehavior"
         static let skipAdsBehavior = "plex.skipAdsBehavior"
         static let skipCreditsBehavior = "plex.skipCreditsBehavior"
+        static let verifiedAccount = "plex.verifiedAccount"
         static let registeredJWTKeyID = "plex.registeredJWTKeyID"
     }
 
@@ -42,7 +44,14 @@ final class PlexSettingsStore {
     private let credentialStore: any PlexCredentialPersisting
     private let loginItemService: any PlexLoginItemControlling
     private var credentialLoadingTask: Task<PlexStoredCredentials, Error>?
+    private(set) var accountSessionRevision = UUID()
     private(set) var accountTokenRevision = UUID()
+    private var verifiedAccount: [String: Any]? {
+        didSet {
+            if let verifiedAccount { defaults.set(verifiedAccount, forKey: DefaultsKeys.verifiedAccount) }
+            else { defaults.removeObject(forKey: DefaultsKeys.verifiedAccount) }
+        }
+    }
     private var credentialPersistenceTask: Task<Void, Error>?
     private var credentialPersistenceErrors: [String: Error] = [:]
     private var isApplyingLoadedCredentials = false
@@ -260,6 +269,7 @@ final class PlexSettingsStore {
         initialCredentials: PlexStoredCredentials? = nil
     ) {
         self.defaults = defaults
+        verifiedAccount = defaults.dictionary(forKey: DefaultsKeys.verifiedAccount)
         if let credentialStore {
             self.credentialStore = credentialStore
         } else if let initialCredentials {
@@ -399,7 +409,36 @@ final class PlexSettingsStore {
         openAtLoginStatus == .requiresApproval
     }
 
+    // Only a successfully fetched account profile establishes ownership of local downloads.
+    var verifiedAccountID: Int? {
+        guard hasLoadedCredentials, hasAuthenticatedAccount,
+              let id = verifiedAccount?["id"] as? Int, id > 0,
+              verifiedAccount?["credentialFingerprint"] as? String == accountTokenFingerprint else { return nil }
+        return id
+    }
+
+    func recordVerifiedAccount(id: Int) {
+        guard hasAuthenticatedAccount, id > 0 else { return }
+        verifiedAccount = ["id": id, "credentialFingerprint": accountTokenFingerprint]
+    }
+
+    private var accountTokenFingerprint: String {
+        SHA256.hash(data: Data(trimmedUserToken.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func beginAccountSession() {
+        accountSessionRevision = UUID()
+        verifiedAccount = nil
+    }
+
     func saveAuthenticatedUserToken(_ token: String) async throws {
+        try Task.checkCancellation()
+        beginAccountSession()
+        try await saveAccountToken(token, preservingVerifiedAccount: false)
+    }
+
+    private func saveAccountToken(_ token: String, preservingVerifiedAccount: Bool) async throws {
+        let accountID = preservingVerifiedAccount ? verifiedAccountID : nil
         let normalizedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
         let previousToken = trimmedUserToken
         try Task.checkCancellation()
@@ -427,6 +466,7 @@ final class PlexSettingsStore {
         isApplyingLoadedCredentials = true
         userToken = normalizedToken
         isApplyingLoadedCredentials = false
+        if let accountID { recordVerifiedAccount(id: accountID) }
     }
 
     func saveServerSelection(_ server: PlexServerResource) {
@@ -546,7 +586,7 @@ extension PlexSettingsStore: PlexAccountJWTStorage {
 
     func persistAccountToken(_ token: String, expectedRevision: UUID) async throws {
         guard accountTokenRevision == expectedRevision else { throw CancellationError() }
-        try await saveAuthenticatedUserToken(token)
+        try await saveAccountToken(token, preservingVerifiedAccount: true)
     }
 }
 
@@ -555,6 +595,7 @@ private extension PlexSettingsStore {
         guard !isApplyingLoadedCredentials else {
             return
         }
+        beginAccountSession()
         accountTokenRevision = UUID()
         enqueueCredentialPersistence(trimmedUserToken.nilIfBlank, account: KeychainAccounts.userToken)
     }

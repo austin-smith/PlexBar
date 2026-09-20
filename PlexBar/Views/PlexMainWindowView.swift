@@ -111,6 +111,9 @@ struct PlexMainWindowView: View {
         .onChange(of: libraryStore.libraries.map(\.id), initial: true) { _, libraryIDs in
             libraryPresentationStore.synchronize(libraryIDs: libraryIDs)
         }
+        .onChange(of: settingsStore.verifiedAccountID) { _, _ in
+            Task { await downloadsStore.reload() }
+        }
         .onChange(of: connectionStore.accountCacheScope) { _, _ in
             resetStateForAccountChange()
             Task {

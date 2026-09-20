@@ -88,6 +88,8 @@ final class PlexDownloadsStore {
                 await refreshAutomaticDownloads()
             }
             beginAutomaticRefreshLoop()
+        } catch is CancellationError {
+            return
         } catch {
             startupErrorMessage = error.localizedDescription
         }
@@ -99,6 +101,8 @@ final class PlexDownloadsStore {
             try await reconcileWorkflowState()
             await refreshAutomaticDownloads()
             startupErrorMessage = nil
+        } catch is CancellationError {
+            return
         } catch {
             startupErrorMessage = error.localizedDescription
         }
@@ -110,6 +114,8 @@ final class PlexDownloadsStore {
             try await reconcileWorkflowState()
             startPendingJobs()
             startupErrorMessage = nil
+        } catch is CancellationError {
+            return
         } catch {
             startupErrorMessage = error.localizedDescription
         }
@@ -613,6 +619,7 @@ final class PlexDownloadsStore {
                   accountID: scope.accountID,
                   serverIdentifier: scope.serverIdentifier
               ),
+              currentAccountScope == scope,
               let source = currentMedia.item.defaultPlaybackSource else {
             throw PlexDownloadWorkflowError.unavailableOfflineMedia
         }
@@ -620,6 +627,7 @@ final class PlexDownloadsStore {
             downloadedMedia[index] = currentMedia
         }
         let record = try await playbackRegistry.record(for: currentMedia.id)
+        guard currentAccountScope == scope else { throw CancellationError() }
         let duration = currentMedia.item.duration.map { TimeInterval($0) / 1_000 }
         let startTime = record.map { TimeInterval($0.position) / 1_000 }
             ?? currentMedia.item.viewOffset.map { TimeInterval($0) / 1_000 }
@@ -719,6 +727,7 @@ final class PlexDownloadsStore {
     }
 
     private func startPendingJobs() {
+        guard authStore.authenticatedUser != nil else { return }
         let availableSlots = maximumConcurrentJobs - jobTasks.count
         guard availableSlots > 0 else { return }
         let pending = jobs
@@ -1041,17 +1050,21 @@ final class PlexDownloadsStore {
     }
 
     private struct AccountScope: Equatable {
+        let sessionRevision: UUID
         let accountID: Int
         let serverIdentifier: String
     }
 
     private var currentAccountScope: AccountScope? {
-        guard let accountID = authStore.authenticatedUser?.id,
+        guard let accountID = connectionStore.settings.verifiedAccountID,
               accountID > 0,
               let serverIdentifier = currentServerIdentifier?.nilIfBlank else {
             return nil
         }
-        return AccountScope(accountID: accountID, serverIdentifier: serverIdentifier)
+        return AccountScope(
+            sessionRevision: connectionStore.settings.accountSessionRevision,
+            accountID: accountID, serverIdentifier: serverIdentifier
+        )
     }
 
     private func loadAccountScopedState() async throws {
@@ -1073,26 +1086,32 @@ final class PlexDownloadsStore {
             automaticDownloadRules = []
             return
         }
-        jobs = try await jobRegistry.jobs().filter {
+        let scopedJobs = try await jobRegistry.jobs().filter {
             $0.accountID == scope.accountID
                 && $0.packageIdentity.accountID == scope.accountID
                 && $0.packageIdentity.serverIdentifier == scope.serverIdentifier
         }
-        downloadedMedia = try await accountScopedDownloadedMedia(scope: scope)
-        automaticDownloadRules = try await automaticRuleRegistry.rules().filter {
+        let media = try await accountScopedDownloadedMedia(scope: scope)
+        let rules = try await automaticRuleRegistry.rules().filter {
             $0.accountID == scope.accountID
                 && $0.serverIdentifier == scope.serverIdentifier
         }
+        guard currentAccountScope == scope else { throw CancellationError() }
+        jobs = scopedJobs
+        downloadedMedia = media
+        automaticDownloadRules = rules
     }
 
     private func accountScopedDownloadedMedia(
         scope explicitScope: AccountScope? = nil
     ) async throws -> [PlexOfflineMedia] {
         guard let scope = explicitScope ?? currentAccountScope else { return [] }
-        return try await packageStore.offlineMedia(
+        let media = try await packageStore.offlineMedia(
             accountID: scope.accountID,
             serverIdentifier: scope.serverIdentifier
         )
+        guard currentAccountScope == scope else { throw CancellationError() }
+        return media
     }
 
     private static func normalizedOffset(_ value: Int?) -> Int {

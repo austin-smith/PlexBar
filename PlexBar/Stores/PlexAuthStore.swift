@@ -119,7 +119,8 @@ final class PlexAuthStore {
     }
 
     func selectServer(withID serverID: String) {
-        guard let server = availableServers.first(where: { $0.id == serverID }) else {
+        guard settings.hasAuthenticatedAccount,
+              let server = availableServers.first(where: { $0.id == serverID }) else {
             return
         }
 
@@ -162,6 +163,7 @@ final class PlexAuthStore {
     }
 
     private func runSignIn() async {
+        var revision = settings.accountSessionRevision
         isAuthenticating = true
         canCancelSignIn = true
         statusMessage = "Waiting for authentication in your browser…"
@@ -173,10 +175,12 @@ final class PlexAuthStore {
 
         do {
             let identity = try await deviceIdentityStore.loadOrCreateIdentity()
+            try requireCurrentSession(revision)
             let pin = try await client.createPin(
                 jwk: identity.publicJWK(includeUse: false),
                 clientContext: clientContext
             )
+            try requireCurrentSession(revision)
             let deviceJWT = try identity.signedDeviceJWT(clientIdentifier: clientIdentifier)
             guard let authURL = clientContext.authURL(for: pin.code) else {
                 throw PlexAuthError.invalidAuthURL
@@ -192,15 +196,22 @@ final class PlexAuthStore {
                     deviceJWT: deviceJWT,
                     clientContext: clientContext
                 )
+                try requireCurrentSession(revision)
                 if let authToken = currentPin.authToken?.nilIfBlank {
                     try Task.checkCancellation()
                     canCancelSignIn = false
                     statusMessage = "Completing sign in…"
                     remainingSeconds = nil
+                    settings.clearAuthentication()
+                    revision = settings.accountSessionRevision
+                    authenticatedUser = nil
+                    availableServers = []
+                    connectionStore.updateAvailableServers([])
                     let preparedToken = try await accountJWTManager.acceptNewAccountToken(
                         authToken,
                         registeredKeyID: identity.keyID
                     )
+                    try requireCurrentSession(revision)
                     scheduleAccountTokenRefresh(preparedToken)
                     statusMessage = "Authentication successful."
                     remainingSeconds = nil
@@ -215,10 +226,7 @@ final class PlexAuthStore {
             statusMessage = nil
             errorMessage = "Authentication timed out. Please try again."
         } catch {
-            if Task.isCancelled {
-                clearSignInPresentation()
-                return
-            }
+            guard revision == settings.accountSessionRevision, !Task.isCancelled else { return }
             statusMessage = nil
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -237,17 +245,22 @@ final class PlexAuthStore {
     }
 
     private func loadAuthenticatedUser() async {
+        let revision = settings.accountSessionRevision
         isLoadingAuthenticatedUser = true
         accountErrorMessage = nil
 
         do {
-            authenticatedUser = try await performAccountRequest { token in
+            let user = try await performAccountRequest { token in
                 try await client.fetchAuthenticatedUser(
                     userToken: token,
                     clientContext: PlexClientContext(clientIdentifier: settings.clientIdentifier)
                 )
             }
+            try requireCurrentSession(revision)
+            authenticatedUser = user
+            settings.recordVerifiedAccount(id: user.id)
         } catch {
+            guard revision == settings.accountSessionRevision, !Task.isCancelled else { return }
             authenticatedUser = nil
             accountErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
@@ -258,6 +271,7 @@ final class PlexAuthStore {
     private func loadServers(
         autoSelectStoredServer: Bool
     ) async {
+        let revision = settings.accountSessionRevision
         isLoadingServers = true
         errorMessage = nil
 
@@ -268,6 +282,7 @@ final class PlexAuthStore {
                     clientContext: PlexClientContext(clientIdentifier: settings.clientIdentifier)
                 )
             }
+            try requireCurrentSession(revision)
             guard !servers.isEmpty else {
                 throw PlexAuthError.noServersFound
             }
@@ -286,6 +301,7 @@ final class PlexAuthStore {
 
             statusMessage = nil
         } catch {
+            guard revision == settings.accountSessionRevision, !Task.isCancelled else { return }
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
 
@@ -295,31 +311,45 @@ final class PlexAuthStore {
 }
 
 private extension PlexAuthStore {
+    func requireCurrentSession(_ revision: UUID) throws {
+        try Task.checkCancellation()
+        guard revision == settings.accountSessionRevision else { throw CancellationError() }
+    }
+
     func performAccountRequest<Value>(
         _ operation: (String) async throws -> Value
     ) async throws -> Value {
+        let revision = settings.accountSessionRevision
         let preparedToken = try await accountJWTManager.prepareAccountToken()
+        try requireCurrentSession(revision)
         scheduleAccountTokenRefresh(preparedToken)
 
         do {
-            return try await operation(preparedToken.token)
+            let result = try await operation(preparedToken.token)
+            try requireCurrentSession(revision)
+            return result
         } catch let error as PlexAuthError where error.requiresTokenRefresh {
-            let refreshedToken = try await accountJWTManager.recoverRejectedAccountToken(
-                preparedToken.token
-            )
+            try requireCurrentSession(revision)
+            let refreshedToken = try await accountJWTManager.recoverRejectedAccountToken(preparedToken.token)
+            try requireCurrentSession(revision)
             scheduleAccountTokenRefresh(refreshedToken)
             do {
-                return try await operation(refreshedToken.token)
+                let result = try await operation(refreshedToken.token)
+                try requireCurrentSession(revision)
+                return result
             } catch let retryError as PlexAuthError where retryError.requiresTokenRefresh {
-                accountTokenRefreshTask?.cancel()
-                accountJWTManager.invalidatePreparation()
-                try await settings.saveAuthenticatedUserToken("")
+                try requireCurrentSession(revision)
+                // A rejected old token must not clear a concurrently refreshed credential.
+                if settings.trimmedUserToken == refreshedToken.token {
+                    signOut()
+                }
                 throw retryError
             }
         }
     }
 
     func scheduleAccountTokenRefresh(_ preparedToken: PlexPreparedAccountToken) {
+        let revision = settings.accountSessionRevision
         accountTokenRefreshTask?.cancel()
         let delay = max(preparedToken.refreshAt.timeIntervalSinceNow, 0)
         accountTokenRefreshTask = Task { [weak self] in
@@ -334,9 +364,11 @@ private extension PlexAuthStore {
 
             do {
                 let refreshedToken = try await accountJWTManager.prepareAccountToken(forceRefresh: true)
+                try requireCurrentSession(revision)
                 scheduleAccountTokenRefresh(refreshedToken)
                 accountErrorMessage = nil
             } catch {
+                guard revision == settings.accountSessionRevision, !Task.isCancelled else { return }
                 accountErrorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             }
         }
