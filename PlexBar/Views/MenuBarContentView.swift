@@ -11,6 +11,8 @@ struct MenuBarContentView: View {
     @Bindable var historyStore: PlexHistoryStore
     @Bindable var libraryStore: PlexLibraryStore
     let playerCoordinator: PlexPlayerCoordinator
+    let commandPaletteStore: PlexCommandPaletteStore
+    @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettingsWindow
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var selectedSection: DashboardSection = .streams
@@ -407,6 +409,14 @@ struct MenuBarContentView: View {
             Button("Settings") {
                 openSettings()
             }
+
+            Button("Search Library and Commands…", systemImage: "command") {
+                openWindow(id: PlexMainNavigationStore.windowID)
+                NSApp.activate()
+                commandPaletteStore.request()
+            }
+            .labelStyle(.iconOnly)
+            .help("Search Library and Commands (⌘K)")
 
             Spacer()
 

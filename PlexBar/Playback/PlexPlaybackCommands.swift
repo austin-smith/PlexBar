@@ -5,13 +5,14 @@ struct PlexPlaybackCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     @Bindable var coordinator: PlexPlayerCoordinator
     @Bindable var settingsStore: PlexSettingsStore
+    var isCommandPalettePresented: Bool
 
     var body: some Commands {
         CommandMenu("Playback") {
             Button("Show Player", systemImage: "play.rectangle") {
                 openWindow(id: PlexMainNavigationStore.windowID)
             }
-            .disabled(coordinator.presentation == nil)
+            .disabled(isCommandPalettePresented || coordinator.presentation == nil)
 
             Divider()
 
@@ -22,10 +23,10 @@ struct PlexPlaybackCommands: Commands {
             )
             // Transport keys are routed by the player so text fields, sliders,
             // and queue controls retain their normal keyboard behavior.
-            .disabled(coordinator.transportAction == nil)
+            .disabled(isCommandPalettePresented || coordinator.transportAction == nil)
 
             Button("Stop", systemImage: "stop.fill", action: coordinator.stopPlayback)
-                .disabled(!coordinator.canStop)
+                .disabled(isCommandPalettePresented || !coordinator.canStop)
 
             Divider()
 
@@ -42,7 +43,7 @@ struct PlexPlaybackCommands: Commands {
                     }
                 }
             }
-            .disabled(!coordinator.canChangePlaybackRate)
+            .disabled(isCommandPalettePresented || !coordinator.canChangePlaybackRate)
 
             Menu("Video Quality") {
                 ForEach(PlexVideoQuality.allCases) { videoQuality in
@@ -55,10 +56,10 @@ struct PlexPlaybackCommands: Commands {
                             Text(videoQuality.label)
                         }
                     }
-                    .disabled(!coordinator.videoQualitySelection.canSelect(videoQuality))
+                    .disabled(isCommandPalettePresented || !coordinator.videoQualitySelection.canSelect(videoQuality))
                 }
             }
-            .disabled(!coordinator.videoQualitySelection.isVideo)
+            .disabled(isCommandPalettePresented || !coordinator.videoQualitySelection.isVideo)
 
             Menu("Video Dynamic Range") {
                 ForEach(PlexVideoDisplayDynamicRange.allCases) { dynamicRange in
@@ -73,7 +74,7 @@ struct PlexPlaybackCommands: Commands {
                     }
                 }
             }
-            .disabled(!coordinator.videoQualitySelection.isVideo)
+            .disabled(isCommandPalettePresented || !coordinator.videoQualitySelection.isVideo)
 
             Menu("Video Scaling") {
                 ForEach(PlexVideoScalingMode.allCases) { scalingMode in
@@ -88,7 +89,7 @@ struct PlexPlaybackCommands: Commands {
                     }
                 }
             }
-            .disabled(!coordinator.videoQualitySelection.isVideo)
+            .disabled(isCommandPalettePresented || !coordinator.videoQualitySelection.isVideo)
 
             if coordinator.serverManagedMediaSelection.hasChoices {
                 Divider()
@@ -107,7 +108,7 @@ struct PlexPlaybackCommands: Commands {
                             }
                         }
                     }
-                    .disabled(!coordinator.canChangeServerManagedMediaSelection)
+                    .disabled(isCommandPalettePresented || !coordinator.canChangeServerManagedMediaSelection)
                 }
 
                 if !coordinator.serverManagedMediaSelection.subtitleOptions.isEmpty {
@@ -137,7 +138,7 @@ struct PlexPlaybackCommands: Commands {
                             }
                         }
                     }
-                    .disabled(!coordinator.canChangeServerManagedMediaSelection)
+                    .disabled(isCommandPalettePresented || !coordinator.canChangeServerManagedMediaSelection)
                 }
             }
 
@@ -150,7 +151,7 @@ struct PlexPlaybackCommands: Commands {
                     }
                 )
             )
-            .disabled(!coordinator.canChangeShuffle)
+            .disabled(isCommandPalettePresented || !coordinator.canChangeShuffle)
 
             Menu("Repeat") {
                 ForEach(PlexPlaybackRepeatMode.allCases) { repeatMode in
@@ -163,10 +164,10 @@ struct PlexPlaybackCommands: Commands {
                             Text(repeatMode.label)
                         }
                     }
-                    .disabled(repeatMode == .all && !coordinator.canRepeatAll)
+                    .disabled(isCommandPalettePresented || repeatMode == .all && !coordinator.canRepeatAll)
                 }
             }
-            .disabled(!coordinator.canChangeRepeatMode)
+            .disabled(isCommandPalettePresented || !coordinator.canChangeRepeatMode)
 
             Divider()
 
@@ -175,22 +176,22 @@ struct PlexPlaybackCommands: Commands {
                 systemImage: "gobackward.10",
                 action: coordinator.skipBackward
             )
-            .disabled(!coordinator.canSeek)
+            .disabled(isCommandPalettePresented || !coordinator.canSeek)
 
             Button(
                 "Skip Forward 10 Seconds",
                 systemImage: "goforward.10",
                 action: coordinator.skipForward
             )
-            .disabled(!coordinator.canSeek)
+            .disabled(isCommandPalettePresented || !coordinator.canSeek)
 
             Divider()
 
             Button("Previous", action: coordinator.goPrevious)
-                .disabled(!coordinator.canGoPrevious)
+                .disabled(isCommandPalettePresented || !coordinator.canGoPrevious)
 
             Button("Next", action: coordinator.goNext)
-                .disabled(!coordinator.canGoNext)
+                .disabled(isCommandPalettePresented || !coordinator.canGoNext)
         }
     }
 }

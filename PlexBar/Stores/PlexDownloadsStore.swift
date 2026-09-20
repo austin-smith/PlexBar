@@ -65,6 +65,14 @@ final class PlexDownloadsStore {
         self.automaticRefreshInterval = automaticRefreshInterval
     }
 
+    var searchableDownloadedMedia: [PlexOfflineMedia] {
+        guard let scope = currentAccountScope else { return [] }
+        return downloadedMedia.filter {
+            $0.package.manifest.identity.accountID == scope.accountID
+                && $0.package.manifest.identity.serverIdentifier == scope.serverIdentifier
+        }
+    }
+
     var activeJobs: [PlexDownloadJob] {
         jobs.filter { $0.state != .failed }
     }

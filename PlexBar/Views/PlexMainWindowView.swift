@@ -14,8 +14,10 @@ struct PlexMainWindowView: View {
     @Bindable var playerCoordinator: PlexPlayerCoordinator
     @Bindable var navigationStore: PlexMainNavigationStore
     @Bindable var downloadsStore: PlexDownloadsStore
+    @Bindable var commandPaletteStore: PlexCommandPaletteStore
     @State private var libraryPresentationStore = PlexLibraryPresentationStore()
     @State private var selectionBeforeGlobalSearch: PlexMainSection?
+    @State private var paletteBrowseDestination: PlexPaletteBrowseDestination?
     @FocusState private var isGlobalSearchFocused: Bool
 
     var body: some View {
@@ -105,6 +107,27 @@ struct PlexMainWindowView: View {
                 perform: refreshAllData
             )
         )
+        .environment(\.isPlexCommandPalettePresented, commandPaletteStore.isPresented)
+        .modifier(PlexCommandPaletteHost(
+            store: commandPaletteStore,
+            settingsStore: settingsStore,
+            connectionStore: connectionStore,
+            libraryStore: libraryStore,
+            browserStore: browserStore,
+            downloadsStore: downloadsStore,
+            playerCoordinator: playerCoordinator,
+            navigate: navigateFromPalette,
+            openResult: openPaletteResult
+        ))
+        .sheet(item: $paletteBrowseDestination) { destination in
+            PlexPaletteBrowseSheet(
+                destination: destination, browserStore: browserStore, historyStore: historyStore,
+                settingsStore: settingsStore, connectionStore: connectionStore,
+                playerCoordinator: playerCoordinator, downloadsStore: downloadsStore
+            )
+        }
+        .onChange(of: playerCoordinator.presentation?.id) { paletteBrowseDestination = nil }
+        .onChange(of: connectionStore.accountCacheScope) { paletteBrowseDestination = nil }
         .task {
             await start()
         }
@@ -142,7 +165,7 @@ struct PlexMainWindowView: View {
             if playerCoordinator.presentation == nil, !usesDestinationToolbar {
                 ToolbarItem {
                     Button("Refresh", systemImage: "arrow.clockwise", action: refreshAllData)
-                        .disabled(!settingsStore.hasValidConfiguration)
+                        .disabled(commandPaletteStore.isPresented || !settingsStore.hasValidConfiguration)
                 }
             }
         }
@@ -172,6 +195,37 @@ struct PlexMainWindowView: View {
             get: { browserStore.globalSearchStore.text },
             set: { browserStore.globalSearchStore.text = $0 }
         )
+    }
+
+    private func navigateFromPalette(to section: PlexMainSection) {
+        selectionBeforeGlobalSearch = nil
+        dismissGlobalSearch()
+        navigationStore.openRoot(section)
+        if case .library(let id) = section {
+            libraryPresentationStore.state(for: id)?.navigationPath.removeAll()
+        }
+    }
+
+    private func openPaletteResult(_ result: PlexPaletteResult, query: String, hubs: [PlexHub]) {
+        if playerCoordinator.presentation != nil {
+            paletteBrowseDestination = PlexPaletteBrowseDestination(result: result, query: query, hubs: hubs)
+            return
+        }
+        switch result.content {
+        case .media(let item, let download):
+            if download != nil {
+                paletteBrowseDestination = PlexPaletteBrowseDestination(result: result, query: query, hubs: hubs)
+            } else {
+                browserStore.globalSearchStore.adopt(
+                    query: query.isEmpty ? item.title : query, hubs: hubs,
+                    destination: .media(PlexMediaRoute(item: item))
+                )
+            }
+        case .allResults(let query):
+            browserStore.globalSearchStore.adopt(query: query, hubs: hubs)
+            isGlobalSearchFocused = false
+        case .command: break
+        }
     }
 
     private var presentsGlobalSearch: Bool {
@@ -424,7 +478,8 @@ private struct PlexGlobalSearchNavigationHost: View {
             historyStore: historyStore,
             settingsStore: settingsStore,
             connectionStore: connectionStore,
-            playerCoordinator: playerCoordinator
+            playerCoordinator: playerCoordinator,
+            searchStore: searchStore
         ) {
             PlexGlobalSearchView(
                 searchStore: searchStore,
@@ -433,6 +488,10 @@ private struct PlexGlobalSearchNavigationHost: View {
                 connectionStore: connectionStore,
                 playerCoordinator: playerCoordinator
             )
+        }
+        .task(id: searchStore.pendingDestination) {
+            // Install a requested route once its NavigationStack owns the path binding.
+            searchStore.openPendingDestination()
         }
     }
 }
@@ -469,6 +528,7 @@ private struct PlexLibraryNavigationHost: View {
 }
 
 private struct PlexMediaNavigationStack<Root: View>: View {
+    var searchStore: PlexGlobalSearchStore?
     @Binding var path: [PlexNavigationRoute]
     @Bindable var browserStore: PlexBrowserStore
     @Bindable var historyStore: PlexHistoryStore
@@ -484,8 +544,10 @@ private struct PlexMediaNavigationStack<Root: View>: View {
         settingsStore: PlexSettingsStore,
         connectionStore: PlexConnectionStore,
         playerCoordinator: PlexPlayerCoordinator,
+        searchStore: PlexGlobalSearchStore? = nil,
         @ViewBuilder root: () -> Root
     ) {
+        self.searchStore = searchStore
         _path = path
         self.browserStore = browserStore
         self.historyStore = historyStore
@@ -530,10 +592,10 @@ private struct PlexMediaNavigationStack<Root: View>: View {
                             ContentUnavailableView("Home Section Unavailable", systemImage: "rectangle.stack")
                         }
                     case .searchHub(let hubRoute):
-                        if let hub = browserStore.globalSearchStore.hub(for: hubRoute) {
+                        if let hub = (searchStore ?? browserStore.globalSearchStore).hub(for: hubRoute) {
                             PlexSearchHubItemsView(
                                 hub: hub,
-                                searchStore: browserStore.globalSearchStore,
+                                searchStore: searchStore ?? browserStore.globalSearchStore,
                                 browserStore: browserStore,
                                 settingsStore: settingsStore,
                                 connectionStore: connectionStore,
@@ -761,6 +823,104 @@ private struct PlexActivityView: View {
             }
             .scenePadding()
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct PlexPaletteBrowseDestination: Identifiable {
+    let id = UUID()
+    let result: PlexPaletteResult
+    let query: String
+    let hubs: [PlexHub]
+}
+
+/// Browsing from playback keeps the existing player mounted and its session untouched.
+private struct PlexPaletteBrowseSheet: View {
+    let destination: PlexPaletteBrowseDestination
+    let browserStore: PlexBrowserStore
+    let historyStore: PlexHistoryStore
+    let settingsStore: PlexSettingsStore
+    let connectionStore: PlexConnectionStore
+    let playerCoordinator: PlexPlayerCoordinator
+    let downloadsStore: PlexDownloadsStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchStore = PlexGlobalSearchStore()
+    @State private var path: [PlexNavigationRoute] = []
+    @State private var playbackError: String?
+    @State private var isPreparingPlayback = false
+    @State private var playbackTask: Task<Void, Never>?
+
+    var body: some View {
+        PlexMediaNavigationStack(
+            path: $path, browserStore: browserStore, historyStore: historyStore,
+            settingsStore: settingsStore, connectionStore: connectionStore,
+            playerCoordinator: playerCoordinator, searchStore: searchStore
+        ) {
+            Group {
+                switch destination.result.content {
+                case .media(let item, let download):
+                    if let download {
+                        offlineDetails(download)
+                    } else {
+                        PlexMediaDestinationView(
+                            initialItem: item, browserStore: browserStore, historyStore: historyStore,
+                            settingsStore: settingsStore, connectionStore: connectionStore,
+                            playerCoordinator: playerCoordinator, refreshesInitialMetadata: true
+                        )
+                    }
+                case .allResults:
+                    PlexGlobalSearchView(searchStore: searchStore, browserStore: browserStore,
+                                         settingsStore: settingsStore, connectionStore: connectionStore,
+                                         playerCoordinator: playerCoordinator)
+                case .command: EmptyView()
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+            }
+        }
+        .frame(minWidth: 600, idealWidth: 900, minHeight: 480, idealHeight: 700)
+        .task { searchStore.adopt(query: destination.query, hubs: destination.hubs) }
+        .onDisappear { playbackTask?.cancel() }
+    }
+
+    private func offlineDetails(_ media: PlexOfflineMedia) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(alignment: .top, spacing: 20) {
+                    PlexDownloadedArtwork(url: media.package.artworkURL, placeholderSystemImage: "film", width: 100, height: 150)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(media.item.title).font(.title.bold())
+                        Label("Downloaded · Available Offline", systemImage: "arrow.down.circle.fill")
+                            .font(.callout).foregroundStyle(.secondary)
+                        Button(destination.result.playTitle, systemImage: "play.fill") { playDownload(media) }
+                            .buttonStyle(.borderedProminent).disabled(isPreparingPlayback)
+                        if isPreparingPlayback { ProgressView("Preparing playback…") }
+                    }
+                }
+                if let summary = media.item.summary { Text(summary).textSelection(.enabled) }
+                if let playbackError { Text(playbackError).foregroundStyle(.red) }
+            }
+            .padding(24)
+        }
+        .navigationTitle(media.item.title)
+    }
+
+    private func playDownload(_ media: PlexOfflineMedia) {
+        guard !isPreparingPlayback else { return }
+        isPreparingPlayback = true
+        playbackError = nil
+        playbackTask = Task {
+            defer { isPreparingPlayback = false }
+            do {
+                let presentation = try await downloadsStore.playbackPresentation(for: media)
+                try Task.checkCancellation()
+                playerCoordinator.present(presentation)
+                dismiss()
+            } catch {
+                guard !Task.isCancelled else { return }
+                playbackError = error.localizedDescription
+            }
         }
     }
 }

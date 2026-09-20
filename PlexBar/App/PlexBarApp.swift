@@ -14,6 +14,7 @@ struct PlexBarApp: App {
     @State private var mainNavigationStore: PlexMainNavigationStore
     @State private var serverPreviewStore: PlexServerPreviewStore
     @State private var downloadsStore: PlexDownloadsStore
+    @State private var commandPaletteStore = PlexCommandPaletteStore()
     private let systemLifecycleObserver: PlexSystemLifecycleObserver
     private let userInteractionMonitor: PlexUserInteractionMonitor
     private let updateService: PlexUpdateService
@@ -102,7 +103,8 @@ struct PlexBarApp: App {
                 browserStore: browserStore,
                 playerCoordinator: playerCoordinator,
                 navigationStore: mainNavigationStore,
-                downloadsStore: downloadsStore
+                downloadsStore: downloadsStore,
+                commandPaletteStore: commandPaletteStore
             )
             .frame(minWidth: 840, minHeight: 560)
             .task {
@@ -116,10 +118,11 @@ struct PlexBarApp: App {
         .windowToolbarStyle(.unified)
         .commands {
             SidebarCommands()
-            PlexMainWindowCommands()
+            PlexMainWindowCommands(paletteStore: commandPaletteStore)
             PlexPlaybackCommands(
                 coordinator: playerCoordinator,
-                settingsStore: settingsStore
+                settingsStore: settingsStore,
+                isCommandPalettePresented: commandPaletteStore.isPresented
             )
         }
 
@@ -145,7 +148,8 @@ struct PlexBarApp: App {
                 sessionStore: sessionStore,
                 historyStore: historyStore,
                 libraryStore: libraryStore,
-                playerCoordinator: playerCoordinator
+                playerCoordinator: playerCoordinator,
+                commandPaletteStore: commandPaletteStore
             )
         } label: {
             MenuBarLabelView(streamCount: sessionStore.activeStreamCount)

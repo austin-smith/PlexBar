@@ -118,6 +118,7 @@ final class PlexPlayerPresentationLifecycle {
 }
 
 struct PlexPlayerView: View {
+    @Environment(\.isPlexCommandPalettePresented) private var isCommandPalettePresented
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
@@ -162,10 +163,10 @@ struct PlexPlayerView: View {
                     videoDynamicRange: settingsStore.videoDynamicRange,
                     videoScalingMode: settingsStore.videoScalingMode,
                     isVideo: session.presentation.plan.mediaKind == .video,
-                    isInteractionBlocked: overlaySelection.isPresented
+                    isInteractionBlocked: isCommandPalettePresented || overlaySelection.isPresented
                         || session.qualitySuggestion != nil
                         || showsPostPlay,
-                    isCursorHidingAllowed: session.presentation.plan.mediaKind == .video
+                    isCursorHidingAllowed: !isCommandPalettePresented && session.presentation.plan.mediaKind == .video
                         && !controlsState.isVisible(status: session.engine.status, voiceOverEnabled: voiceOverEnabled)
                         && !overlaySelection.isPresented && !showsPostPlay
                         && session.qualitySuggestion == nil && session.errorMessage == nil
@@ -195,7 +196,7 @@ struct PlexPlayerView: View {
                         mediaOptions: mediaOptions,
                         state: controlsState,
                         lifecycle: presentationLifecycle,
-                        isInteractionEnabled: !overlaySelection.isPresented && !showsPostPlay
+                        isInteractionEnabled: !isCommandPalettePresented && !overlaySelection.isPresented && !showsPostPlay
                             && session.qualitySuggestion == nil
                             && !presentationLifecycle.isPictureInPictureActive,
                         showQueue: toggleUpNextOverlay,
@@ -301,11 +302,19 @@ struct PlexPlayerView: View {
                 perform: toggleUpNextOverlay
             )
         )
+        .focusedSceneValue(
+            \.plexPlayerCloseCommand,
+            PlexFocusedCommandAction(
+                title: "Stop Playback and Return to Library",
+                perform: closePlayer
+            )
+        )
         .toolbar {
             ToolbarItem(placement: .navigation) {
                 Button("Back to Library", systemImage: "chevron.backward", action: closePlayer)
                     .labelStyle(.iconOnly)
                     .help("Stop Playback and Return to Library")
+                    .disabled(isCommandPalettePresented)
             }
 
         }

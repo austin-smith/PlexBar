@@ -557,10 +557,13 @@ struct PlexMediaDetailsView: View {
             do {
                 let playbackItem = try await browserStore.refreshedPlayableDetails(for: item)
                 let videoQuality = settingsStore.videoQuality(for: activeConnectionKind)
-                let presentation = try await playbackPresentation(
+                let presentation = try await PlexMediaPlaybackPreparation(
+                    browserStore: browserStore, settingsStore: settingsStore, connectionStore: connectionStore
+                ).prepare(
                     for: playbackItem,
                     startOption: startOption,
-                    videoQuality: videoQuality
+                    videoQuality: videoQuality,
+                    mediaIndex: selectedMediaIndex
                 )
                 playerCoordinator.present(presentation)
             } catch {
@@ -605,77 +608,7 @@ struct PlexMediaDetailsView: View {
         }
     }
 
-    private func playbackQueue(for item: PlexMediaItem) async throws -> PlexPlaybackQueue? {
-        guard item.continuousPlayQueueType != nil else {
-            return nil
-        }
-        return try await browserStore.continuousPlayQueue(for: item)
-    }
 
-    private func playbackPresentation(
-        for playbackItem: PlexMediaItem,
-        startOption: PlexPlaybackStartOption,
-        videoQuality: PlexVideoQuality
-    ) async throws -> PlexPlaybackPresentation {
-        guard let selectedPlaybackSource = playbackItem.playbackSource(
-            mediaIndex: selectedMediaIndex
-        ) else {
-            throw PlexAPIError.noPlayableMedia
-        }
-
-        let serverIdentifier = connectionStore.activeConnection?.serverID
-            ?? settingsStore.selectedServerIdentifier?.nilIfBlank
-        if let extrasPrefixCount = PlexCinemaPreplayRequestPolicy.extrasPrefixCount(
-            for: playbackItem,
-            startOption: startOption,
-            preference: settingsStore.cinemaPreplayPreference
-        ) {
-            let queue = try await browserStore.cinemaPlayQueue(
-                for: playbackItem,
-                extrasPrefixCount: extrasPrefixCount
-            )
-            let firstItem = try await browserStore.refreshedPlayableDetails(
-                for: queue.currentItem
-            )
-            let sourcePreference = PlexPlaybackQueueSourcePreference(
-                ratingKey: playbackItem.ratingKey,
-                source: selectedPlaybackSource
-            )
-            guard let firstSource = sourcePreference.source(for: firstItem)
-                ?? firstItem.defaultPlaybackSource else {
-                throw PlexAPIError.noPlayableMedia
-            }
-            let plan = try await browserStore.playbackPlan(
-                for: firstItem,
-                source: firstSource,
-                videoQuality: videoQuality,
-                startTimeOverride: 0
-            )
-            return PlexPlaybackPresentation(
-                item: firstItem,
-                plan: plan,
-                queue: queue,
-                videoQuality: videoQuality,
-                serverIdentifier: serverIdentifier,
-                queueSourcePreference: sourcePreference
-            )
-        }
-
-        async let plan = browserStore.playbackPlan(
-            for: playbackItem,
-            source: selectedPlaybackSource,
-            videoQuality: videoQuality,
-            startTimeOverride: startOption.startTimeOverride
-        )
-        async let queue = playbackQueue(for: playbackItem)
-        return try await PlexPlaybackPresentation(
-            item: playbackItem,
-            plan: plan,
-            queue: queue,
-            videoQuality: videoQuality,
-            serverIdentifier: serverIdentifier
-        )
-    }
 }
 
 private struct PlexPrimaryExtraButton: View {

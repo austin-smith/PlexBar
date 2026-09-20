@@ -395,9 +395,11 @@ private struct PlexOfflineMediaRow: View {
     }
 }
 
-private struct PlexDownloadedArtwork: View {
+struct PlexDownloadedArtwork: View {
     let url: URL?
     let placeholderSystemImage: String
+    var width: CGFloat = 44
+    var height: CGFloat = 64
 
     var body: some View {
         Group {
@@ -414,7 +416,7 @@ private struct PlexDownloadedArtwork: View {
                     .background(.quaternary)
             }
         }
-        .frame(width: 44, height: 64)
+        .frame(width: width, height: height)
         .compositingGroup()
         .clipShape(.rect(cornerRadius: 6))
         .accessibilityHidden(true)

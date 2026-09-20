@@ -109,9 +109,13 @@ public struct PlexHub: Decodable, Equatable, Identifiable, Sendable {
 }
 
 private struct PlexHubDirectoryMediaItem: Decodable {
+    private enum CodingKeys: String, CodingKey { case ratingKey }
     let mediaItem: PlexMediaItem?
 
     init(from decoder: Decoder) throws {
-        mediaItem = try? PlexMediaItem(from: decoder)
+        // Navigation-only directories are not library media. Malformed media entries
+        // must surface their decoding error instead of silently disappearing from search.
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        mediaItem = values.contains(.ratingKey) ? try PlexMediaItem(from: decoder) : nil
     }
 }
