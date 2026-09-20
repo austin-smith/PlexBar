@@ -3,7 +3,7 @@ import PlexModels
 import Foundation
 
 extension PlexBrowserStore {
-    func searchAllLibraries(query: String) async throws -> [PlexHub] {
+    func searchAllLibraries(query: String, limit: Int = 12) async throws -> [PlexHub] {
         try await connectionStore.perform { configuration in
             let endpoints = try await self.advertisedLibraryProviderEndpoints(
                 using: configuration
@@ -14,7 +14,8 @@ extension PlexBrowserStore {
             return try await client.fetchSearchHubs(
                 query: query,
                 endpointPath: searchPath,
-                using: configuration
+                using: configuration,
+                limit: limit
             )
         }
     }

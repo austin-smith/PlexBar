@@ -18,6 +18,17 @@ final class PlexMainNavigationStore {
         homeNavigationPath = [.media(PlexMediaRoute(item: item))]
     }
 
+    func openRoot(_ section: PlexMainSection) {
+        selection = section
+        switch section {
+        case .home: homeNavigationPath.removeAll()
+        case .history: historyNavigationPath.removeAll()
+        case .collections: collectionsNavigationPath.removeAll()
+        case .playlists: playlistsNavigationPath.removeAll()
+        case .downloads, .library, .activity, .users: break
+        }
+    }
+
     func resetForServerChange() {
         selection = .home
         homeNavigationPath.removeAll()

@@ -8,6 +8,7 @@ import Observation
 final class PlexGlobalSearchStore {
     var text = ""
     var navigationPath: [PlexNavigationRoute] = []
+    private(set) var pendingDestination: PlexNavigationRoute?
     private(set) var displayedQuery = ""
     private(set) var pendingQuery: String?
     private(set) var hubs: [PlexHub] = []
@@ -118,8 +119,25 @@ final class PlexGlobalSearchStore {
         finishRequest(revision: revision, query: requestedQuery)
     }
 
+    /// Commit a quick-search snapshot only when the user chooses a destination.
+    func adopt(query: String, hubs: [PlexHub], destination: PlexNavigationRoute? = nil) {
+        reset()
+        text = query
+        displayedQuery = normalizedQuery
+        self.hubs = hubs
+        hasSearched = !hubs.isEmpty
+        pendingDestination = destination
+    }
+
+    func openPendingDestination() {
+        guard let destination = pendingDestination else { return }
+        navigationPath = [destination]
+        pendingDestination = nil
+    }
+
     func reset() {
         requestRevision += 1
+        pendingDestination = nil
         text = ""
         navigationPath.removeAll()
         clearContent()

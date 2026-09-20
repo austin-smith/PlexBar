@@ -26,9 +26,12 @@ extension FocusedValues {
     @Entry var plexSearchCommand: PlexFocusedCommandAction?
     @Entry var plexPlayerInfoCommand: PlexFocusedCommandAction?
     @Entry var plexPlayerUpNextCommand: PlexFocusedCommandAction?
+    @Entry var plexPlayerCloseCommand: PlexFocusedCommandAction?
 }
 
 struct PlexMainWindowCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+    @Bindable var paletteStore: PlexCommandPaletteStore
     @FocusedValue(\.plexRefreshCommand) private var refreshCommand
     @FocusedValue(\.plexSearchCommand) private var searchCommand
     @FocusedValue(\.plexPlayerInfoCommand) private var playerInfoCommand
@@ -38,16 +41,30 @@ struct PlexMainWindowCommands: Commands {
         CommandGroup(after: .toolbar) {
             Divider()
 
+            Button("Search Library and Commands…") {
+                if paletteStore.isPresented {
+                    paletteStore.dismiss()
+                } else {
+                    paletteStore.request()
+                    if paletteStore.isPresentationRequested {
+                        openWindow(id: PlexMainNavigationStore.windowID)
+                    }
+                }
+            }
+            .keyboardShortcut("k", modifiers: .command)
+
+            Divider()
+
             Button(playerInfoCommand?.title ?? "Show Info") {
                 playerInfoCommand?()
             }
             .keyboardShortcut("i", modifiers: .command)
-            .disabled(playerInfoCommand?.isEnabled != true)
+            .disabled(paletteStore.isPresented || playerInfoCommand?.isEnabled != true)
 
             Button(playerUpNextCommand?.title ?? "Show Up Next") {
                 playerUpNextCommand?()
             }
-            .disabled(playerUpNextCommand?.isEnabled != true)
+            .disabled(paletteStore.isPresented || playerUpNextCommand?.isEnabled != true)
 
             Divider()
 
@@ -55,13 +72,13 @@ struct PlexMainWindowCommands: Commands {
                 searchCommand?()
             }
             .keyboardShortcut("f", modifiers: .command)
-            .disabled(searchCommand?.isEnabled != true)
+            .disabled(paletteStore.isPresented || searchCommand?.isEnabled != true)
 
             Button(refreshCommand?.title ?? "Refresh") {
                 refreshCommand?()
             }
             .keyboardShortcut("r", modifiers: .command)
-            .disabled(refreshCommand?.isEnabled != true)
+            .disabled(paletteStore.isPresented || refreshCommand?.isEnabled != true)
         }
     }
 }
