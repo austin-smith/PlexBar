@@ -308,7 +308,8 @@ final class TVAppStore {
         authClient: PlexAuthClient = PlexAuthClient(),
         deviceIdentityStore: any PlexDeviceIdentityProviding = PlexKeychainDeviceIdentityStore(keychain: KeychainStore(service: TVAppConfiguration.bundleIdentifier)),
         keychain: KeychainStore = KeychainStore(service: TVAppConfiguration.bundleIdentifier),
-        topShelfPublisher: TVTopShelfPublisher = TVTopShelfPublisher()
+        topShelfPublisher: TVTopShelfPublisher = TVTopShelfPublisher(),
+        accountStorage: TVPlexAccountJWTStorage? = nil
     ) {
         self.client = client
         self.authClient = authClient
@@ -316,7 +317,7 @@ final class TVAppStore {
         self.keychain = keychain
         self.defaults = defaults
         self.topShelfPublisher = topShelfPublisher
-        let accountStorage = TVPlexAccountJWTStorage(defaults: defaults, keychain: keychain)
+        let accountStorage = accountStorage ?? TVPlexAccountJWTStorage(defaults: defaults, keychain: keychain)
         self.accountStorage = accountStorage
         accountJWTManager = PlexAccountJWTManager(
             storage: accountStorage,
@@ -396,15 +397,18 @@ final class TVAppStore {
 
     func restoreSession() async {
         guard !hasRestoredSession else { return }
+        let revision = sessionRevision
         defer {
             hasRestoredSession = true
-            processPendingTopShelfRoute()
+            if revision == sessionRevision { processPendingTopShelfRoute() }
         }
         guard !isConnected else { return }
         isPairing = false
         do {
             try await accountStorage.loadAccountToken()
+            try requireCurrentSession(revision)
         } catch {
+            guard revision == sessionRevision, !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
             return
         }
@@ -445,6 +449,10 @@ final class TVAppStore {
     }
 
     func startPlexDeviceAuthorization() {
+        sessionRevision = UUID()
+        let revision = sessionRevision
+        accountJWTManager.invalidatePreparation()
+        accountTokenRefreshTask?.cancel()
         signInTask?.cancel()
         isPairing = true
         signInCode = nil
@@ -456,11 +464,13 @@ final class TVAppStore {
             guard let self else { return }
             do {
                 let identity = try await deviceIdentityStore.loadOrCreateIdentity()
+                try requireCurrentSession(revision)
                 let pin = try await authClient.createPin(
                     jwk: identity.publicJWK(includeUse: false),
                     strong: false,
                     clientContext: clientContext
                 )
+                try requireCurrentSession(revision)
                 let deviceJWT = try identity.signedDeviceJWT(
                     clientIdentifier: accountStorage.clientIdentifier
                 )
@@ -474,16 +484,19 @@ final class TVAppStore {
                         deviceJWT: deviceJWT,
                         clientContext: clientContext
                     )
+                    try requireCurrentSession(revision)
                     guard let userToken = currentPin.authToken?.nilIfBlank else { continue }
                     let preparedToken = try await accountJWTManager.acceptNewAccountToken(
                         userToken,
                         registeredKeyID: identity.keyID
                     )
+                    try requireCurrentSession(revision)
                     scheduleAccountTokenRefresh(preparedToken)
                     let servers = try await fetchAuthorizedServers()
+                    try requireCurrentSession(revision)
                     isPairing = false
                     signInCode = nil
-                    await presentDiscoveredServers(servers, preferStoredSelection: true)
+                    await presentDiscoveredServers(servers, preferStoredSelection: true, revision: revision)
                     return
                 }
 
@@ -493,7 +506,7 @@ final class TVAppStore {
             } catch is CancellationError {
                 return
             } catch {
-                guard !Task.isCancelled else { return }
+                guard revision == sessionRevision, !Task.isCancelled else { return }
                 isPairing = false
                 signInCode = nil
                 errorMessage = error.localizedDescription
@@ -502,17 +515,20 @@ final class TVAppStore {
     }
 
     func selectServer(_ server: PlexServerResource) async {
+        let revision = sessionRevision
+        guard hasAuthorizedAccount, availableServers.contains(server) else { return }
         guard !server.connections.isEmpty else {
             errorMessage = "\(server.name) has no available connections."
             return
         }
         availableServers = []
-        if await connect(to: server) {
+        if await connect(to: server), revision == sessionRevision, hasAuthorizedAccount, !Task.isCancelled {
             defaults.set(server.id, forKey: DefaultsKey.selectedServerIdentifier)
         }
     }
 
     func reconnectAuthorizedAccount() async {
+        let revision = sessionRevision
         guard hasAuthorizedAccount else {
             startPlexDeviceAuthorization()
             return
@@ -523,8 +539,10 @@ final class TVAppStore {
         errorMessage = nil
         do {
             let servers = try await fetchAuthorizedServers()
-            await presentDiscoveredServers(servers, preferStoredSelection: true)
+            try requireCurrentSession(revision)
+            await presentDiscoveredServers(servers, preferStoredSelection: true, revision: revision)
         } catch {
+            guard revision == sessionRevision, !Task.isCancelled else { return }
             connection = nil
             connectionState = .disconnected
             errorMessage = error.localizedDescription
@@ -532,6 +550,7 @@ final class TVAppStore {
     }
 
     func chooseServer() async {
+        let revision = sessionRevision
         guard hasAuthorizedAccount else {
             startPlexDeviceAuthorization()
             return
@@ -539,11 +558,13 @@ final class TVAppStore {
 
         do {
             let servers = try await fetchAuthorizedServers()
+            try requireCurrentSession(revision)
             availableServers = servers
             playbackRequest = nil
             connection = nil
             connectionState = .disconnected
         } catch {
+            guard revision == sessionRevision, !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
     }
@@ -1590,6 +1611,8 @@ final class TVAppStore {
     func logout() async {
         accountJWTManager.invalidatePreparation()
         sessionRevision = UUID()
+        let revision = sessionRevision
+        availableServers = []
         pendingTopShelfRoute = nil
         topShelfRouteTask?.cancel()
         topShelfPublisher.clear()
@@ -1600,10 +1623,13 @@ final class TVAppStore {
         cancelPlaybackPreparation()
         do {
             try await accountStorage.persistAccountToken("")
+            try requireCurrentSession(revision)
             try await keychain.delete(account: KeychainAccounts.serverToken)
         } catch {
+            guard revision == sessionRevision, !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
+        guard revision == sessionRevision, !Task.isCancelled else { return }
         defaults.removeObject(forKey: DefaultsKey.selectedServerIdentifier)
         connection = nil
         connectionState = .disconnected
@@ -1775,8 +1801,11 @@ final class TVAppStore {
 
     private func presentDiscoveredServers(
         _ servers: [PlexServerResource],
-        preferStoredSelection: Bool
+        preferStoredSelection: Bool,
+        revision: UUID
     ) async {
+        guard revision == sessionRevision, hasAuthorizedAccount, !Task.isCancelled else { return }
+        availableServers = servers
         if preferStoredSelection,
            let selectedServerIdentifier = defaults.string(
                forKey: DefaultsKey.selectedServerIdentifier
@@ -1792,31 +1821,44 @@ final class TVAppStore {
         }
     }
 
+    private func requireCurrentSession(_ revision: UUID) throws {
+        try Task.checkCancellation()
+        guard revision == sessionRevision else { throw CancellationError() }
+    }
+
     private func performAccountRequest<Value>(
         _ operation: (String) async throws -> Value
     ) async throws -> Value {
+        let revision = sessionRevision
         let preparedToken = try await accountJWTManager.prepareAccountToken()
+        try requireCurrentSession(revision)
         scheduleAccountTokenRefresh(preparedToken)
 
         do {
-            return try await operation(preparedToken.token)
+            let result = try await operation(preparedToken.token)
+            try requireCurrentSession(revision)
+            return result
         } catch let error as PlexAuthError where error.requiresTokenRefresh {
-            let refreshedToken = try await accountJWTManager.recoverRejectedAccountToken(
-                preparedToken.token
-            )
+            try requireCurrentSession(revision)
+            let refreshedToken = try await accountJWTManager.recoverRejectedAccountToken(preparedToken.token)
+            try requireCurrentSession(revision)
             scheduleAccountTokenRefresh(refreshedToken)
             do {
-                return try await operation(refreshedToken.token)
+                let result = try await operation(refreshedToken.token)
+                try requireCurrentSession(revision)
+                return result
             } catch let retryError as PlexAuthError where retryError.requiresTokenRefresh {
-                accountTokenRefreshTask?.cancel()
-                accountJWTManager.invalidatePreparation()
-                try await accountStorage.persistAccountToken("")
+                try requireCurrentSession(revision)
+                if accountStorage.storedAccountToken == refreshedToken.token {
+                    await logout()
+                }
                 throw retryError
             }
         }
     }
 
     private func scheduleAccountTokenRefresh(_ preparedToken: PlexPreparedAccountToken) {
+        let revision = sessionRevision
         accountTokenRefreshTask?.cancel()
         let delay = max(preparedToken.refreshAt.timeIntervalSinceNow, 0)
         accountTokenRefreshTask = Task { [weak self] in
@@ -1831,8 +1873,10 @@ final class TVAppStore {
                 let refreshedToken = try await accountJWTManager.prepareAccountToken(
                     forceRefresh: true
                 )
+                try requireCurrentSession(revision)
                 scheduleAccountTokenRefresh(refreshedToken)
             } catch {
+                guard revision == sessionRevision, !Task.isCancelled else { return }
                 errorMessage = error.localizedDescription
             }
         }

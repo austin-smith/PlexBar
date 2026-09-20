@@ -210,7 +210,7 @@ struct TVTopShelfTests {
 
     @Test(arguments: [TVTopShelfRoute.Action.display, .play])
     func coldLaunchRouteWaitsForSessionAndFetchesFreshMetadata(action: TVTopShelfRoute.Action) async throws {
-        let fixture = try routingFixture()
+        let fixture = try await routingFixture()
         defer { fixture.close() }
         fixture.store.openTopShelfURL(TVTopShelfRoute(action: action, serverIdentifier: "server", ratingKey: "42").url)
         #expect(fixture.store.homePath.isEmpty)
@@ -233,7 +233,7 @@ struct TVTopShelfTests {
     }
 
     @Test func routeToAnotherServerDoesNotFetchOrPlayAnUnrelatedTitle() async throws {
-        let fixture = try routingFixture()
+        let fixture = try await routingFixture()
         defer { fixture.close() }
         await fixture.connect()
         await fixture.store.restoreSession()
@@ -295,7 +295,7 @@ struct TVTopShelfTests {
         }
     }
 
-    private func routingFixture() throws -> RoutingFixture {
+    private func routingFixture() async throws -> RoutingFixture {
         let (session, client) = mockClient { request in
             let json: String
             switch request.url?.path {
@@ -315,7 +315,11 @@ struct TVTopShelfTests {
         let suite = "TopShelfRoutingTests-\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))
         let publisher = TVTopShelfPublisher(cache: { cache }, notify: {})
-        let store = TVAppStore(client: client, defaults: defaults, keychain: KeychainStore(service: suite), topShelfPublisher: publisher)
+        let accountStorage = TVPlexAccountJWTStorage(defaults: defaults, credentialStore: PlexMemoryCredentialStore(
+            credentials: PlexStoredCredentials(userToken: "test-account", serverToken: "")
+        ))
+        try await accountStorage.loadAccountToken()
+        let store = TVAppStore(client: client, defaults: defaults, keychain: KeychainStore(service: suite), topShelfPublisher: publisher, accountStorage: accountStorage)
         return RoutingFixture(store: store, session: session, defaults: defaults, suite: suite, cache: cache, publisher: publisher)
     }
 
@@ -329,9 +333,11 @@ struct TVTopShelfTests {
         let publisher: TVTopShelfPublisher
 
         func connect() async {
-            await store.selectServer(.init(id: "server", name: "Server", productVersion: nil, accessToken: "private-token", connections: [
+            let server = PlexServerResource(id: "server", name: "Server", productVersion: nil, accessToken: "private-token", connections: [
                 .init(uri: URL(string: "https://plex.test")!, local: true, relay: false)
-            ]))
+            ])
+            store.availableServers = [server]
+            await store.selectServer(server)
         }
 
         func close() {

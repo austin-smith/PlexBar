@@ -978,16 +978,24 @@ struct TVPlaybackPreparationTests {
                 directory: FileManager.default.temporaryDirectory.appending(path: defaultsName)
             )
             topShelfPublisher = TVTopShelfPublisher(cache: { topShelfCache }, notify: {})
+            let accountStorage = TVPlexAccountJWTStorage(
+                defaults: defaults,
+                credentialStore: PlexMemoryCredentialStore(credentials: PlexStoredCredentials(userToken: "test-account", serverToken: ""))
+            )
+            try await accountStorage.loadAccountToken()
             store = TVAppStore(
                 client: TVPlexClient(session: session),
                 defaults: defaults,
                 keychain: KeychainStore(service: defaultsName),
-                topShelfPublisher: topShelfPublisher
+                topShelfPublisher: topShelfPublisher,
+                accountStorage: accountStorage
             )
-            await store.selectServer(PlexServerResource(
+            let server = PlexServerResource(
                 id: "test-server", name: "Test Server", productVersion: nil, accessToken: "test-token",
                 connections: [PlexServerConnection(uri: URL(string: "https://plex.test")!, local: true, relay: false)]
-            ))
+            )
+            store.availableServers = [server]
+            await store.selectServer(server)
             #expect(store.isConnected)
         }
 
@@ -1003,10 +1011,12 @@ struct TVPlaybackPreparationTests {
         }
 
         func selectOtherServer() async {
-            await store.selectServer(PlexServerResource(
+            let server = PlexServerResource(
                 id: "other-server", name: "Other Server", productVersion: nil, accessToken: "other-token",
                 connections: [PlexServerConnection(uri: URL(string: "https://other.plex.test")!, local: true, relay: false)]
-            ))
+            )
+            store.availableServers = [server]
+            await store.selectServer(server)
             #expect(store.connection?.serverIdentifier == "other-server")
         }
 
