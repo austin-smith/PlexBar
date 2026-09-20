@@ -108,9 +108,9 @@ extension PlexPaletteResult {
         for hub in hubs {
             var count = 0
             for item in hub.metadata {
-                guard seen.insert(item.ratingKey).inserted else { continue }
                 let isExact = normalized(item.title) == exact
                 guard isExact || count < 4 else { continue }
+                guard seen.insert(item.ratingKey).inserted else { continue }
                 let result = media(item, group: isExact ? "Top Results" : hub.title,
                                    libraries: libraries, downloads: downloads)
                 if isExact { top.append(result) }

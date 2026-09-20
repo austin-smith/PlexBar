@@ -181,6 +181,26 @@ struct PlexPaletteSearchTests {
         #expect(results[0].canPlay)
     }
 
+    @Test func cappedItemsRemainEligibleInLaterHubsWithoutDuplicatingEmittedResults() throws {
+        var firstHub = try #require(fixture(title: "Movie 1", key: "1").first)
+        firstHub.metadata = try (1...5).map { index in
+            try #require(fixture(title: "Movie \(index)", key: String(index)).first?.metadata.first)
+        }
+        var secondHub = try JSONDecoder().decode(PlexHub.self, from: Data(
+            #"{"hubIdentifier":"related","title":"Related","Metadata":[]}"#.utf8
+        ))
+        secondHub.metadata = try [1, 5, 5, 6, 7, 8, 9].map { index in
+            try #require(fixture(title: "Movie \(index)", key: String(index)).first?.metadata.first)
+        }
+
+        let results = PlexPaletteResult.mediaResults(
+            hubs: [firstHub, secondHub], query: "movie", libraries: [], downloads: []
+        )
+
+        #expect(results.map(\.id) == (1...8).map { .media(String($0)) })
+        #expect(results.map(\.group) == Array(repeating: "Movies", count: 4) + Array(repeating: "Related", count: 4))
+    }
+
     @Test func playbackFailureKeepsSearchOpenAndCancellationCannotStartPlayback() async throws {
         let gate = PaletteSearchGate()
         let item = try #require(fixture(title: "Movie", key: "1").first?.metadata.first)
