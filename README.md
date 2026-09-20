@@ -3,7 +3,7 @@
   <br><span style="font-family: monospace;">PlexBar</span>
 </h1>
 
-PlexBar is a lightweight macOS menu bar app for Plex server telemetry.
+PlexBar is a native Plex client for macOS.
 
 <p align="center">
   <img src="./docs/screenshots/screen-grab-streams.png" alt="Active streams" height="300" />
@@ -14,9 +14,10 @@ PlexBar is a lightweight macOS menu bar app for Plex server telemetry.
 
 ## Features
 
-- Native macOS menu bar app
-- Plex sign-in and server discovery
-- Live view of active sessions with playback details
+- Plex media streaming
+- Native video and audio playback
+- Offline downloads
+- Plex server telemetry
 
 ## Requirements
 

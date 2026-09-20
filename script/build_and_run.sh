@@ -2,12 +2,11 @@
 set -euo pipefail
 
 MODE="run"
-ENABLE_CODESIGN=0
 ENABLE_MOCK_RUNTIME=0
 APP_NAME="PlexBar"
-BUNDLE_ID="com.crapshack.PlexBar"
-MIN_SYSTEM_VERSION="26.0"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PROJECT_PATH="$ROOT_DIR/PlexBar.xcodeproj"
+SCHEME="PlexBar"
 
 if [[ -f "$ROOT_DIR/.env.local" ]]; then
   set -a
@@ -17,37 +16,37 @@ if [[ -f "$ROOT_DIR/.env.local" ]]; then
 fi
 
 BUILD_CONFIGURATION="${BUILD_CONFIGURATION:-debug}"
+APP_MARKETING_VERSION="${APP_MARKETING_VERSION:-}"
 APP_BUILD_VERSION="${APP_BUILD_VERSION:-}"
 SPARKLE_APPCAST_URL="${SPARKLE_APPCAST_URL:-}"
 SPARKLE_PUBLIC_KEY="${SPARKLE_PUBLIC_KEY:-}"
 APPLE_TEAM_ID="${APPLE_TEAM_ID:-}"
-
+CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:-}"
+CODE_SIGN_KEYCHAIN="${CODE_SIGN_KEYCHAIN:-}"
+DERIVED_DATA_DIR="${PLEXBAR_DERIVED_DATA_PATH:-$ROOT_DIR/build/DerivedData}"
+SOURCE_PACKAGES_DIR="${PLEXBAR_SOURCE_PACKAGES_PATH:-$ROOT_DIR/.build/SourcePackages}"
 DIST_DIR="$ROOT_DIR/dist"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
-APP_CONTENTS="$APP_BUNDLE/Contents"
-APP_MACOS="$APP_CONTENTS/MacOS"
-APP_FRAMEWORKS="$APP_CONTENTS/Frameworks"
-APP_RESOURCES="$APP_CONTENTS/Resources"
-APP_BINARY="$APP_MACOS/$APP_NAME"
-INFO_PLIST="$APP_CONTENTS/Info.plist"
-APP_ICON_NAME="AppIcon"
-APP_ICON_SOURCE="$ROOT_DIR/$APP_ICON_NAME.icon"
-ACTOOL="$(xcrun --find actool)"
+
+usage() {
+  echo "usage: $0 [--mock] [build|run|debug|logs|telemetry|verify]" >&2
+}
 
 parse_args() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --codesign)
-        ENABLE_CODESIGN=1
-        ;;
       --mock)
         ENABLE_MOCK_RUNTIME=1
         ;;
-      build|--build|run|debug|--debug|logs|--logs|telemetry|--telemetry|verify|--verify)
-        MODE="$1"
+      build|run|debug|logs|telemetry|verify|--build|--debug|--logs|--telemetry|--verify)
+        MODE="${1#--}"
+        ;;
+      -h|--help)
+        usage
+        exit 0
         ;;
       *)
-        echo "usage: $0 [--codesign] [--mock] [build|run|--debug|--logs|--telemetry|--verify]" >&2
+        usage
         exit 2
         ;;
     esac
@@ -55,120 +54,14 @@ parse_args() {
   done
 }
 
-resolve_apple_development_identity() {
-  local matches=()
-  local unique_matches=()
-  local candidate_identities=()
-  local identity_line
-  local identity_hash
-  local identity_name
-  local identity_team_id
-  local probe_dir
-  local probe_file
-
-  if [[ -z "$APPLE_TEAM_ID" ]]; then
-    echo "Missing required signing configuration: APPLE_TEAM_ID." >&2
-    echo "Set APPLE_TEAM_ID in .env.local before using --codesign." >&2
-    return 1
-  fi
-
-  while IFS= read -r identity_line; do
-    if [[ "$identity_line" == *"\"Apple Development:"* ]]; then
-      candidate_identities+=("$identity_line")
-    fi
-  done < <(security find-identity -p codesigning -v 2>/dev/null || true)
-
-  probe_dir="$(mktemp -d "${TMPDIR:-/tmp}/PlexBarCodesignProbe.XXXXXX")"
-  probe_file="$probe_dir/probe"
-  trap 'rm -rf "$probe_dir"' RETURN
-
-  printf '#!/bin/sh\nexit 0\n' > "$probe_file"
-  chmod +x "$probe_file"
-
-  for identity_line in "${candidate_identities[@]}"; do
-    identity_hash="$(printf '%s\n' "$identity_line" | sed -E 's/^[[:space:]]*[0-9]+\) ([0-9A-F]+) .*/\1/')"
-    identity_name="${identity_line#*\"}"
-    identity_name="${identity_name%\"*}"
-
-    rm -f "$probe_file"
-    printf '#!/bin/sh\nexit 0\n' > "$probe_file"
-    chmod +x "$probe_file"
-
-    if ! codesign --force --sign "$identity_hash" "$probe_file" >/dev/null 2>&1; then
-      continue
-    fi
-
-    identity_team_id="$(
-      codesign -d -vv "$probe_file" 2>&1 |
-        sed -n 's/^TeamIdentifier=//p'
-    )"
-
-    if [[ "$identity_team_id" == "$APPLE_TEAM_ID" ]]; then
-      matches+=("$identity_hash|$identity_name")
-    fi
-  done
-
-  if [[ "${#matches[@]}" -gt 0 ]]; then
-    while IFS= read -r identity_line; do
-      unique_matches+=("$identity_line")
-    done < <(
-      printf '%s\n' "${matches[@]}" |
-        LC_ALL=C sort -u
-    )
-
-    if [[ "${#unique_matches[@]}" -gt 1 ]]; then
-      echo "Multiple Apple Development signing identities matched TeamIdentifier=$APPLE_TEAM_ID." >&2
-      echo "Using ${unique_matches[0]#*|}." >&2
-    fi
-
-    printf '%s\n' "${unique_matches[0]%%|*}"
-    return 0
-  fi
-
-  echo "No Apple Development signing identities matched TeamIdentifier=$APPLE_TEAM_ID." >&2
-
-  return 1
-}
-
-codesign_path() {
-  local identity="$1"
-  local path="$2"
-
-  codesign --force --sign "$identity" "$path"
-}
-
-codesign_path_preserving_entitlements() {
-  local identity="$1"
-  local path="$2"
-
-  codesign --force --preserve-metadata=entitlements --sign "$identity" "$path"
-}
-
-codesign_app_bundle() {
-  local identity="$1"
-  local sparkle_framework="$APP_FRAMEWORKS/Sparkle.framework"
-
-  if [[ ! -d "$sparkle_framework" ]]; then
-    echo "Sparkle framework not found at $sparkle_framework." >&2
-    exit 1
-  fi
-
-  codesign_path "$identity" "$sparkle_framework/Versions/B/XPCServices/Installer.xpc"
-
-  if [[ -d "$sparkle_framework/Versions/B/XPCServices/Downloader.xpc" ]]; then
-    codesign_path_preserving_entitlements "$identity" "$sparkle_framework/Versions/B/XPCServices/Downloader.xpc"
-  fi
-
-  codesign_path "$identity" "$sparkle_framework/Versions/B/Autoupdate"
-  codesign_path "$identity" "$sparkle_framework/Versions/B/Updater.app"
-  codesign_path "$identity" "$sparkle_framework"
-  codesign_path "$identity" "$APP_BUNDLE"
-}
-
 parse_args "$@"
 
 case "$BUILD_CONFIGURATION" in
-  debug|release)
+  debug|Debug)
+    XCODE_CONFIGURATION="Debug"
+    ;;
+  release|Release)
+    XCODE_CONFIGURATION="Release"
     ;;
   *)
     echo "BUILD_CONFIGURATION must be 'debug' or 'release', received '$BUILD_CONFIGURATION'." >&2
@@ -176,133 +69,75 @@ case "$BUILD_CONFIGURATION" in
     ;;
 esac
 
-if [[ "$BUILD_CONFIGURATION" == "release" && (-z "$SPARKLE_APPCAST_URL" || -z "$SPARKLE_PUBLIC_KEY") ]]; then
+if [[ "$XCODE_CONFIGURATION" == "Release" && (-z "$SPARKLE_APPCAST_URL" || -z "$SPARKLE_PUBLIC_KEY") ]]; then
   echo "Missing required Sparkle build metadata: SPARKLE_APPCAST_URL and SPARKLE_PUBLIC_KEY." >&2
   exit 2
 fi
 
-APP_PRODUCT_VERSION="$(
-  sed -n -E 's/^[[:space:]]*static let productVersion = "([^"]+)".*/\1/p' \
-    "$ROOT_DIR/Sources/PlexBar/Support/AppConstants.swift" |
-    head -n 1
-)"
-[[ -n "$APP_PRODUCT_VERSION" ]] || exit 2
-APP_BUILD_VERSION="${APP_BUILD_VERSION:-$APP_PRODUCT_VERSION}"
-
-pkill -x "$APP_NAME" >/dev/null 2>&1 || true
-
-SWIFT_BUILD_ARGS=(
-  -c "$BUILD_CONFIGURATION"
-  -Xlinker -rpath
-  -Xlinker "@executable_path/../Frameworks"
+XCODEBUILD_ARGS=(
+  -project "$PROJECT_PATH"
+  -scheme "$SCHEME"
+  -configuration "$XCODE_CONFIGURATION"
+  -destination "platform=macOS,arch=$(uname -m)"
+  -derivedDataPath "$DERIVED_DATA_DIR"
+  -clonedSourcePackagesDirPath "$SOURCE_PACKAGES_DIR"
+  -onlyUsePackageVersionsFromResolvedFile
 )
 
-BUILD_BIN_DIR="$(swift build "${SWIFT_BUILD_ARGS[@]}" --show-bin-path)"
-RESOURCE_BUNDLE_NAME="${APP_NAME}_${APP_NAME}.bundle"
-RESOURCE_BUNDLE_SOURCE="$BUILD_BIN_DIR/$RESOURCE_BUNDLE_NAME"
-BUILD_BINARY="$BUILD_BIN_DIR/$APP_NAME"
+BUILD_SETTINGS=(
+  "SPARKLE_APPCAST_URL=$SPARKLE_APPCAST_URL"
+  "SPARKLE_PUBLIC_KEY=$SPARKLE_PUBLIC_KEY"
+)
 
-# SwiftPM leaves stale files behind in processed resource bundles when resources
-# are removed from the manifest. Clear the generated bundle before rebuilding so
-# dist apps cannot accidentally ship old debug-only assets.
-rm -rf "$RESOURCE_BUNDLE_SOURCE"
-
-swift build "${SWIFT_BUILD_ARGS[@]}"
-
-rm -rf "$APP_BUNDLE"
-mkdir -p "$APP_MACOS" "$APP_FRAMEWORKS" "$APP_RESOURCES"
-cp "$BUILD_BINARY" "$APP_BINARY"
-chmod +x "$APP_BINARY"
-
-if [[ -d "$RESOURCE_BUNDLE_SOURCE" ]]; then
-  cp -R "$RESOURCE_BUNDLE_SOURCE" "$APP_RESOURCES/$RESOURCE_BUNDLE_NAME"
+if [[ -n "$APP_MARKETING_VERSION" ]]; then
+  BUILD_SETTINGS+=("MARKETING_VERSION=$APP_MARKETING_VERSION")
 fi
 
-SPARKLE_FRAMEWORK_SOURCE="$(find "$BUILD_BIN_DIR" "$ROOT_DIR/.build" -type d -name "Sparkle.framework" -print -quit)"
-if [[ -n "${SPARKLE_FRAMEWORK_SOURCE:-}" ]]; then
-  ditto "$SPARKLE_FRAMEWORK_SOURCE" "$APP_FRAMEWORKS/Sparkle.framework"
+if [[ -n "$APP_BUILD_VERSION" ]]; then
+  BUILD_SETTINGS+=("CURRENT_PROJECT_VERSION=$APP_BUILD_VERSION")
 fi
 
-cat >"$INFO_PLIST" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleExecutable</key>
-  <string>$APP_NAME</string>
-  <key>CFBundleIdentifier</key>
-  <string>$BUNDLE_ID</string>
-  <key>CFBundleName</key>
-  <string>$APP_NAME</string>
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-  <key>LSMinimumSystemVersion</key>
-  <string>$MIN_SYSTEM_VERSION</string>
-  <key>NSPrincipalClass</key>
-  <string>NSApplication</string>
-</dict>
-</plist>
-PLIST
-
-/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $APP_PRODUCT_VERSION" "$INFO_PLIST"
-/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string $APP_BUILD_VERSION" "$INFO_PLIST"
-
-if [[ -n "$SPARKLE_APPCAST_URL" && -n "$SPARKLE_PUBLIC_KEY" ]]; then
-  /usr/libexec/PlistBuddy -c "Add :SUFeedURL string $SPARKLE_APPCAST_URL" "$INFO_PLIST"
-  /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $SPARKLE_PUBLIC_KEY" "$INFO_PLIST"
-  /usr/libexec/PlistBuddy -c "Add :SUVerifyUpdateBeforeExtraction bool true" "$INFO_PLIST"
-  /usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool true" "$INFO_PLIST"
-fi
-
-if [[ -d "$APP_ICON_SOURCE" ]]; then
-  ASSET_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/AppIcon.XXXXXX")"
-  ASSET_CATALOG="$ASSET_WORK_DIR/PlexBarAssets.xcassets"
-  ASSET_OUTPUT="$ASSET_WORK_DIR/output"
-  ASSET_INFO_PLIST="$ASSET_WORK_DIR/icon-info.plist"
-  cleanup_icon_workdir() {
-    rm -rf "$ASSET_WORK_DIR"
-  }
-  trap cleanup_icon_workdir EXIT
-
-  mkdir -p "$ASSET_CATALOG" "$ASSET_OUTPUT"
-  printf '{"info":{"author":"xcode","version":1}}\n' > "$ASSET_CATALOG/Contents.json"
-
-  "$ACTOOL" \
-    "$ASSET_CATALOG" \
-    "$APP_ICON_SOURCE" \
-    --compile "$ASSET_OUTPUT" \
-    --output-format human-readable-text \
-    --notices \
-    --warnings \
-    --output-partial-info-plist "$ASSET_INFO_PLIST" \
-    --app-icon "$APP_ICON_NAME" \
-    --target-device mac \
-    --minimum-deployment-target "$MIN_SYSTEM_VERSION" \
-    --platform macosx \
-    --bundle-identifier "$BUNDLE_ID"
-
-  if [[ ! -f "$ASSET_OUTPUT/Assets.car" || ! -f "$ASSET_OUTPUT/$APP_ICON_NAME.icns" ]]; then
-    echo "actool did not produce the expected app icon outputs." >&2
-    exit 1
-  fi
-
-  cp "$ASSET_OUTPUT/Assets.car" "$APP_RESOURCES/Assets.car"
-  cp "$ASSET_OUTPUT/$APP_ICON_NAME.icns" "$APP_RESOURCES/$APP_ICON_NAME.icns"
-  /usr/libexec/PlistBuddy -c "Merge $ASSET_INFO_PLIST" "$INFO_PLIST"
-
-  trap - EXIT
-  cleanup_icon_workdir
-fi
-
-if [[ "$ENABLE_CODESIGN" -eq 1 ]]; then
-  if ! identity_hash="$(resolve_apple_development_identity)"; then
+if [[ -n "$CODE_SIGN_IDENTITY" ]]; then
+  if [[ -z "$APPLE_TEAM_ID" ]]; then
+    echo "APPLE_TEAM_ID is required when CODE_SIGN_IDENTITY is configured." >&2
     exit 2
   fi
 
-  codesign_app_bundle "$identity_hash"
+  BUILD_SETTINGS+=(
+    "CODE_SIGN_STYLE=Manual"
+    "CODE_SIGN_IDENTITY=$CODE_SIGN_IDENTITY"
+    "DEVELOPMENT_TEAM=$APPLE_TEAM_ID"
+  )
+
+  if [[ -n "$CODE_SIGN_KEYCHAIN" ]]; then
+    BUILD_SETTINGS+=("OTHER_CODE_SIGN_FLAGS=--timestamp --keychain $CODE_SIGN_KEYCHAIN")
+  else
+    BUILD_SETTINGS+=("OTHER_CODE_SIGN_FLAGS=--timestamp")
+  fi
+elif [[ -n "$APPLE_TEAM_ID" ]]; then
+  BUILD_SETTINGS+=("DEVELOPMENT_TEAM=$APPLE_TEAM_ID")
+else
+  BUILD_SETTINGS+=(
+    "CODE_SIGN_STYLE=Manual"
+    "CODE_SIGN_IDENTITY=-"
+  )
 fi
 
+xcodebuild "${XCODEBUILD_ARGS[@]}" "${BUILD_SETTINGS[@]}" build
+
+BUILT_APP="$DERIVED_DATA_DIR/Build/Products/$XCODE_CONFIGURATION/$APP_NAME.app"
+if [[ ! -d "$BUILT_APP" ]]; then
+  echo "Xcode did not produce the expected app at $BUILT_APP." >&2
+  exit 1
+fi
+
+rm -rf "$APP_BUNDLE"
+mkdir -p "$DIST_DIR"
+ditto "$BUILT_APP" "$APP_BUNDLE"
+
 open_app() {
+  pkill -x "$APP_NAME" >/dev/null 2>&1 || true
+
   if [[ "$ENABLE_MOCK_RUNTIME" -eq 1 ]]; then
     /usr/bin/open -n "$APP_BUNDLE" --args --mock
   else
@@ -310,35 +145,96 @@ open_app() {
   fi
 }
 
+verify_app_bundle() {
+  local app_binary="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+  local info_plist="$APP_BUNDLE/Contents/Info.plist"
+  local sparkle_framework="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+  local bundle_id
+  local app_architectures
+  local plist_minimum_version
+  local binary_minimum_version
+  local signature_details
+  local signed_entitlements
+
+  [[ -x "$app_binary" ]] || { echo "Missing app executable at $app_binary." >&2; exit 1; }
+  [[ -f "$info_plist" ]] || { echo "Missing Info.plist at $info_plist." >&2; exit 1; }
+  [[ -d "$sparkle_framework" ]] || { echo "Missing Sparkle framework at $sparkle_framework." >&2; exit 1; }
+  [[ -f "$APP_BUNDLE/Contents/Resources/AppIcon.icns" ]] || { echo "Missing compiled app icon." >&2; exit 1; }
+  [[ -f "$APP_BUNDLE/Contents/Resources/MenuBarIcon.tiff" ]] || { echo "Missing menu-bar icon." >&2; exit 1; }
+
+  codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+  plutil -lint "$info_plist" >/dev/null
+
+  if [[ "$XCODE_CONFIGURATION" == "Release" ]]; then
+    app_architectures="$(lipo -archs "$app_binary")"
+    if [[ " $app_architectures " != *" arm64 "* || " $app_architectures " != *" x86_64 "* ]]; then
+      echo "The Release app must be universal (arm64 and x86_64); found: $app_architectures" >&2
+      exit 1
+    fi
+
+    signature_details="$(codesign -dvv "$APP_BUNDLE" 2>&1)"
+    if [[ "$signature_details" != *"runtime"* ]]; then
+      echo "The Release app is missing hardened-runtime signing." >&2
+      exit 1
+    fi
+
+    signed_entitlements="$(codesign -d --entitlements - "$APP_BUNDLE" 2>/dev/null)"
+    if [[ "$signed_entitlements" == *"com.apple.security.get-task-allow"* ]]; then
+      echo "The Release app must not contain the debugger entitlement." >&2
+      exit 1
+    fi
+  fi
+
+  bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info_plist")"
+  plist_minimum_version="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$info_plist")"
+  binary_minimum_version="$(
+    otool -l "$app_binary" |
+      awk '
+        $1 == "cmd" && $2 == "LC_BUILD_VERSION" { in_build_version = 1; next }
+        in_build_version && $1 == "minos" { print $2; exit }
+      '
+  )"
+
+  if [[ "$bundle_id" != "com.crapshack.PlexBar" ]]; then
+    echo "Unexpected bundle identifier: $bundle_id" >&2
+    exit 1
+  fi
+  if [[ "$plist_minimum_version" != "26.0" ]]; then
+    echo "Unexpected Info.plist minimum system version: $plist_minimum_version" >&2
+    exit 1
+  fi
+  if [[ "$binary_minimum_version" != "26.0" ]]; then
+    echo "Unexpected Mach-O minimum system version: $binary_minimum_version" >&2
+    exit 1
+  fi
+
+  printf 'Verified app bundle at %s\n' "$APP_BUNDLE"
+}
+
 case "$MODE" in
-  build|--build)
+  build)
     printf 'Built app bundle at %s\n' "$APP_BUNDLE"
     ;;
   run)
     open_app
     ;;
-  --debug|debug)
+  debug)
+    pkill -x "$APP_NAME" >/dev/null 2>&1 || true
     if [[ "$ENABLE_MOCK_RUNTIME" -eq 1 ]]; then
-      lldb -- "$APP_BINARY" --mock
+      lldb -- "$APP_BUNDLE/Contents/MacOS/$APP_NAME" --mock
     else
-      lldb -- "$APP_BINARY"
+      lldb -- "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
     fi
     ;;
-  --logs|logs)
+  logs)
     open_app
     /usr/bin/log stream --info --style compact --predicate "process == \"$APP_NAME\""
     ;;
-  --telemetry|telemetry)
+  telemetry)
     open_app
-    /usr/bin/log stream --info --style compact --predicate "subsystem == \"$BUNDLE_ID\""
+    /usr/bin/log stream --info --style compact --predicate 'subsystem == "com.crapshack.PlexBar"'
     ;;
-  --verify|verify)
-    open_app
-    sleep 1
-    pgrep -x "$APP_NAME" >/dev/null
-    ;;
-  *)
-    echo "usage: $0 [--mock] [build|run|--debug|--logs|--telemetry|--verify]" >&2
-    exit 2
+  verify)
+    verify_app_bundle
     ;;
 esac

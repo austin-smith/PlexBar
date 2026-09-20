@@ -19,19 +19,95 @@ concurrency:
 jobs:
   macos-build-and-test:
     name: macOS Build + Test
-    runs-on: macos-26
+    runs-on: xcode-27
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Setup Swift 6.3.1
-        uses: swift-actions/setup-swift@v3
-        with:
-          swift-version: "6.3.1"
+      - name: Check app source boundaries
+        run: python3 script/check_source_boundaries.py
+
+      - name: Test shared data contracts
+        run: swift test --package-path Packages/PlexData
 
       - name: Build
-        run: swift build
+        run: |
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBar \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
       - name: Test
-        run: swift test
+        run: |
+          mkdir -p build/TestResults
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBar \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/TestResults/PlexBar.xcresult \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Build and test Studio
+        run: |
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBarStudio \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/StudioDerivedData \
+            -resultBundlePath build/TestResults/PlexBarStudio.xcresult \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-test-results
+          path: build/TestResults/
+          retention-days: 7
+
+  tvos-build-and-test:
+    name: tvOS Build + Test
+    runs-on: xcode-27
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build and test Apple TV
+        run: |
+          mkdir -p build/TestResults
+          xcodebuild \
+            -project PlexBar.xcodeproj \
+            -scheme PlexBarTV \
+            -configuration Debug \
+            -destination 'platform=tvOS Simulator,name=Apple TV 4K (3rd generation),OS=latest' \
+            -derivedDataPath build/TVOSDerivedData \
+            -resultBundlePath build/TestResults/PlexBarTV.xcresult \
+            -clonedSourcePackagesDirPath .build/SourcePackages \
+            -onlyUsePackageVersionsFromResolvedFile \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: tvos-test-results
+          path: build/TestResults/
+          retention-days: 7

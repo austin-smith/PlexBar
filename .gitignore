@@ -2,9 +2,11 @@
 /.build
 /build
 /dist
-/Packages
+/Packages/**/.build/
+/Packages/**/.swiftpm/
 xcuserdata/
 DerivedData/
+*.xcresult
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
@@ -17,3 +19,6 @@ Icon[^a-zA-Z]
 
 # docs
 /docs/plans
+
+# Studio keeps unaccepted generations and local history out of version control.
+/PlexBar/Resources/MockServer/.studio/
